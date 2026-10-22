@@ -1,0 +1,69 @@
+# Linux 部署（仅手动触发）
+#
+# 2026-10-21 起本工作流不再负责「搬代码」：这台机器是 Windows / Linux 双启动，
+# 同一时刻只有一个系统在线，push 触发的自托管任务注定在对方离线时入队，
+# 只能排队到 24 小时过期（实测近 20 次 push 里 0 次真正合并）。
+# 代码同步已改为本地磁盘通道 scripts/sync/code_sync.py：
+#   Linux 启动前直连 Windows 工作副本、退出后写回同盘 hub；
+#   Windows 启动前从 hub 拉。三跳全在本地磁盘，不依赖网络与 runner 在线。
+#
+# 本工作流现在只做两件事：
+#   1. 用同一条本地通道把代码拉到最新（失败即中止，不再部署旧代码）；
+#   2. 调 scripts/deploy/deploy_linux.sh 把代码变成"在跑的新版本"。
+#
+# 不传 BASE_SHA：deploy_linux.sh 会把"有变化才做"的判断退化为"总是做"（保守）。
+name: Deploy Linux
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "确认部署（装依赖 / 重启服务）"
+        type: boolean
+        default: false
+      build_cpp:
+        description: "重新编译 C++ 调度器（默认关闭，当前基本不用）"
+        type: boolean
+        default: false
+      build_web:
+        description: "重新构建 Web 前端（默认关闭，默认前后端分离）"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: 部署（装依赖 / 重启服务）
+    if: inputs.deploy
+    runs-on: [self-hosted, Linux, X64]
+
+    steps:
+      - name: 同步代码到最新（本地通道，失败即中止）
+        shell: bash
+        # 退出码 2 = 被本地改动或分叉挡住；此时部署旧代码只会制造假象，直接失败。
+        # code_sync.py 只用标准库，系统 python3 即可。
+        run: |
+          set -euo pipefail
+          cd /home/user/xiaoyou-core
+          python3 scripts/sync/code_sync.py pull
+
+      - name: 执行部署脚本
+        shell: bash
+        env:
+          BUILD_CPP: ${{ inputs.build_cpp && '1' || '0' }}
+          BUILD_WEB: ${{ inputs.build_web && '1' || '0' }}
+
+        run: |
+          set -euo pipefail
+          repo="/home/user/xiaoyou-core"
+          cd "$repo"
+
+          if [ ! -f scripts/deploy/deploy_linux.sh ]; then
+            echo "错误：未找到 scripts/deploy/deploy_linux.sh"
+            exit 1
+          fi
+
+          echo "部署目标：$(git -c safe.directory="$repo" rev-parse --short HEAD)"
+          bash scripts/deploy/deploy_linux.sh
