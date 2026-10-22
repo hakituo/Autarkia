@@ -13,6 +13,70 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
+def _install_public_slice_stubs() -> None:
+    """公开切片专用：为未随发布外发的模块安装占位壳。
+
+    公开仓库不含角色资料（core/character）、角色日程引擎与私密 prompt 装配层，
+    但这些模块被大量单元测试引用。这里用 MetaPathFinder 注入轻量占位模块，
+    让测试可以正常导入与收集；被测逻辑本身仍走公开仓库里的真实实现。
+    私有主仓库中这些目录真实存在，本函数不会生效。
+    """
+    if (PROJECT_ROOT / "core" / "character").exists():
+        return
+
+    import importlib.abc
+    import importlib.machinery
+    import types
+    from unittest.mock import MagicMock
+
+    stub_prefixes = (
+        "core.character",
+        "core.services.character_daily",
+        "core.services.dual_role",
+        "core.agents.chat_agent_components.persona_system.prompt",
+        "core.services.study.signal_detector",
+        "config.character_daily_config",
+        "clients.bots.qq.media_tags",
+        "tools",
+        "scripts.import",
+    )
+
+    class _StubModule(types.ModuleType):
+        """占位模块：任意属性访问都返回可调用的 MagicMock。"""
+
+        def __getattr__(self, name):
+            if name == "__file__":
+                return f"<public-stub:{self.__name__}>"
+            if name.startswith("__") and name.endswith("__"):
+                raise AttributeError(name)
+            value = MagicMock(name=f"{self.__name__}.{name}")
+            setattr(self, name, value)
+            return value
+
+    class _StubFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
+        def find_spec(self, fullname, path=None, target=None):
+            if any(
+                fullname == prefix or fullname.startswith(prefix + ".")
+                for prefix in stub_prefixes
+            ):
+                return importlib.machinery.ModuleSpec(fullname, self, is_package=True)
+            return None
+
+        def create_module(self, spec):
+            module = _StubModule(spec.name)
+            module.__path__ = []
+            module.__file__ = f"<public-stub:{spec.name}>"
+            return module
+
+        def exec_module(self, module):
+            return None
+
+    sys.meta_path.insert(0, _StubFinder())
+
+
+_install_public_slice_stubs()
+
+
 def pytest_configure(config):
     """pytest 配置钩子"""
     # 配置测试发现路径
