@@ -1,14 +1,25 @@
 name: Public Slice Check
 
+# 仅服务于公开切片仓库（hakituo/Autarkia）。
+# 公开仓库是脱敏后的展示切片，不包含角色资料、运行配置与模型文件，
+# 完整流水线在私有主仓库执行；这里只做能稳定通过的结构性检查。
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   syntax:
-    # 仅在公开切片仓库运行；主仓库走 core-ci / android-ci 等完整流水线
+    name: Python 语法
     if: github.repository == 'hakituo/Autarkia'
     runs-on: ubuntu-latest
     steps:
@@ -16,14 +27,103 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.12"
 
-      - name: Python 语法检查
+      - name: 全量编译检查
         run: python -m compileall -q core routers memory clients config maintenance scripts tests
 
-      - name: 文档完整性
+      - name: 统计规模
         run: |
-          test -f readme.md
-          test -f PROJECT_TECHNICAL_REFERENCE.md
-          test -d docs/updates
-          test -d docs/API
+          py=$(find . -name "*.py" -not -path "./.git/*" | wc -l)
+          echo "Python 文件：${py}"
+
+  hygiene:
+    name: 切片完整性
+    if: github.repository == 'hakituo/Autarkia'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 角色资料未随发布
+        run: |
+          if [ -d core/character ]; then
+            echo "::error::core/character 不应出现在公开切片中"
+            exit 1
+          fi
+          echo "core/character 不存在 ✓"
+
+      - name: 敏感标识残留
+        run: |
+          if grep -rInE "Ling_b|Lin_b|Lin|某词|某生理词" \
+               --include="*.py" --include="*.md" --include="*.kt" \
+               --include="*.ts" --include="*.tsx" --include="*.json" \
+               --exclude-dir=".git" --exclude-dir=".github" --exclude-dir="node_modules" . ; then
+            echo "::error::检测到敏感标识残留"
+            exit 1
+          fi
+          echo "敏感标识扫描通过 ✓"
+
+      - name: 超大文件
+        run: |
+          big=$(find . -path ./.git -prune -o -type f -size +50M -print)
+          if [ -n "$big" ]; then
+            echo "::error::存在超过 50MB 的文件："
+            echo "$big"
+            exit 1
+          fi
+          echo "无超大文件 ✓"
+
+  docs:
+    name: 文档与配置
+    if: github.repository == 'hakituo/Autarkia'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 核心文档齐备
+        run: |
+          set -e
+          for f in readme.md readme.en.md PROJECT_TECHNICAL_REFERENCE.md UPDATES.md LICENSE; do
+            test -f "$f" || { echo "::error::缺少 $f"; exit 1; }
+          done
+          for d in docs/updates docs/API Question_Reviewer; do
+            test -d "$d" || { echo "::error::缺少目录 $d"; exit 1; }
+          done
+          echo "文档结构完整 ✓"
+
+      - name: 清单文件可解析
+        run: |
+          python - <<'PY'
+          import json
+          import tomllib
+          from pathlib import Path
+
+          json_files = [
+              "clients/frontend/aveline-web/package.json",
+              "clients/frontend/aveline-web/tsconfig.json",
+          ]
+          for rel in json_files:
+              json.loads(Path(rel).read_text(encoding="utf-8"))
+              print(f"JSON OK: {rel}")
+
+          tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          print("TOML OK: pyproject.toml")
+          PY
+
+      - name: 更新日志索引与文件一致
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          index = Path("docs/updates/README.md").read_text(encoding="utf-8")
+          listed = len(re.findall(r"^\|\s*\[", index, flags=re.M))
+          actual = len(list(Path("docs/updates").rglob("*.md"))) - 1
+          print(f"索引条目 {listed} / 实际文件 {actual}")
+          if listed == 0:
+              raise SystemExit("更新日志索引为空")
+          PY
