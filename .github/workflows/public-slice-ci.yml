@@ -49,9 +49,10 @@ jobs:
         run: |
           python -m pip install --quiet --upgrade pip
           python -m pip install --quiet \
-            pytest python-dotenv pyyaml structlog pytz \
+            pytest python-dotenv pyyaml structlog pytz tzlocal python-dateutil six \
             pydantic pydantic-settings fastapi aiofiles jinja2 \
-            APScheduler httpx python-multipart orjson aiohttp
+            APScheduler httpx python-multipart orjson aiohttp \
+            colorama colorlog
 
       - name: 运行不依赖重库的单元测试
         run: |
