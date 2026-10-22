@@ -1,0 +1,29 @@
+name: Public Slice Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax:
+    # 仅在公开切片仓库运行；主仓库走 core-ci / android-ci 等完整流水线
+    if: github.repository == 'hakituo/Autarkia'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Python 语法检查
+        run: python -m compileall -q core routers memory clients config maintenance scripts tests
+
+      - name: 文档完整性
+        run: |
+          test -f readme.md
+          test -f PROJECT_TECHNICAL_REFERENCE.md
+          test -d docs/updates
+          test -d docs/API
