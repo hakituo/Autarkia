@@ -295,4 +295,4 @@ def _mirror_table() -> Dict[str, str]:
             return dict(table)
     except Exception:  # noqa: BLE001 - 镜像表只是辅助推断，取不到走内置默认
         pass
-    return {"d:/ai/study": "~/Study"}
+    return {"d:/projects/study": "~/Study"}

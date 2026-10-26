@@ -407,6 +407,8 @@ def test_get_model_manager_caches_singleton(monkeypatch):
 
 def test_module_import_fallbacks_when_optional_deps_missing(monkeypatch):
     """torch / watchdog 缺失时模块应降级为 None / object（导入期兜底分支）。"""
+    if mm.torch is None:
+        pytest.skip("torch 未安装：真实模块本身已是兜底态，无法验证探针不污染真实模块")
     filename = os.path.abspath(mm.__file__)
     code = compile(Path(filename).read_text(encoding="utf-8"), filename, "exec")
     namespace = {"__name__": "core.core_engine.model_manager_probe", "__file__": filename}

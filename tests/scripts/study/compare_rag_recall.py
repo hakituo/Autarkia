@@ -37,7 +37,7 @@ CASES = [
 def main() -> int:
     from core.services.study.rag import RetrievalQuery, StudyLibrary
 
-    root = Path("D:/AI/Study")
+    root = Path("D:/projects/study")
     library = StudyLibrary()
 
     ingested = 0

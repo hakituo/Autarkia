@@ -12,6 +12,8 @@ from __future__ import annotations
 import sys
 from unittest.mock import MagicMock
 
+import pytest
+
 import core.modules.llm.model_loader as model_loader
 from core.modules.llm.model_loader import ModelLoader
 
@@ -349,6 +351,8 @@ def test_module_level_optional_imports_fall_back_to_none(monkeypatch):
     ``spec_from_file_location`` 把被测文件加载成**独立模块对象**执行，
     避免污染真实模块的全局状态。
     """
+    if model_loader.AutoModelForCausalLM is None:
+        pytest.skip("transformers 未安装：真实模块本身已是兜底态，无法验证探针不污染真实模块")
     import importlib.util
 
     probe_name = "core.modules.llm._model_loader_import_probe"

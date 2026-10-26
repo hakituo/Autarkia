@@ -934,7 +934,7 @@ def get_background_circle_dir() -> Path:
 
 # ── Study Daily 辅助函数 ────────────────────────────────────
 
-#: Windows 盘符绝对路径（如 D:\projects\study、D:/AI/Study）
+#: Windows 盘符绝对路径（如 D:\projects\study、D:/projects/study）
 _WINDOWS_ABS_PATH_RE = re.compile(r"^([A-Za-z]):[\\/]+(.*)$")
 
 #: Windows 盘符路径在 POSIX 平台的镜像位置（按数据迁移后的实际目录布局维护）。
@@ -942,7 +942,7 @@ _WINDOWS_ABS_PATH_RE = re.compile(r"^([A-Za-z]):[\\/]+(.*)$")
 #: - POSIX 平台：同一配置值按本表重定向到本机镜像目录（~ 相对用户家目录展开）。
 #: key 一律归一化为小写 + 正斜杠后查表。
 _POSIX_WINDOWS_PATH_MIRRORS: dict[str, str] = {
-    "d:/ai/study": "~/Study",
+    "d:/projects/study": "~/Study",
 }
 
 

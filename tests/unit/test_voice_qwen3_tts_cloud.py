@@ -23,9 +23,15 @@ import io
 
 import numpy as np
 import pytest
-import soundfile as sf
 
 from core.voice import qwen3_tts_cloud as qc
+
+try:
+    import soundfile as sf
+except ImportError:  # voice extra 未安装：整文件跳过，避免轻量 CI 收集失败
+    sf = None
+
+pytestmark = pytest.mark.skipif(sf is None, reason="soundfile 属于 voice extra，未安装")
 
 
 # ============================================================

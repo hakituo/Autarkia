@@ -70,7 +70,7 @@ ASSISTANT_ASK = (
 )
 ANSWER = "位移是负的话，弹力应该朝正方向，因为 -kx 前面那个负号把方向翻过来了"
 
-REAL_STUDY_ROOT = Path("D:/AI/Study")
+REAL_STUDY_ROOT = Path("D:/projects/study")
 
 # ----------------------------------------------------------------------
 # 多轮场景：一次更接近真实的辅导对话

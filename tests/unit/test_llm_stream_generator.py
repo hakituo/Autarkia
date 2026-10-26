@@ -1582,6 +1582,8 @@ def test_module_import_guard_without_transformers(monkeypatch):
     本环境 transformers 已安装，因此用 sys.modules 屏蔽后 reload 触发。
     测试结束务必恢复（finally 中 reload 回来）。
     """
+    if sg.TextIteratorStreamer is None:
+        pytest.skip("transformers 未安装：模块本身已是兜底态，无法验证 reload 恢复")
     import importlib
 
     monkeypatch.setitem(sys.modules, "transformers", None)

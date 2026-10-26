@@ -30,7 +30,7 @@ def test_windows_study_root_mirrors_to_home_study():
 
 @pytest.mark.parametrize(
     "raw",
-    [r"D:\projects\study", "D:/AI/Study", r"d:\ai\study", "d:/ai/study"],
+    [r"D:\projects\study", "D:/projects/study", r"d:\projects\study", "d:/projects/study"],
 )
 def test_windows_path_slash_and_case_normalization(raw):
     """正反斜杠与大小写差异归一化后命中同一条镜像。"""
