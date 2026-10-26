@@ -18,7 +18,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -55,6 +57,22 @@ class VoiceInputManager @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var sherpaObserverJob: Job? = null
+
+    /**
+     * 首次开录前的模型加载协程。
+     *
+     * 模型从 assets 加载要 1~3s，原来是在主线程上做的，用户点麦克风后整个界面先僵住几秒。
+     * 现在拆成后台协程；用户在加载期间又点了一次停止时靠 cancel 这次启动。
+     */
+    private var sherpaStartJob: Job? = null
+
+    init {
+        // 聊天页 / 悬浮助手一建起来就后台预热模型：真等用户点麦克风才加载，
+        // 那一下仍然会慢一拍。asrProvider=system 的机器不加载端侧模型。
+        if (appPreferences.asrProvider != "system") {
+            scope.launch { sherpaNcnnEngine.initialize() }
+        }
+    }
 
     // ── System SpeechRecognizer (fallback) ──────────────
     private var speechRecognizer: SpeechRecognizer? = null
@@ -134,17 +152,39 @@ class VoiceInputManager @Inject constructor(
     // ── sherpa-ncnn 通道 ─────────────────────────────────
 
     private fun startSherpaNcnn() {
-        // 先初始化引擎 (加载模型, 耗时但只首次)
-        if (!sherpaNcnnEngine.initialize()) {
-            Log.w(TAG, "sherpa-ncnn 初始化失败, 降级 system")
-            activeEngine = "system"
-            startSystemSpeechRecognizer()
+        attachSherpaObservers()
+
+        if (sherpaNcnnEngine.isModelLoaded()) {
+            sherpaNcnnEngine.startListening()
             return
         }
 
-        // 观察 sherpa 引擎状态, 转发到本管理器的 state
-        // partialText / amplitude 挂进同一个 job: 每次开录都新起一组 collector 的话,
-        // 录多次后会同时有多组协程往同一个 StateFlow 写, 属于协程泄漏
+        // 首次使用还没加载模型：放到后台加载完再开录，全程不占主线程
+        sherpaStartJob?.cancel()
+        sherpaStartJob = scope.launch {
+            if (!sherpaNcnnEngine.initialize()) {
+                Log.w(TAG, "sherpa-ncnn 初始化失败, 降级 system")
+                activeEngine = "system"
+                detachSherpaObservers()
+                // SpeechRecognizer 必须在有 Looper 的线程上创建
+                withContext(Dispatchers.Main.immediate) {
+                    startSystemSpeechRecognizer()
+                }
+                return@launch
+            }
+            // 加载期间用户可能已经点了停止，别再自己开录
+            if (!isActive) return@launch
+            sherpaNcnnEngine.startListening()
+        }
+    }
+
+    /**
+     * 观察 sherpa 引擎状态, 转发到本管理器的 state。
+     *
+     * partialText / amplitude 挂进同一个 job: 每次开录都新起一组 collector 的话,
+     * 录多次后会同时有多组协程往同一个 StateFlow 写, 属于协程泄漏。
+     */
+    private fun attachSherpaObservers() {
         sherpaObserverJob?.cancel()
         sherpaObserverJob = scope.launch {
             launch {
@@ -163,8 +203,11 @@ class VoiceInputManager @Inject constructor(
                 }
             }
         }
+    }
 
-        sherpaNcnnEngine.startListening()
+    private fun detachSherpaObservers() {
+        sherpaObserverJob?.cancel()
+        sherpaObserverJob = null
     }
 
     // ── System SpeechRecognizer 通道 (原有逻辑) ──────────
@@ -179,9 +222,10 @@ class VoiceInputManager @Inject constructor(
             return
         }
 
-        // 清理 sherpa 观察协程
-        sherpaObserverJob?.cancel()
-        sherpaObserverJob = null
+        // 清理 sherpa 观察协程与可能还在跑的模型加载
+        detachSherpaObservers()
+        sherpaStartJob?.cancel()
+        sherpaStartJob = null
 
         speechRecognizer?.destroy()
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
@@ -251,21 +295,36 @@ class VoiceInputManager @Inject constructor(
     }
 
     fun stopListening() {
+        // 模型还在加载时用户就点了停止：撤掉这次启动，别加载完又自己开录
+        sherpaStartJob?.cancel()
+        sherpaStartJob = null
+
         when (activeEngine) {
             "sherpa_ncnn" -> {
                 sherpaNcnnEngine.stopListening()
                 // state 已通过 observer 转发
             }
             else -> {
-                speechRecognizer?.stopListening()
+                // 系统识别器要等 onResults 才回最终结果：先把状态切到 Processing，
+                // 输入栏立刻退出录音态（文本在点「完成」那一刻就已经落进输入框了）
+                _state.value = VoiceInputState.Processing
                 _amplitude.value = 0f
+                speechRecognizer?.stopListening()
             }
         }
     }
 
     fun cancel() {
         when (activeEngine) {
-            "sherpa_ncnn" -> sherpaNcnnEngine.cancel()
+            "sherpa_ncnn" -> {
+                // 模型还在加载就取消了：别让它加载完又自己开录
+                sherpaStartJob?.cancel()
+                sherpaStartJob = null
+                sherpaNcnnEngine.cancel()
+                _state.value = VoiceInputState.Idle
+                _partialText.value = ""
+                _amplitude.value = 0f
+            }
             else -> {
                 speechRecognizer?.cancel()
                 _state.value = VoiceInputState.Idle
@@ -285,8 +344,9 @@ class VoiceInputManager @Inject constructor(
     }
 
     fun destroy() {
-        sherpaObserverJob?.cancel()
-        sherpaObserverJob = null
+        detachSherpaObservers()
+        sherpaStartJob?.cancel()
+        sherpaStartJob = null
         speechRecognizer?.destroy()
         speechRecognizer = null
         sherpaNcnnEngine.destroy()

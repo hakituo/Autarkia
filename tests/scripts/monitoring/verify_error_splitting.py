@@ -10,7 +10,7 @@ r"""
 4. .gitignore 中 logs/upstream_errors/ 规则存在
 
 运行：
-    D:\projects\xiaoyou\venv_core\Scripts\python.exe tests\scripts\monitoring\verify_error_splitting.py
+    D:\AI\autarkia\venv_core\Scripts\python.exe tests\scripts\monitoring\verify_error_splitting.py
 """
 
 import json

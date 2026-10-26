@@ -12,6 +12,25 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# 共享 fixture 按职责拆到同目录的独立模块；这里显式导入，pytest 会把导入的 fixture 注册到 conftest。
+TESTS_DIR = Path(__file__).resolve().parent
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
+
+from autarkia_pytest_isolations import (  # noqa: E402,F401
+    _daily_submodules_follow_facade_clock,
+    _reset_current_channel,
+    _reset_note_retrieval_cache,
+    _reset_offline_role_prefix_cache,
+    _reset_segment_extractor_registry,
+    _reset_topology_tree_registry,
+)
+from autarkia_pytest_sandboxes import (  # noqa: E402,F401
+    agenda_sandbox,
+    fake_agenda_ladder,
+    study_sandbox,
+)
+
 
 def _install_public_slice_stubs() -> None:
     """公开切片专用：为未随发布外发的模块安装占位壳。

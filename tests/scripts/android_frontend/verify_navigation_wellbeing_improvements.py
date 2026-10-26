@@ -23,11 +23,14 @@ def require(condition: bool, message: str) -> None:
 
 def verify_drawer_gesture() -> None:
     source = read("presentation/MainActivity.kt")
+    # 2026-10-23：侧栏接线从 MainActivity 抽到 AdaptiveAppShell（宽窗口换成常驻导航栏），
+    # 窄窗口仍由 PullableNavigationDrawer 承载，这里跟着检查新宿主。
+    shell = read("presentation/components/AdaptiveAppShell.kt")
     drawer = read("presentation/components/PullableNavigationDrawer.kt")
     swipe_defaults = read("presentation/components/SwipeGestureDefaults.kt")
     require("POSITIONAL_THRESHOLD_RATIO = 0.12f" in swipe_defaults, "侧栏与详情页的打开阈值不再统一")
-    require("PullableNavigationDrawer(" in source, "主页没有使用可跟手侧边栏")
-    require("ModalNavigationDrawer(" not in source, "仍在使用无法注入连续位移的 Material Drawer")
+    require("PullableNavigationDrawer(" in shell, "主页没有使用可跟手侧边栏")
+    require("ModalNavigationDrawer(" not in source + shell, "仍在使用无法注入连续位移的 Material Drawer")
     require("AnchoredDraggableState" in drawer, "侧边栏没有统一的锚点拖拽状态")
     require(".anchoredDraggable(" in drawer, "主页直接拖拽没有驱动侧边栏位移")
     require("NestedScrollConnection" in drawer, "缺少 Pager 边界 NestedScroll 仲裁")
@@ -130,7 +133,7 @@ def verify_backend_model_selection() -> None:
 def verify_shop_cache() -> None:
     repository_contract = read("domain/repository/ShopRepository.kt")
     repository = read("data/repository/ShopRepositoryImpl.kt")
-    view_model = read("presentation/shop/ShopViewModel.kt")
+    view_model = read("presentation/mall/ShopViewModel.kt")
     nav_graph = read("presentation/navigation/NavGraph.kt")
 
     require("data class ShopCacheSnapshot" in repository_contract, "商城仓库没有可跨 ViewModel 恢复的分页快照")
@@ -145,12 +148,43 @@ def verify_shop_cache() -> None:
     require("onRefresh = shopViewModel::refreshItems" not in nav_graph, "商城顶栏仍保留手动刷新入口")
 
 
+def verify_mall_redesign() -> None:
+    """2026-10-26 设计稿改版：一行一件、纯文字类目、底部面板、库存独立页。"""
+    mall_screen = read("presentation/mall/MallScreen.kt")
+    item_row = read("presentation/mall/ShopItemRow.kt")
+    sheet = read("presentation/mall/MallSheetScaffold.kt")
+    inventory = read("presentation/mall/InventoryScreen.kt")
+    mall_graph = read("presentation/navigation/graph/MallGraph.kt")
+    nav_graph = read("presentation/navigation/NavGraph.kt")
+
+    old_source = ANDROID_SOURCE / "presentation/food"
+    require(
+        not old_source.exists() or not any(old_source.glob("*.kt")),
+        "旧的食物商城源码仍然存在",
+    )
+    require("MallCategoryTabs(" in mall_screen, "商城没有纯文字类目 Tab")
+    require("ShopItemRow(" in mall_screen, "商城列表没有改成一行一件")
+    require("formatCoins(shopUiState.balance.coins)" in mall_screen, "页头没有常驻余额")
+    require("balance.coins >= item.price" in mall_screen, "买不起的商品没有走价格变灰口径")
+    require("item.isFood" in item_row and 'text = "食用"' in item_row, "食物行缺少「食用」入口")
+    require("item.icon" not in item_row, "商品行仍在使用类别表情")
+    require("ModalBottomSheet" in sheet, "购买 / 食用 / 送出没有统一底部面板")
+    require(
+        "AlertDialog" not in mall_screen + item_row + sheet + inventory,
+        "商城仍残留 AlertDialog 弹窗",
+    )
+    require("RecipientPickerSheet(" in mall_screen, "食用没有走选人面板")
+    require("InventoryRow(" in inventory and "RecipientPickerSheet(" in inventory, "库存页没有逐行送出")
+    require('const val INVENTORY = "inventory"' in nav_graph, "库存没有独立路由")
+    require("Routes.INVENTORY" in mall_graph and "InventoryScreen(" in mall_graph, "导航图没有接库存页")
+
+
 def verify_refresh_buttons_removed() -> None:
     """子栏目顶栏不再放刷新键，改为进页面/回前台自动刷新。"""
     screens = {
         "Life": "presentation/life/LifeScreen.kt",
         "Study": "presentation/study/StudyScreenV2.kt",
-        "Mall": "presentation/food/FoodScreen.kt",
+        "Mall": "presentation/mall/MallScreen.kt",
         "Wellbeing": "presentation/wellbeing/WellbeingScreen.kt",
     }
     for name, relative_path in screens.items():
@@ -158,7 +192,7 @@ def verify_refresh_buttons_removed() -> None:
 
     life_screen = read("presentation/life/LifeScreen.kt")
     study_screen = read("presentation/study/StudyScreenV2.kt")
-    mall_screen = read("presentation/food/FoodScreen.kt")
+    mall_screen = read("presentation/mall/MallScreen.kt")
     nav_graph = read("presentation/navigation/NavGraph.kt")
     daily_view_model = read("presentation/health/DailyDataViewModel.kt")
     require("onManualRefresh" not in life_screen + nav_graph, "Life 仍保留手动强制刷新入口")
@@ -177,8 +211,9 @@ def main() -> None:
     verify_wellbeing_enforcement()
     verify_backend_model_selection()
     verify_shop_cache()
+    verify_mall_redesign()
     verify_refresh_buttons_removed()
-    print("Android 前端静态验证通过：商城缓存、手势独占、后端模型同步、侧边栏与伴侣详情跟手拖拽、圈子清理、数字健康即时执行、子栏目刷新键移除均已落地。")
+    print("Android 前端静态验证通过：商城缓存与列表改版、手势独占、后端模型同步、侧边栏与伴侣详情跟手拖拽、圈子清理、数字健康即时执行、子栏目刷新键移除均已落地。")
 
 
 if __name__ == "__main__":

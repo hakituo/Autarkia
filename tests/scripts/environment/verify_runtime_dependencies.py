@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import importlib.metadata
 import importlib.util
+import os
 import subprocess
 import sys
 from collections import Counter
@@ -86,9 +87,17 @@ def _verify_requirement_files() -> None:
     assert "--index-url https://download.pytorch.org/whl/cu128" in gpu_text
 
 
+def _site_packages_dir() -> Path:
+    """当前解释器的 site-packages：Windows 用 Lib，Linux/macOS 用 lib/pythonX.Y。"""
+    if os.name == "nt":
+        return Path(sys.prefix) / "Lib" / "site-packages"
+    version = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    return Path(sys.prefix) / "lib" / version / "site-packages"
+
+
 def _verify_environment(expected_environment: str) -> None:
     """验证当前解释器的包元数据和关键运行时。"""
-    site_packages = Path(sys.prefix) / "Lib" / "site-packages"
+    site_packages = _site_packages_dir()
     invalid_entries = sorted(
         item.name for item in site_packages.iterdir() if item.name.startswith(("~", "-"))
     )

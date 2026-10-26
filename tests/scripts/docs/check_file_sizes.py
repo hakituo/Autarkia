@@ -94,6 +94,8 @@ SKIP_DIRS = {
     ".git",
     "build",
     "build_vs18",
+    "build_vs17",
+    "third_party",
     "dist",
     "__pycache__",
     ".gradle",

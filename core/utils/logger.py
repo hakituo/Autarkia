@@ -186,7 +186,7 @@ def format_log_message(message: str, **kwargs) -> str:
 
 
 # 提供一个默认的根日志记录器
-default_logger = get_logger("xiaoyou_core")
+default_logger = get_logger("autarkia")
 
 
 # 初始化日志脱敏系统
@@ -224,35 +224,35 @@ def init_logging_system():
 def debug(message: str, **kwargs):
     """调试日志"""
     if _has_sanitizer:
-        message = sanitize_log(message, "xiaoyou_core")
+        message = sanitize_log(message, "autarkia")
     default_logger.debug(format_log_message(message, **kwargs))
 
 
 def info(message: str, **kwargs):
     """信息日志"""
     if _has_sanitizer:
-        message = sanitize_log(message, "xiaoyou_core")
+        message = sanitize_log(message, "autarkia")
     default_logger.info(format_log_message(message, **kwargs))
 
 
 def warning(message: str, **kwargs):
     """警告日志"""
     if _has_sanitizer:
-        message = sanitize_log(message, "xiaoyou_core")
+        message = sanitize_log(message, "autarkia")
     default_logger.warning(format_log_message(message, **kwargs))
 
 
 def error(message: str, **kwargs):
     """错误日志"""
     if _has_sanitizer:
-        message = sanitize_log(message, "xiaoyou_core")
+        message = sanitize_log(message, "autarkia")
     default_logger.error(format_log_message(message, **kwargs))
 
 
 def critical(message: str, **kwargs):
     """严重错误日志"""
     if _has_sanitizer:
-        message = sanitize_log(message, "xiaoyou_core")
+        message = sanitize_log(message, "autarkia")
     default_logger.critical(format_log_message(message, **kwargs))
 
 

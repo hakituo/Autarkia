@@ -7,10 +7,6 @@ import time
 from typing import Dict, List, Optional
 
 import numpy as np
-import onnxruntime as ort
-# 直接从子模块导入，绕过 transformers 5.x _LazyModule 的延迟加载机制
-# 避免在 asyncio.to_thread 多线程环境下触发竞态条件导致 ImportError
-from transformers.models.auto.tokenization_auto import AutoTokenizer
 
 from .bert_definitions import (
     CATEGORY_DEFINITIONS,
@@ -48,6 +44,14 @@ class BertRuntimeMixin:
         try:
             t_start = time.time()
             logger.info("Loading BERT ONNX model from %s...", self.model_path)
+
+            # 延迟导入：transformers 会连带拉起 torch / sklearn / tokenizers（实测约 8 秒），
+            # 只在真正加载 BERT 时才需要。放在函数内后，测试收集和只做正则/规则判断的
+            # 轻量路径不必再付这笔导入成本。
+            # 直接从子模块导入，绕过 transformers 5.x _LazyModule 的延迟加载机制，
+            # 避免在 asyncio.to_thread 多线程环境下触发竞态条件导致 ImportError。
+            from transformers.models.auto.tokenization_auto import AutoTokenizer
+            import onnxruntime as ort
 
             sess_options = ort.SessionOptions()
             sess_options.intra_op_num_threads = 4

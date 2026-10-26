@@ -31,8 +31,8 @@ from core.services.character_daily.interrupt_window import (
 )
 from core.services.character_daily.reply_policy import evaluate_reply_state
 from core.services.character_daily.config import ReplyPolicyConfig
-from routers.v1.life import interrupt_current_activity, skip_current_activity
-from routers.v1.life import ActivityInterruptRequest, ActivitySkipRequest
+from routers.v1.life_activity import interrupt_current_activity, skip_current_activity
+from routers.v1.life_shared import ActivityInterruptRequest, ActivitySkipRequest
 
 
 def _make_skip_request(conversation_id: str) -> ActivitySkipRequest:

@@ -33,10 +33,7 @@ async def test_force_send_passes_explicit_persona_and_reports_delivery():
         )
 
     executor.trigger_message.assert_awaited_once()
-    assert (
-        executor.trigger_message.await_args.kwargs["profile_filename"]
-        == "core_ye.json"
-    )
+    assert executor.trigger_message.await_args.kwargs["profile_filename"] == "core_ye.json"
     assert result["status"] == "success"
     assert result["data"]["delivered"] is True
     assert result["data"]["profile_filename"] == "core_ye.json"

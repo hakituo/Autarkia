@@ -42,26 +42,26 @@ def load_multi_config():
         sys.exit(1)
 
     # 环境变量覆盖（保留原逻辑：QQAdapterConfig.from_dict 不读 env，需在外部覆盖）
-    master_qq_id = os.getenv("XIAOYOU_QQ_MASTER_ID", "").strip()
-    xiaoyou_access_token = os.getenv("XIAOYOU_ACCESS_TOKEN", "").strip()
+    master_qq_id = os.getenv("AUTARKIA_QQ_MASTER_ID", "").strip()
+    autarkia_access_token = os.getenv("AUTARKIA_ACCESS_TOKEN", "").strip()
     napcat_access_token = os.getenv("NAPCAT_ACCESS_TOKEN", "").strip()
-    group_id = os.getenv("XIAOYOU_QQ_GROUP_ID", "").strip()
+    group_id = os.getenv("AUTARKIA_QQ_GROUP_ID", "").strip()
     # 向后兼容:aveline/ling 用旧 env var 名
-    aveline_qq = os.getenv("XIAOYOU_QQ_BOT_NUMBER", "").strip()
-    ling_qq = os.getenv("XIAOYOU_QQ_BOT_NUMBER_LING", "").strip()
+    aveline_qq = os.getenv("AUTARKIA_QQ_BOT_NUMBER", "").strip()
+    ling_qq = os.getenv("AUTARKIA_QQ_BOT_NUMBER_LING", "").strip()
 
-    # N 角色通用:收集每个角色自己的 QQ 号(从 env var XIAOYOU_QQ_BOT_NUMBER_{ROLE_ID_UPPER})
+    # N 角色通用:收集每个角色自己的 QQ 号(从 env var AUTARKIA_QQ_BOT_NUMBER_{ROLE_ID_UPPER})
     # 注意:角色自己的 QQ 号不存到 QQAdapterConfig(无该字段),仅用于填充其他角色的 peer_qq_id
     # 向后兼容:aveline/ling 已单独读取
     role_own_qq = {
         "aveline": aveline_qq,
         "ling": ling_qq,
     }
-    # 扫描所有 XIAOYOU_QQ_BOT_NUMBER_* 环境变量
+    # 扫描所有 AUTARKIA_QQ_BOT_NUMBER_* 环境变量
     for env_key, env_val in os.environ.items():
-        if env_key.startswith("XIAOYOU_QQ_BOT_NUMBER_"):
+        if env_key.startswith("AUTARKIA_QQ_BOT_NUMBER_"):
             # 提取 role_id(去掉前缀,转小写)
-            role_suffix = env_key[len("XIAOYOU_QQ_BOT_NUMBER_"):].lower()
+            role_suffix = env_key[len("AUTARKIA_QQ_BOT_NUMBER_"):].lower()
             if role_suffix and env_val.strip():
                 role_own_qq[role_suffix] = env_val.strip()
 
@@ -72,8 +72,8 @@ def load_multi_config():
         cfg = QQAdapterConfig.from_dict(role_cfg, role_id=role_id)
         if master_qq_id and not cfg.master_qq_id:
             cfg.master_qq_id = master_qq_id
-        if xiaoyou_access_token and not cfg.xiaoyou_access_token:
-            cfg.xiaoyou_access_token = xiaoyou_access_token
+        if autarkia_access_token and not cfg.autarkia_access_token:
+            cfg.autarkia_access_token = autarkia_access_token
         if napcat_access_token and not cfg.napcat_access_token:
             cfg.napcat_access_token = napcat_access_token
         if group_id and not cfg.group_id:

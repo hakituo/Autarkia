@@ -13,9 +13,9 @@ class MemorySettings(BaseSettings):
     """内存管理配置"""
 
     # 对话历史配置
-    short_term_capacity: int = Field(default=60, description="短期记忆容量（内存中保留的最大条数）")
+    short_term_capacity: int = Field(default=120, description="短期记忆容量（内存中保留的最大条数，120 条≈60 轮）")
     long_term_capacity: int = Field(default=100000, description="长期记忆容量（基本不限制）")
-    trim_threshold: int = Field(default=60, description="短期记忆修剪触发阈值，超过此数量触发修剪")
+    trim_threshold: int = Field(default=120, description="短期记忆修剪触发阈值，超过此数量触发修剪")
     history_dir: str = Field(default="", description="运行时目录基类（留空时各模块回退到 'runtime'）；实际由 preference_manager/session_manager/vocabulary/metacognition/user_physiology 等模块使用")
     auto_save_interval: int = Field(default=300, description="自动保存间隔(秒)")
     history_cleanup_interval_seconds: float = Field(
@@ -39,6 +39,12 @@ class MemorySettings(BaseSettings):
     )
     enable_user_daily_summary_generation: bool = Field(
         default=True, description="是否允许为用户自动生成每日总结/日记"
+    )
+
+    # 派生笔记检索（v3 G）：search_memory 先查每段梗概（BM25 + 向量），再补旧加权记忆与原文。
+    # 笔记库为空时等于没开；关掉即退回旧检索，无需改数据。
+    notes_retrieval_enabled: bool = Field(
+        default=True, description="search_memory 是否优先检索按段梗概（派生笔记库）"
     )
 
     # 内存管理配置

@@ -23,17 +23,6 @@ enum class ShopCategory {
             LUXURY -> "奢侈品"
         }
 
-    val icon: String
-        get() = when (this) {
-            FOOD -> "🍔"
-            GIFT -> "🎁"
-            TOY -> "🧸"
-            BOOK -> "📚"
-            CLOTHING -> "👗"
-            TECH -> "📱"
-            LUXURY -> "💎"
-        }
-
     companion object {
         fun fromString(cat: String?): ShopCategory? = when (cat?.lowercase()?.trim()) {
             "food" -> FOOD
@@ -88,14 +77,6 @@ enum class ItemRarity {
             RARE -> "稀有"
             EPIC -> "史诗"
             LEGENDARY -> "传说"
-        }
-
-    val icon: String
-        get() = when (this) {
-            COMMON -> ""
-            RARE -> "⭐"
-            EPIC -> "💜"
-            LEGENDARY -> "💛"
         }
 
     companion object {

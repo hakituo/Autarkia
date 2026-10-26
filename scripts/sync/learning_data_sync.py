@@ -16,9 +16,9 @@
 用法示例::
 
     # Windows：把学习数据推到 G 盘中转目录
-    python scripts/sync/learning_data_sync.py --hub G:\\xiaoyou-sync --apply
+    python scripts/sync/learning_data_sync.py --hub G:\\Autarkia-sync --apply
     # Linux：挂载 G 盘后拉回本机
-    python scripts/sync/learning_data_sync.py --hub /mnt/G/xiaoyou-sync --apply
+    python scripts/sync/learning_data_sync.py --hub /mnt/G/Autarkia-sync --apply
 
 详见 ``scripts/sync/README.md``。
 """
@@ -67,8 +67,9 @@ from scripts.sync.learning_data.transfer import (  # noqa: E402
 
 logger = get_logger("LearningDataSync")
 
-#: 中转目录路径的环境变量兜底，便于把同步挂进启动脚本
-HUB_ENV = "XIAOYOU_LEARNING_SYNC_HUB"
+#: 中转目录路径的环境变量兜底（新名优先、旧名兼容），便于把同步挂进启动脚本
+HUB_ENV = "AUTARKIA_LEARNING_SYNC_HUB"
+HUB_ENV_LEGACY = "XIAOYOU_LEARNING_SYNC_HUB"
 
 #: 基准根 → 显式指定对端目录用的命令行参数
 _PEER_FLAG_OF = {
@@ -123,7 +124,9 @@ def _group_names() -> List[str]:
 
 def build_peer_layout(args: argparse.Namespace) -> Optional[PeerLayout]:
     """按参数构造对端布局；无法确定对端时返回 None。"""
-    hub = args.hub or os.environ.get(HUB_ENV, "").strip()
+    hub = args.hub or (
+        os.environ.get(HUB_ENV) or os.environ.get(HUB_ENV_LEGACY) or ""
+    ).strip()
     if not hub:
         # 配了跨系统共享根时默认用它下面的 learning_hub，两个系统天然对上同一个目录
         from core.utils.shared_roots import get_learning_hub_root

@@ -6,6 +6,7 @@
 llama_cpp / transformers / torch / psutil 全部以替身注入，不加载真实模型、
 不使用 GPU、不发网络请求；所有文件 IO 落在 pytest 的 tmp_path 内。
 """
+
 from __future__ import annotations
 
 import sys
@@ -113,9 +114,7 @@ class _FakeTorch:
     """torch 替身，只提供被测代码会读到的属性。"""
 
     def __init__(self, available=True, error=None, empty_cache_error=None):
-        self.cuda = _FakeCuda(
-            available=available, error=error, empty_cache_error=empty_cache_error
-        )
+        self.cuda = _FakeCuda(available=available, error=error, empty_cache_error=empty_cache_error)
         self.float16 = "float16"
         self.bfloat16 = "bfloat16"
         self.float32 = "float32"
@@ -330,9 +329,7 @@ def test_transformers_loads_model_and_tokenizer(monkeypatch):
     assert module.model == "model-on-cpu"
     assert module.is_loaded is True
 
-    tokenizer_cls.from_pretrained.assert_called_once_with(
-        "model_dir", local_files_only=True
-    )
+    tokenizer_cls.from_pretrained.assert_called_once_with("model_dir", local_files_only=True)
     model_cls.from_pretrained.assert_called_once_with(
         "model_dir",
         low_cpu_mem_usage=True,

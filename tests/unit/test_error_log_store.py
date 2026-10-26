@@ -51,7 +51,10 @@ def test_error_log_store_basic():
         assert errors[0]["error_message"] == "处理消息时出错: 模型加载失败", "错误消息应该一致"
         assert errors[0]["error_code"] == "MODEL_LOAD_ERROR", "错误码应该一致"
         assert errors[0]["user_message"] == "这是一条测试用户消息", "用户消息应该保存"
-        assert errors[0]["error_details"] == {"model": "gpt-4", "retry_count": 3}, "错误详情应该保存"
+        assert errors[0]["error_details"] == {
+            "model": "gpt-4",
+            "retry_count": 3,
+        }, "错误详情应该保存"
         assert errors[0]["message_id"] == "msg_12345", "message_id 应该保存"
 
 
@@ -70,9 +73,7 @@ def test_error_log_store_file_location():
         )
 
         now = get_current_time()
-        error_file = (
-            Path(tmpdir) / str(now.year) / str(now.month) / str(now.day) / "error.log"
-        )
+        error_file = Path(tmpdir) / str(now.year) / str(now.month) / str(now.day) / "error.log"
         assert error_file.exists(), f"错误日志文件应该位于 {error_file}"
 
         entry = json.loads(error_file.read_text(encoding="utf-8").strip())

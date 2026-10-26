@@ -7,8 +7,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.aveline.ai.mobile.presentation.theme.EmotionRed
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Danger
+import com.aveline.ai.mobile.presentation.theme.Accent
 
 /**
  * 悬浮窗里的助手胶囊内容。
@@ -28,12 +28,12 @@ import com.aveline.ai.mobile.presentation.theme.Primary
 fun AssistantCapsuleOverlay(
     viewModel: AssistantCapsuleViewModel,
     modifier: Modifier = Modifier,
-    accent: Color = Primary,
+    accent: Color = Accent,
     onDrag: (deltaXPx: Float, deltaYPx: Float) -> Unit = { _, _ -> },
     onDragEnd: () -> Unit = {}
 ) {
     val stage by viewModel.stage.collectAsStateWithLifecycle()
-    val effectiveAccent = if (stage is AssistantCapsuleStage.Failed) EmotionRed else accent
+    val effectiveAccent = if (stage is AssistantCapsuleStage.Failed) Danger else accent
 
     // 这里绝对不能用 fillMaxSize：窗口是 WRAP_CONTENT 的，内容一旦去填满父容器，
     // 测量结果会一路顶到整屏，窗口就变成全屏窗口 —— 空白区域开始吃触摸，

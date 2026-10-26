@@ -2,9 +2,9 @@
 
 验证项：
 1. 索引文件存在性检查（无索引时跳过相关测试，不报错）
-2. pick_meme_by_semantic 基础检索
+2. pick_meme_by_semantic 基础检索（默认阈值 0.60）
 3. 媒体标签 [MEME:语义] 端到端（通过 media_tags.pick_meme_image）
-4. fallback 行为（语义无候选时回退 random）
+4. 低相似度查询直接不发（0.5x 的无关匹配不得发图）
 5. LRU 去重生效
 
 运行：
@@ -42,15 +42,15 @@ def test_basic_search() -> bool:
     print(f"[INFO] 索引状态: {get_status()}")
 
     queries = [
-        "刚解决问题如释重负",
-        "被萌到捂心口",
-        "得意地叉腰笑",
+        "委屈想哭",
+        "害羞脸红",
+        "开心大笑",
         "生气地瞪着",
-        "委屈巴巴地看着",
+        "惊讶震惊",
     ]
     success = 0
     for q in queries:
-        result = pick_meme_by_semantic(q, top_k=5, min_similarity=0.15)
+        result = pick_meme_by_semantic(q, top_k=5)
         if result and result.is_file():
             print(f"  [OK] {q!r:30} -> {result.name}")
             success += 1
@@ -66,7 +66,7 @@ def test_via_media_tags() -> bool:
     media_tags.reset_recent_history()
 
     # 自然语言描述（非分类名）应触发语义检索
-    queries = ["刚起床伸懒腰", "开心地跳起来", "无语地看着"]
+    queries = ["无语地看着", "委屈想哭", "害羞脸红"]
     success = 0
     for q in queries:
         result = media_tags.pick_meme_image(q)
@@ -98,37 +98,42 @@ def test_known_category_still_works() -> bool:
 
 
 def test_lru_dedup() -> bool:
-    """测试 LRU 去重：连续多次相同查询，不应返回完全相同的图。"""
+    """测试 LRU 去重：连续多次相同语义查询，不应返回完全相同的图。"""
     from clients.bots.qq import media_tags
-    from clients.bots.qq.meme_search import pick_meme_by_semantic
 
     media_tags.reset_recent_history()
-    results = set()
+    results: list[str] = []
     for _ in range(5):
-        r = pick_meme_by_semantic("开心地笑", top_k=10, min_similarity=0.1)
-        if r:
-            results.add(str(r))
-    # 5 次查询，LRU 至少应能区分出 2 张以上不同的图
-    if len(results) >= 2:
-        print(f"  [OK] LRU 去重生效，5 次查询返回 {len(results)} 张不同图")
+        r = media_tags.pick_meme_image("害羞脸红")
+        if r is None:
+            break
+        results.append(str(r))
+    if len(results) >= 2 and len(set(results)) == len(results):
+        print(f"  [OK] LRU 去重生效，{len(results)} 次查询返回 {len(results)} 张不同图")
         return True
-    print(f"  [WARN] LRU 去重可能未生效，5 次查询只返回 {len(results)} 张不同图")
-    return len(results) >= 1
-
-
-def test_fallback_on_disabled() -> bool:
-    """测试语义检索失败时 fallback 到 random。"""
-    from clients.bots.qq import media_tags
-    media_tags.reset_recent_history()
-
-    # 用一个无意义的查询触发语义检索，看是否 fallback 到 random
-    # （因为索引可能不全或相似度太低）
-    result = media_tags.pick_meme_image("这是一个非常奇怪无法匹配的查询xyz123")
-    if result and result.is_file():
-        print(f"  [OK] fallback 到 random: {result.name}")
-        return True
-    print("  [FAIL] fallback 失败")
+    print(f"  [WARN] LRU 去重可能未生效，返回 {len(set(results))}/{len(results)} 张不同图")
     return False
+
+
+def test_low_similarity_no_send() -> bool:
+    """低相似度查询必须直接不发，字面撞词的"抱胸"图也算不匹配。"""
+    from clients.bots.qq import media_tags
+
+    media_tags.reset_recent_history()
+    queries = [
+        "抱住蹭蹭",
+        "张开手臂把你揽过来抱住",
+        "这是一个非常奇怪无法匹配的查询xyz123",
+    ]
+    ok = True
+    for q in queries:
+        result = media_tags.pick_meme_image(q)
+        if result is not None:
+            print(f"  [FAIL] 低相似度查询仍发图: {q!r} -> {result.name}")
+            ok = False
+        else:
+            print(f"  [OK] 低相似度查询未发图: {q!r}")
+    return ok
 
 
 def main() -> int:
@@ -140,7 +145,7 @@ def main() -> int:
         ("已知分类路径", test_known_category_still_works),
         ("端到端标签", test_via_media_tags),
         ("LRU 去重", test_lru_dedup),
-        ("fallback 兜底", test_fallback_on_disabled),
+        ("低相似度不发图", test_low_similarity_no_send),
     ]
     results = []
     for name, fn in tests:

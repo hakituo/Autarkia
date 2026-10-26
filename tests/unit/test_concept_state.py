@@ -3,6 +3,7 @@
 覆盖：新建、答对提升、答错降低或保持、提示成功不等于独立成功、
 多次独立成功进入 mastered、mastered 后再次失败可退化、状态文件损坏恢复。
 """
+
 from __future__ import annotations
 
 import json
@@ -96,9 +97,7 @@ def test_multiple_independent_successes_reach_mastered(study_sandbox):
     mgr = _mgr(study_sandbox)
     mgr.mark_taught("math", "三角函数")
     for _ in range(4):
-        state = mgr.apply_evaluation(
-            "math", "三角函数", correctness=0.95, independent=True
-        )
+        state = mgr.apply_evaluation("math", "三角函数", correctness=0.95, independent=True)
 
     assert state.status == ConceptStatus.MASTERED
     assert state.independent_success_streak >= 3
@@ -169,7 +168,6 @@ def test_mark_mastered_is_explicit_override(study_sandbox):
     state = mgr.mark_mastered("math", "集合")
     assert state.status == ConceptStatus.MASTERED
     assert state.independent_success_streak >= 3
-
 
 
 def test_name_drift_merges_into_same_concept(study_sandbox):

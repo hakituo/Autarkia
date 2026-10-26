@@ -57,11 +57,7 @@ async def _direct_service_test(model_hint: str, description: str) -> None:
         "exceed context window",
         "context window of",
     ]
-    if (
-        not reply
-        or reply.strip() == ""
-        or any(snippet in reply for snippet in bad_snippets)
-    ):
+    if not reply or reply.strip() == "" or any(snippet in reply for snippet in bad_snippets):
         _print_result(
             f"Direct Service Test ({description})",
             False,
@@ -130,9 +126,7 @@ def _http_test_message(model: str, description: str) -> None:
 async def main() -> None:
     # 1. 直接服务层测试（不依赖正在运行的后端进程）
     await _direct_service_test(model_hint="", description="Local / Default Model")
-    await _direct_service_test(
-        model_hint="deepseek-ai/DeepSeek-V3.2", description="Cloud DeepSeek"
-    )
+    await _direct_service_test(model_hint="deepseek-ai/DeepSeek-V3.2", description="Cloud DeepSeek")
 
     # 2. HTTP 层测试（需要后端已在 localhost:8000 运行）
     try:
@@ -146,9 +140,7 @@ async def main() -> None:
         return
 
     _http_test_message(model="", description="Local / Default Model")
-    _http_test_message(
-        model="deepseek-ai/DeepSeek-V3.2", description="Cloud DeepSeek"
-    )
+    _http_test_message(model="deepseek-ai/DeepSeek-V3.2", description="Cloud DeepSeek")
 
 
 def test_script_entrypoint_exists():
@@ -161,6 +153,7 @@ def test_script_entrypoint_exists():
 
 def test_handle_message_timeout_response_format(monkeypatch):
     import importlib
+
     api = importlib.import_module("routers.v1.chat")
 
     async def runner():
@@ -175,7 +168,9 @@ def test_handle_message_timeout_response_format(monkeypatch):
         monkeypatch.setattr(api, "get_aveline_service", lambda: _FakeAvelineService())
         monkeypatch.setattr(api.asyncio, "wait_for", fake_wait_for)
 
-        resp = await api.handle_message({"content": "test"}, conversation_id="test_conv", model=None, voice_id=None)
+        resp = await api.handle_message(
+            {"content": "test"}, conversation_id="test_conv", model=None, voice_id=None
+        )
 
         assert resp["status"] == "success"
         assert isinstance(resp.get("response"), str)
@@ -187,6 +182,7 @@ def test_handle_message_timeout_response_format(monkeypatch):
 
 def test_tts_timeout_response_format(monkeypatch):
     import importlib
+
     # TTS 端点已随 media.py 拆分迁到 media_voice；同时禁用 TTS 缓存，
     # 否则重复调用会直接命中缓存、绕过被测的超时分支。
     monkeypatch.setenv("TTS_CACHE_DISABLED", "1")
@@ -276,9 +272,7 @@ def test_resource_manager_emergency_cleanup_survives_voice_offload_timeout(monke
     async def stuck_offload_voice(models):
         await asyncio.sleep(3600)
 
-    monkeypatch.setattr(
-        rm._gpu_manager, "offload_voice_services", stuck_offload_voice
-    )
+    monkeypatch.setattr(rm._gpu_manager, "offload_voice_services", stuck_offload_voice)
 
     async def runner():
         # 清理策略内部对语音卸载有 3 秒超时，整体应远快于 6 秒
@@ -303,13 +297,9 @@ async def test_prepare_for_heavy_task_image_gen_offloads_llm(monkeypatch):
         model.vram_usage_mb = 0
         return True
 
-    monkeypatch.setattr(
-        rm._gpu_manager, "try_offload_model_to_cpu", fake_try_offload
-    )
+    monkeypatch.setattr(rm._gpu_manager, "try_offload_model_to_cpu", fake_try_offload)
     # 显存紧张（可用 100MB），确保不会跳过清理
-    monkeypatch.setattr(
-        rm.monitor, "get_gpu_memory_usage_async", _make_async(lambda: (1900, 2000))
-    )
+    monkeypatch.setattr(rm.monitor, "get_gpu_memory_usage_async", _make_async(lambda: (1900, 2000)))
 
     rm.register_model(
         model_id="llm_engine",

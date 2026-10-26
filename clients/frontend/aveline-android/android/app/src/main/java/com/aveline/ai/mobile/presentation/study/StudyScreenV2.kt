@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -32,11 +33,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.domain.models.PlanItem
 import com.aveline.ai.mobile.presentation.components.AvelineTabRow
 import com.aveline.ai.mobile.presentation.components.ModuleHeader
+import com.aveline.ai.mobile.presentation.study.today.currentTodayDateLabel
+import com.aveline.ai.mobile.presentation.study.today.formatTodayDateLabel
 import com.aveline.ai.mobile.presentation.theme.Background
-import com.aveline.ai.mobile.presentation.theme.EmotionGreen
+import com.aveline.ai.mobile.presentation.theme.Accent
+import com.aveline.ai.mobile.presentation.theme.TextTertiary
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
@@ -133,6 +138,11 @@ fun StudyScreenV2(
         mutableStateOf(if (initialVocab) StudyMoreSection.VOCAB else StudyMoreSection.HUB)
     }
     var vocabSubScreen by remember { mutableStateOf(VocabSubScreen.DASHBOARD) }
+    // 页头右侧日期跟着「今天」走；切到其他 Tab 时不显示，避免和暂存的日期互相矛盾。
+    val planDate = planUiState.plan?.date ?: planUiState.selectedDate
+    val todayDateLabel = remember(planDate) {
+        formatTodayDateLabel(planDate).ifBlank { currentTodayDateLabel() }
+    }
 
     LaunchedEffect(pagerState.currentPage) {
         val tab = tabs[pagerState.currentPage]
@@ -184,20 +194,44 @@ fun StudyScreenV2(
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-            // 不再放刷新键：回到页面时由 ON_RESUME 的变更检查自动刷新
-            ModuleHeader(
-                title = "Study",
-                subtitle = "今天只做下一件事"
-            )
+            // 二级板块（更多 → 计划/词汇/笔记/日记/学习记录）自己画返回行 + 大标题，
+            // 顶层「学习」页头和 Tab 栏在这时让位，避免同一屏出现两级标题。
+            val inMoreSection = moreSection != StudyMoreSection.HUB &&
+                tabs[pagerState.currentPage] == StudyTabV2.MORE
+            if (!inMoreSection) {
+                // 不再放刷新键：回到页面时由 ON_RESUME 的变更检查自动刷新
+                // 页头只留「学习」：Tab 自己就是标题，正文里不再重复写「今天 / 学科 / 更多」。
+                // 「今天」页把日期放在右侧，其他页留空，页头宽度不跳。
+                ModuleHeader(
+                    title = "学习",
+                    actions = {
+                        if (tabs[pagerState.currentPage] == StudyTabV2.TODAY &&
+                            todayDateLabel.isNotBlank()
+                        ) {
+                            // 贴住「学习」的行底：日期是页头的副信息，不跟标题抢中线。
+                            Box(
+                                modifier = Modifier.height(38.dp),
+                                contentAlignment = Alignment.BottomEnd
+                            ) {
+                                Text(
+                                    text = todayDateLabel,
+                                    fontSize = 13.sp,
+                                    color = TextTertiary
+                                )
+                            }
+                        }
+                    }
+                )
 
-            AvelineTabRow(
-                titles = tabs.map { it.title },
-                selectedTabIndex = pagerState.currentPage,
-                onTabSelected = { index ->
-                    scope.launch { pagerState.animateScrollToPage(index) }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
+                AvelineTabRow(
+                    titles = tabs.map { it.title },
+                    selectedTabIndex = pagerState.currentPage,
+                    onTabSelected = { index ->
+                        scope.launch { pagerState.animateScrollToPage(index) }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             uiState.successMessage?.takeIf { it.isNotBlank() }?.let { message ->
                 androidx.compose.material3.Card(
@@ -207,13 +241,13 @@ fun StudyScreenV2(
                         .clip(RoundedCornerShape(14.dp))
                         .clickable { onClearError() },
                     colors = androidx.compose.material3.CardDefaults.cardColors(
-                        containerColor = EmotionGreen.copy(alpha = 0.1f)
+                        containerColor = Accent.copy(alpha = 0.1f)
                     ),
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Text(
                         text = message,
-                        color = EmotionGreen,
+                        color = Accent,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(14.dp)
                     )
@@ -304,16 +338,26 @@ fun StudyScreenV2(
                                 onOpenBooks()
                                 vocabSubScreen = VocabSubScreen.BOOK_LIST
                             },
+                            onOpenMistakes = { vocabSubScreen = VocabSubScreen.MISTAKES },
                             onSearch = onSearch,
                             onClearSearch = onClearSearch,
-                            onOpenLibraryNote = onOpenLibraryNote,
-                            onCloseLibraryNoteReader = onCloseLibraryNoteReader
+                            onOpenLibraryNote = onOpenLibraryNote
                         )
 
                         else -> Unit
                     }
                 }
             }
+        }
+
+        // 笔记阅读页挂在根层：列表在分页器内、左右各有 16dp 内边距，放在列表里会被切窄。
+        AnimatedVisibility(
+            visible = notesUiState.isReaderOpen,
+            modifier = Modifier.background(Background),
+            enter = slideInHorizontally(tween(300)) { it } + fadeIn(tween(300)),
+            exit = slideOutHorizontally(tween(300)) { it } + fadeOut(tween(300))
+        ) {
+            NoteReaderScreen(uiState = notesUiState, onClose = onCloseLibraryNoteReader)
         }
 
         val showVocabHost = vocabUiState.isReviewMode
@@ -335,6 +379,7 @@ fun StudyScreenV2(
                 onSetIsReviewMode = onSetIsReviewMode,
                 onSetSessionSummary = onSetSessionSummary,
                 onSwitchBook = onSwitchBook,
+                onLoadBookWords = onLoadBookWords,
                 onStartNewWords = onStartNewWords,
                 onStartReview = onStartReview
             )

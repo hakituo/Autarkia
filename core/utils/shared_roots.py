@@ -4,9 +4,10 @@
 两边都能挂载。把日志、学习数据中转目录放进共享根后，两个系统读写的是同一份
 文件，不再需要互相复制，也不会出现"这边改了那边看不见"。
 
-共享根由环境变量 ``XIAOYOU_SHARED_ROOT`` 指定，各系统填自己的挂载路径即可
-（Windows 填 ``G:\\xiaoyou-shared``、Linux 填 ``/mnt/G/xiaoyou-shared``）。
-未设置时全部退回项目根目录下的原位置，行为与加这个模块之前完全一致。
+共享根由环境变量 ``AUTARKIA_SHARED_ROOT``（旧名 ``XIAOYOU_SHARED_ROOT`` 仍兼容）
+指定，各系统填自己的挂载路径即可（Windows 填 ``G:\\Autarkia-shared``、
+Linux 填 ``/mnt/G/Autarkia-shared``）。未设置时全部退回项目根目录下的原位置，
+行为与加这个模块之前完全一致。
 
 注意：项目根取自零依赖的 ``core.utils.project_root``，不能走 ``core.utils.common``
 —— 后者模块级就要取 logger，会与本模块的使用方形成导入环。
@@ -20,16 +21,19 @@ from typing import Optional
 
 from core.utils.project_root import get_project_root
 
-#: 共享根环境变量名
-SHARED_ROOT_ENV = "XIAOYOU_SHARED_ROOT"
+#: 共享根环境变量名（新名优先、旧名兼容）
+SHARED_ROOT_ENV = "AUTARKIA_SHARED_ROOT"
+SHARED_ROOT_ENV_LEGACY = "XIAOYOU_SHARED_ROOT"
 
 _LOGS_DIR_NAME = "logs"
 _LEARNING_HUB_DIR_NAME = "learning_hub"
 
 
 def get_shared_root() -> Optional[Path]:
-    """返回共享根目录；未配置 ``XIAOYOU_SHARED_ROOT`` 时返回 None。"""
-    env_root = os.environ.get(SHARED_ROOT_ENV, "").strip()
+    """返回共享根目录；未配置共享根环境变量时返回 None。"""
+    env_root = (
+        os.environ.get(SHARED_ROOT_ENV) or os.environ.get(SHARED_ROOT_ENV_LEGACY) or ""
+    ).strip()
     if not env_root:
         return None
     return Path(env_root).expanduser()

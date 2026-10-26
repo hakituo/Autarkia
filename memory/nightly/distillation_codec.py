@@ -1,17 +1,30 @@
-"""Nightly 蒸馏的 Prompt、响应解析与零 API 信号规则。"""
+"""Nightly 蒸馏的 Prompt、响应解析（人物线索判定见 people_filter）。"""
 
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
+from core.services.dual_role.personas import resolve_role_id
 from core.utils.logger import get_module_logger
+
+from .people_filter import (
+    build_excluded_people_names as _build_excluded_people_names,
+    detect_profile_signals_locally as _detect_profile_signals_locally,
+    empty_profile_signals as _empty_profile_signals,
+    filter_people_mentions as _filter_people_mentions,
+    filter_profile_signals as _filter_profile_signals,
+)
 
 logger = get_module_logger(__name__, "nightly_processor.log")
 
 
 class DistillationCodec:
-    """蒸馏服务使用的无状态文本转换能力。"""
+    """蒸馏服务使用的无状态文本转换能力。
+
+    人物线索的排除/本地信号逻辑在 ``people_filter``，这里保留同名入口，
+    既有调用方（service / task_runner / 测试）不用改。
+    """
 
     @staticmethod
     def group_memories_by_time(
@@ -43,47 +56,44 @@ class DistillationCodec:
         return groups
 
     @staticmethod
-    def generate_distillation_prompt(content: str) -> List[Dict[str, str]]:
-        """生成稳定 system + 动态 user 的单条蒸馏 Prompt。"""
-        from core.agents.chat_agent_components.persona_system.prompt.service_prompts import (
-            MEMORY_DISTILLATION_SYSTEM_PROMPT,
-            MEMORY_DISTILLATION_USER_TEMPLATE,
-        )
-
-        return [
-            {"role": "system", "content": MEMORY_DISTILLATION_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": MEMORY_DISTILLATION_USER_TEMPLATE.format(content=content),
-            },
+    def _split_by_length(
+        group: List[Dict[str, Any]],
+    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """把无需 LLM 的短内容和批量 LLM 内容分开。"""
+        short_items = [
+            item
+            for item in group
+            if not item.get("content") or len(str(item.get("content", ""))) < 20
         ]
+        long_items = [
+            item
+            for item in group
+            if item.get("content") and len(str(item.get("content", ""))) >= 20
+        ]
+        return short_items, long_items
+
+    @staticmethod
+    def generate_distillation_prompt(
+        content: str,
+        perspective: Optional[Dict[str, str]] = None,
+    ) -> List[Dict[str, str]]:
+        """生成稳定 system + 动态 user 的单条蒸馏 Prompt。
+
+        perspective 为空（scope 解析不出角色）时退回中立模板。
+        """
+        from .perspective import build_single_distillation_prompt
+
+        return build_single_distillation_prompt(content, perspective or {})
 
     @staticmethod
     def generate_batch_distillation_prompt(
         messages: List[Dict[str, Any]],
+        perspective: Optional[Dict[str, str]] = None,
     ) -> List[Dict[str, str]]:
         """生成稳定 system + 编号动态条目的批量蒸馏 Prompt。"""
-        from core.agents.chat_agent_components.persona_system.prompt.service_prompts import (
-            MEMORY_DISTILLATION_BATCH_SYSTEM_PROMPT,
-            MEMORY_DISTILLATION_BATCH_USER_TEMPLATE,
-        )
+        from .perspective import build_batch_distillation_prompt
 
-        items = "\n\n".join(
-            f"【条目{index}】\n"
-            f"【说话者】{str(message.get('role', '') or 'unknown')}\n"
-            f"{str(message.get('content', '') or '').strip()}"
-            for index, message in enumerate(messages, start=1)
-        )
-        return [
-            {"role": "system", "content": MEMORY_DISTILLATION_BATCH_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": MEMORY_DISTILLATION_BATCH_USER_TEMPLATE.format(
-                    count=len(messages),
-                    items=items,
-                ),
-            },
-        ]
+        return build_batch_distillation_prompt(messages, perspective or {})
 
     @classmethod
     def parse_batch_distillation_response(
@@ -125,15 +135,48 @@ class DistillationCodec:
                 )
         return results
 
+    # ---- 人物线索门控（委托 people_filter） ------------------------------
+
     @staticmethod
     def empty_profile_signals(*, analyzed: bool) -> Dict[str, Any]:
-        """构造蒸馏阶段的人物门控元数据。"""
-        return {
-            "profile_signal_version": 1,
-            "profile_signal_analyzed": analyzed,
-            "people_mentions": [],
-            "role_update_candidates": [],
-        }
+        return _empty_profile_signals(analyzed=analyzed)
+
+    @staticmethod
+    def build_excluded_people_names(
+        perspective: Optional[Dict[str, str]] = None,
+    ) -> List[str]:
+        return _build_excluded_people_names(perspective)
+
+    @staticmethod
+    def filter_people_mentions(
+        values: List[str],
+        excluded_names: Optional[List[str]] = None,
+    ) -> List[str]:
+        return _filter_people_mentions(values, excluded_names)
+
+    @classmethod
+    def filter_profile_signals(
+        cls,
+        metadata: Dict[str, Any],
+        perspective: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
+        return _filter_profile_signals(metadata, perspective)
+
+    @classmethod
+    def detect_profile_signals_locally(
+        cls,
+        content: str,
+        *,
+        role: str = "",
+        owner_role_id: str = "",
+    ) -> Dict[str, Any]:
+        return _detect_profile_signals_locally(
+            content,
+            role=role,
+            owner_role_id=owner_role_id,
+        )
+
+    # ---- 线索解析 -------------------------------------------------------
 
     @staticmethod
     def _parse_profile_signal_values(raw_value: str) -> List[str]:
@@ -170,10 +213,20 @@ class DistillationCodec:
                 people_match.group(1)
             )
         if role_match:
-            metadata["role_update_candidates"] = cls._parse_profile_signal_values(
+            metadata["role_update_candidates"] = cls._parse_role_candidates(
                 role_match.group(1)
             )
         return metadata
+
+    @classmethod
+    def _parse_role_candidates(cls, raw_value: str) -> List[str]:
+        """角色演化只保留角色名，模型多写的「：习惯……」说明一律丢掉。"""
+        values: List[str] = []
+        for item in cls._parse_profile_signal_values(raw_value):
+            name = re.split(r"[：:]", item, 1)[0].strip()
+            if resolve_role_id(name) and name not in values:
+                values.append(name)
+        return values
 
     @classmethod
     def parse_batch_profile_signals(
@@ -197,37 +250,6 @@ class DistillationCodec:
             )
             parsed[index] = cls.parse_profile_signals(response[start:end].strip())
         return parsed
-
-    @classmethod
-    def detect_profile_signals_locally(
-        cls,
-        content: str,
-        *,
-        role: str = "",
-    ) -> Dict[str, Any]:
-        """短文本不调 LLM，用保守规则补齐人物门控元数据。"""
-        metadata = cls.empty_profile_signals(analyzed=True)
-        text = str(content or "").strip()
-        if not text:
-            return metadata
-        person_pattern = re.compile(
-            r"(?:我的|他的|她的|家里的|班上的)?"
-            r"(?:妈妈|爸爸|父亲|母亲|哥哥|弟弟|姐姐|妹妹|"
-            r"老师|同学|朋友|同事|亲戚|室友|班主任|教授|医生|"
-            r"师傅|老板|邻居|叔叔|阿姨|爷爷|奶奶|"
-            r"外公|外婆|男朋友|女朋友)"
-            r"|(?:叫|名叫|姓)\s*[\u4e00-\u9fff]{1,4}"
-        )
-        if person_pattern.search(text):
-            metadata["people_mentions"] = ["local_candidate"]
-        normalized_role = str(role or "").strip().lower()
-        if normalized_role in {"assistant", "aveline", "ling"} and re.search(
-            r"(?:我|本人).{0,6}(?:喜欢|讨厌|不喜欢|习惯|偏好|"
-            r"以后都|从不|总是|害怕|擅长|想要)",
-            text,
-        ):
-            metadata["role_update_candidates"] = [normalized_role]
-        return metadata
 
     @staticmethod
     def parse_distillation_response(response: str) -> Tuple[str, List[str]]:

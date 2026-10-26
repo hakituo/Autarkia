@@ -50,9 +50,7 @@ class FakeVector:
 
     def search(self, query: str, top_k: int) -> list[tuple[str, float]]:
         hits = [
-            (cid, 1.0)
-            for cid, text in self.store.items()
-            if "位移" in text or "平衡位置" in text
+            (cid, 1.0) for cid, text in self.store.items() if "位移" in text or "平衡位置" in text
         ]
         return hits[:top_k]
 

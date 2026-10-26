@@ -136,8 +136,8 @@ class TelegramSession(StreamEditMixin, ResponseSenderMixin):
             "platform": "telegram",
             "_send_ts": time.time() * 1000,
         }
-        if getattr(self.adapter, "xiaoyou_access_token", ""):
-            payload["access_token"] = self.adapter.xiaoyou_access_token
+        if getattr(self.adapter, "autarkia_access_token", ""):
+            payload["access_token"] = self.adapter.autarkia_access_token
 
         # 人设：显式传入优先，否则取 adapter 当前人设
         effective_persona = str(profile_filename or "").strip() or self._get_current_profile_filename()
@@ -169,14 +169,14 @@ class TelegramSession(StreamEditMixin, ResponseSenderMixin):
             while self.running:
                 try:
                     ws_url = (
-                        f"{self.adapter.xiaoyou_ws_url}"
+                        f"{self.adapter.autarkia_ws_url}"
                         f"?client_id={self._client_id}"
                         f"&user_id={self.session_id}"
                         f"&platform=telegram"
                     )
                     headers = None
-                    if self.adapter.xiaoyou_access_token:
-                        headers = {"Authorization": f"Bearer {self.adapter.xiaoyou_access_token}"}
+                    if self.adapter.autarkia_access_token:
+                        headers = {"Authorization": f"Bearer {self.adapter.autarkia_access_token}"}
 
                     t_conn_start = time.time()
                     connect_kwargs = {

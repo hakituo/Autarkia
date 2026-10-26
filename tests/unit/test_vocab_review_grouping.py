@@ -1,4 +1,5 @@
 """复习分组：limit=每组数量，完成一组后自然推进到下一组。"""
+
 from __future__ import annotations
 
 import os
@@ -14,8 +15,7 @@ class _FakeStore:
 
     def __init__(self, words):
         self.dictionary = [
-            {"word": word, "translations": [{"type": "n.", "translation": word}]}
-            for word in words
+            {"word": word, "translations": [{"type": "n.", "translation": word}]} for word in words
         ]
         self.progress = {}
 

@@ -84,8 +84,10 @@ def _fake_torch(available: bool, calls: list):
 def _fake_resource_manager(calls: list, *, boom: bool = False):
     """构造假的 get_resource_manager 工厂。"""
     if boom:
+
         def _factory():
             raise RuntimeError("rm boom")
+
         return _factory
 
     class _RM:

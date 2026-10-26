@@ -44,7 +44,7 @@ import com.aveline.ai.mobile.presentation.companion.memory.memoryTreeItems
 import com.aveline.ai.mobile.presentation.components.SectionCard
 import com.aveline.ai.mobile.presentation.memory.MemoryGraphUiState
 import com.aveline.ai.mobile.presentation.memory.MemoryUiState
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
 
 /**
  * Companion 记忆 Tab。
@@ -278,7 +278,7 @@ fun CompanionMemoryTab(
                                         .padding(vertical = 32.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    CircularProgressIndicator(color = Primary)
+                                    CircularProgressIndicator(color = Accent)
                                 }
                             }
                         }

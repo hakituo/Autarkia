@@ -11,10 +11,9 @@ import kotlinx.serialization.json.jsonArray
 /**
  * 词汇学习洞察加载器。
  *
- * 负责三块只读数据，写入 [VocabUiState]：
+ * 负责两块只读数据，写入 [VocabUiState]：
  * - 今日已背单词明细（新学/复习、评分、时间）
  * - 当前词书进度（已学/总数/掌握/待复习）
- * - 已学单词预览列表（词书进度卡里展示最近学过的词）
  *
  * 这些请求失败时不打扰用户：首页仍有本地统计兜底，下次进入词汇 Tab 会重试。
  */
@@ -27,7 +26,6 @@ class StudyVocabInsightsManager(
     fun refresh() {
         loadTodayWords()
         loadBookProgress()
-        loadLearnedWords()
     }
 
     fun loadTodayWords() {
@@ -83,32 +81,6 @@ class StudyVocabInsightsManager(
                     )
                 }
             }
-        }
-    }
-
-    /** 只取最近一页用于预览；完整列表留给后续「已学单词」页复用同一接口。 */
-    fun loadLearnedWords() {
-        scope.launch {
-            studyRepository.getLearnedWords(page = 1, pageSize = 10, status = "all", scope = "book")
-                .onSuccess { resp ->
-                    val data = resp.payload()
-                    val words = data["words"]?.jsonArray.orEmptyArray().map { item ->
-                        val obj = item as? JsonObject ?: return@map null
-                        LearnedWordItem(
-                            word = obj.string("word"),
-                            translation = obj.string("translation"),
-                            status = obj.string("status"),
-                            intervalDays = obj.int("interval_days") ?: 0,
-                            lastReviewAt = obj.string("last_review_at")
-                        )
-                    }.filterNotNull()
-                    vocabState.update {
-                        it.copy(
-                            learnedWords = words,
-                            learnedWordsTotal = data.int("total") ?: words.size
-                        )
-                    }
-                }
         }
     }
 

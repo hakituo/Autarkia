@@ -20,7 +20,7 @@
     python scripts/cleanup/cleanup_memory_md_duplicates.py
 
     # 自定义路径
-    python scripts/cleanup/cleanup_memory_md_duplicates.py --base-dir D:/AI/xiaoyou-core/companion_data
+    python scripts/cleanup/cleanup_memory_md_duplicates.py --base-dir D:/AI/autarkia/companion_data
 """
 
 from __future__ import annotations
@@ -375,7 +375,7 @@ async def move_user_level_to_user_data(user_level_items: List[str], user_data_fi
 
 async def main() -> int:
     parser = argparse.ArgumentParser(description="清理 MEMORY.md 重复条目 + 迁移用户级偏好")
-    parser.add_argument("--base-dir", default="D:/AI/xiaoyou-core/companion_data",
+    parser.add_argument("--base-dir", default="D:/AI/autarkia/companion_data",
                         help="companion_data 目录路径")
     parser.add_argument("--dry-run", action="store_true", help="只显示会怎么改，不写文件")
     parser.add_argument("--threshold", type=float, default=0.85,

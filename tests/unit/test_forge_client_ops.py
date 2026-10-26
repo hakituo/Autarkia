@@ -18,6 +18,7 @@ import pytest
 import core.modules.forge_client as fc
 from core.modules.forge_client import ForgeClient
 
+
 # ------------------------------- 替身工具 ------------------------------- #
 class FakeClock:
     """受控时钟：完整替代被测模块内的 ``time``。"""
@@ -90,14 +91,17 @@ def _b64(text: str = "img") -> str:
 
 def _raiser(exc: Exception):
     """返回一个「调用即抛 exc」的替身函数。"""
+
     def _f(*args, **kwargs):
         raise exc
+
     return _f
 
 
 def _ok(payload=None):
     """构造 200 + 单图响应。"""
     return FakeResponse(200, payload if payload is not None else {"images": [_b64("x")]})
+
 
 # -------------------------------- fixtures ------------------------------- #
 @pytest.fixture()
@@ -130,6 +134,7 @@ def gen_client(clock, monkeypatch):
     monkeypatch.setattr(c, "switch_model", lambda m: (calls.append(m), True)[1])
     c.switch_calls = calls
     return c
+
 
 # ------------------------- resolve_model_checkpoint ---------------------- #
 def test_resolve_empty(client):
@@ -180,6 +185,7 @@ def test_resolve_no_match_and_missing_fields(client, monkeypatch):
     monkeypatch.setattr(client, "_get_models_cached", lambda *a, **k: [{}])
     assert client.resolve_model_checkpoint("zzz") == "zzz"
 
+
 # -------------------------------- get_loras ------------------------------ #
 def test_get_loras_ok(client, fake_requests):
     """200 → 返回列表。"""
@@ -198,6 +204,7 @@ def test_get_loras_error(client, fake_requests, result):
     assert client.get_loras() == []
     if isinstance(result, ConnectionError):
         assert client._last_unavailable_log_ts == 1000.0
+
 
 # ------------------------------- switch_model ---------------------------- #
 def test_switch_model_already_loaded(client, monkeypatch):
@@ -232,6 +239,7 @@ def test_switch_model_failure(client, fake_requests, monkeypatch, result):
     monkeypatch.setattr(client, "_get_current_model_filename", lambda: "old.safetensors")
     fake_requests(post_results=[result])
     assert client.switch_model("sd1.5") is False
+
 
 # --------------------- generate_images：成功 / 参数分支 ------------------ #
 def test_generate_images_success_basic(gen_client, fake_requests):
@@ -268,9 +276,20 @@ def test_generate_images_explicit_params(gen_client, fake_requests):
     """显式参数覆盖默认值；None 可选字段被跳过；restore_faces 强制 False。"""
     fr = fake_requests(post_results=[_ok()])
     gen_client.generate_images(
-        "p", model_type="sd1.5", width=512, height=768, steps=30, cfg_scale=5,
-        restore_faces=True, negative_prompt="bad", seed=42, sampler_name="Euler",
-        scheduler="Karras", enable_hr=True, hr_scale=None, script_name="x",
+        "p",
+        model_type="sd1.5",
+        width=512,
+        height=768,
+        steps=30,
+        cfg_scale=5,
+        restore_faces=True,
+        negative_prompt="bad",
+        seed=42,
+        sampler_name="Euler",
+        scheduler="Karras",
+        enable_hr=True,
+        hr_scale=None,
+        script_name="x",
     )
     payload = fr.post_calls[0][1]["json"]
     assert (payload["width"], payload["height"], payload["steps"]) == (512, 768, 30)
@@ -300,14 +319,23 @@ def test_generate_images_num_images_param_ignored(gen_client, fake_requests):
     assert len(out) == 1
     assert fr.post_calls[0][1]["json"]["n_iter"] == 1
 
+
 # --------------------- generate_images：图片解码分支 --------------------- #
 def test_generate_images_decode_dict_and_datauri(gen_client, fake_requests):
     """dict(data/image/base64) 与 data-uri 字符串均可解码。"""
     data_uri = "data:image/png;base64," + _b64("png")
     fake_requests(
         post_results=[
-            _ok({"images": [{"data": _b64("d")}, {"image": _b64("i")},
-                            {"base64": _b64("b")}, data_uri]})
+            _ok(
+                {
+                    "images": [
+                        {"data": _b64("d")},
+                        {"image": _b64("i")},
+                        {"base64": _b64("b")},
+                        data_uri,
+                    ]
+                }
+            )
         ]
     )
     assert gen_client.generate_images("p") == [b"d"]
@@ -317,6 +345,7 @@ def test_generate_images_skip_invalid_entries(gen_client, fake_requests):
     """非法条目（空 dict / 空串 / 非字符串）被跳过。"""
     fake_requests(post_results=[_ok({"images": [{}, "", 123, _b64("ok")]})])
     assert gen_client.generate_images("p") == [b"ok"]
+
 
 # --------------------- generate_images：失败 / 重试 / 异常 --------------- #
 @pytest.mark.parametrize(
@@ -385,7 +414,10 @@ def test_generate_images_win_pipe_recovery_hooks_raise(
     monkeypatch.setattr(gen_client, "switch_model", _switch)
     monkeypatch.setattr(clock, "sleep", _raiser(RuntimeError("sl")))
     fake_requests(
-        post_results=[FakeResponse(500, text="[WinError 233] broken"), FakeResponse(200, {"images": []})]
+        post_results=[
+            FakeResponse(500, text="[WinError 233] broken"),
+            FakeResponse(200, {"images": []}),
+        ]
     )
     with pytest.raises(RuntimeError) as ei:
         gen_client.generate_images("p")
@@ -407,6 +439,7 @@ def test_generate_images_unexpected_error(gen_client, fake_requests):
     with pytest.raises(RuntimeError) as ei:
         gen_client.generate_images("p")
     assert "Forge connection error" in str(ei.value)
+
 
 # -------------- generate_images：timeout / override / LoRA --------------- #
 @pytest.mark.parametrize("rt,expected", [(5, (10, 5.0)), ("abc", (10, 120.0)), (None, (10, 120.0))])
@@ -468,6 +501,7 @@ def test_generate_images_sdxl_sd15_lora_warning(gen_client, fake_requests):
     fr = fake_requests(post_results=[_ok()])
     gen_client.generate_images("p", model_type="sdxl", loras=[{"name": "sd1.5_style"}])
     assert "<lora:sd1.5_style:0.8>" in fr.post_calls[0][1]["json"]["prompt"]
+
 
 # --------------------------------- generate ------------------------------ #
 @pytest.mark.parametrize("ret,expected", [([b"one", b"two"], b"one"), ([], None), (None, None)])

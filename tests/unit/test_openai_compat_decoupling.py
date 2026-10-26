@@ -29,8 +29,8 @@ def _dsml_block() -> str:
     """一段完整的 V4 DSML 工具调用块"""
     return (
         f"{START}"
-        f"<{PREFIX}invoke name=\"get_weather\">"
-        f"<{PREFIX}parameter name=\"city\" string=\"true\">上海</{PREFIX}parameter>"
+        f'<{PREFIX}invoke name="get_weather">'
+        f'<{PREFIX}parameter name="city" string="true">上海</{PREFIX}parameter>'
         f"</{PREFIX}invoke>"
         f"{CLOSE}"
     )
@@ -90,8 +90,8 @@ def test_filter_instances_do_not_share_buffer():
     f1.filter_chunk({"content": block[:40]})
     out2 = f2.filter_chunk({"content": block})
 
-    assert f1.active is True          # 还在等自己的闭合标记
-    assert out2[0]["tool_calls"]      # f2 已经完整解析
+    assert f1.active is True  # 还在等自己的闭合标记
+    assert out2[0]["tool_calls"]  # f2 已经完整解析
     assert f2.active is False
 
 
@@ -199,7 +199,9 @@ async def test_stream_chat_uses_temp_session_for_dynamic_key():
     client = object.__new__(OpenAIClient)
     for key, value in base.items():
         setattr(client, key, value)
-    client._route_vision_if_needed = AsyncMock(return_value=([{"role": "user", "content": "x"}], ""))
+    client._route_vision_if_needed = AsyncMock(
+        return_value=([{"role": "user", "content": "x"}], "")
+    )
     client._build_payload = lambda *_a, **_kw: {"model": "m"}
     client._get_session = AsyncMock(return_value=_FakeSession())
 
@@ -221,7 +223,9 @@ async def test_stream_chat_reuses_resident_session_without_dynamic_key():
     client.api_key = "static"
     client.timeout = 5
     client.proxy = None
-    client._route_vision_if_needed = AsyncMock(return_value=([{"role": "user", "content": "x"}], ""))
+    client._route_vision_if_needed = AsyncMock(
+        return_value=([{"role": "user", "content": "x"}], "")
+    )
     client._build_payload = lambda *_a, **_kw: {"model": "m"}
     client._get_session = AsyncMock(return_value=_FakeSession())
 

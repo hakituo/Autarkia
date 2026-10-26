@@ -42,7 +42,7 @@ class ConfigManager:
             on_config_updated: 配置更新后的回调（通常用于清除缓存）
         """
         try:
-            base = str(self.cfg.xiaoyou_http_base_url or "").rstrip("/")
+            base = str(self.cfg.autarkia_http_base_url or "").rstrip("/")
             if not base:
                 return
 

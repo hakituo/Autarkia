@@ -25,6 +25,9 @@ import androidx.compose.ui.unit.sp
 
 private val EdgeColor = Color(0xFF5E7385)
 
+/** 布局层刻意用纯 JVM 的 [GraphPoint] 便于单测，画到 Compose 画布时再转 [Offset] */
+private fun GraphPoint.toOffset(): Offset = Offset(x, y)
+
 /**
  * 记忆网络的画布。
  *
@@ -72,7 +75,7 @@ internal fun MemoryGraphCanvas(
             }
         }
         val centers = remember(placement) {
-            placement.nodes.associate { it.id to it.center }
+            placement.nodes.associate { it.id to it.center.toOffset() }
         }
         val textMeasurer = rememberTextMeasurer()
         val labelStyle = remember {
@@ -119,13 +122,13 @@ internal fun MemoryGraphCanvas(
                     drawCircle(
                         color = color.copy(alpha = 0.82f),
                         radius = node.radius,
-                        center = node.center
+                        center = node.center.toOffset()
                     )
                     if (node.isSeed) {
                         drawCircle(
                             color = color,
                             radius = node.radius + 4f,
-                            center = node.center,
+                            center = node.center.toOffset(),
                             style = Stroke(width = 2.2f)
                         )
                     }

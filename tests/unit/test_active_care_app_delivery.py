@@ -165,9 +165,7 @@ async def test_dispatch_message_carries_profile_filename():
     executor.state_persistence = SimpleNamespace(
         persist_proactive_message=AsyncMock(return_value=None)
     )
-    executor.storage = SimpleNamespace(
-        increment_proactive_count=AsyncMock(return_value=None)
-    )
+    executor.storage = SimpleNamespace(increment_proactive_count=AsyncMock(return_value=None))
 
     aveline_service = SimpleNamespace(
         dispatch_proactive_message=AsyncMock(return_value={"delivered": True})

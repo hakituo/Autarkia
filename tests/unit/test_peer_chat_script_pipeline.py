@@ -28,6 +28,7 @@ from core.services.active_care.peer_chat.peer_script_llm import (
 # 通用替身
 # ============================================================
 
+
 class _StubLLM:
     """替身 LLM 模块：可编程返回脚本或抛异常。"""
 
@@ -71,7 +72,14 @@ def _record_raw_text(self, text):  # noqa: ANN001 - 绑定到替身用
     self.raw_texts.append(text)
 
 
-def _patch_script_llm_deps(monkeypatch, llm, *, knowledge=None, script=None):
+def _patch_script_llm_deps(
+    monkeypatch,
+    llm,
+    *,
+    knowledge=None,
+    script=None,
+    fallback_model="cloud:stub/fallback-model",
+):
     """把 peer_script_llm 的所有外部依赖替换成替身。
 
     peer_script_llm 内部是"函数体内 import"，所以必须 patch 源模块上的符号。
@@ -80,9 +88,7 @@ def _patch_script_llm_deps(monkeypatch, llm, *, knowledge=None, script=None):
     from core.services.active_care.peer_chat import peer_knowledge
 
     # LLM 模块入口
-    monkeypatch.setattr(
-        peer_script_llm_module(), "get_llm_module", lambda: llm
-    )
+    monkeypatch.setattr(peer_script_llm_module(), "get_llm_module", lambda: llm)
 
     # 模型路径解析：直接给一个哨兵值，避免读真实配置
     import config.model_config as model_config
@@ -91,6 +97,12 @@ def _patch_script_llm_deps(monkeypatch, llm, *, knowledge=None, script=None):
         model_config,
         "resolve_active_care_model_path",
         lambda **kwargs: "stub/script/model",
+    )
+    # 兜底路由也走 YAML getter，测试里给固定值避免读真实配置
+    monkeypatch.setattr(
+        model_config,
+        "get_fallback_model_for_peer_chat_script",
+        lambda default="": fallback_model,
     )
 
     # prompt 构造：返回固定结构，避免拼装真实 prompt（也避免读人设文件）
@@ -110,7 +122,9 @@ def _patch_script_llm_deps(monkeypatch, llm, *, knowledge=None, script=None):
     monkeypatch.setattr(
         peer_knowledge,
         "build_knowledge_buckets",
-        lambda **kwargs: knowledge if knowledge is not None else {"role_id": "aveline", "peer_role_id": "ling"},
+        lambda **kwargs: (
+            knowledge if knowledge is not None else {"role_id": "aveline", "peer_role_id": "ling"}
+        ),
     )
     if script is not None:
         # parse_script 走替身，直接给出目标剧本
@@ -203,6 +217,7 @@ class _WaitForRecorder:
 # peer_chat_decision.py
 # ============================================================
 
+
 class TestPeerChatDecider:
     """决策器：正常解析 / 超时降级 / 异常降级 / 社交事件失败不影响主流程。"""
 
@@ -227,9 +242,7 @@ class TestPeerChatDecider:
         llm = _StubLLM(exc=asyncio.TimeoutError())
         _patch_decider_deps(monkeypatch, llm)
         # wait_for 会把 TimeoutError 抛出来，走 asyncio.TimeoutError 分支
-        monkeypatch.setattr(
-            asyncio, "wait_for", _raise_timeout
-        )
+        monkeypatch.setattr(asyncio, "wait_for", _raise_timeout)
 
         result = await decider.decide({}, "aveline", "Ling")
         assert result["should_send"] is False
@@ -254,9 +267,7 @@ class TestPeerChatDecider:
         assert metrics.get_snapshot()["decision_timeout"] >= 1
         metrics.reset()
 
-    async def test_decide_timeout_config_falls_back_when_settings_read_fails(
-        self, monkeypatch
-    ):
+    async def test_decide_timeout_config_falls_back_when_settings_read_fails(self, monkeypatch):
         """读决策超时配置失败时必须回退 20 秒，而不是让异常冒泡。
 
         注意 get_settings 在 peer_chat_decision 里是**模块级导入**，必须 patch 该模块上的
@@ -323,9 +334,7 @@ class TestPeerChatDecider:
     async def test_decide_handles_dict_response_shape(self, monkeypatch):
         """LLM 返回 dict（含 response 字段）时也要能解析。"""
         decider = PeerChatDecider()
-        llm = _StubLLM(
-            response={"response": '{"should_send":true,"conversation_seed":"天气"}'}
-        )
+        llm = _StubLLM(response={"response": '{"should_send":true,"conversation_seed":"天气"}'})
         _patch_decider_deps(monkeypatch, llm)
 
         result = await decider.decide({}, "aveline", "Ling")
@@ -366,9 +375,7 @@ async def _raise_timeout(coro, timeout=None):  # noqa: ANN001
     raise asyncio.TimeoutError()
 
 
-def _patch_decider_deps(
-    monkeypatch, llm, *, social_events_boom=False, capture_prompt=None
-):
+def _patch_decider_deps(monkeypatch, llm, *, social_events_boom=False, capture_prompt=None):
     """替换 PeerChatDecider 的全部外部依赖。"""
     from core.services.active_care.peer_chat import peer_chat_decision as decider_module
 
@@ -393,9 +400,7 @@ def _patch_decider_deps(
             capture_prompt.update(kwargs)
         return _Prompt()
 
-    monkeypatch.setattr(
-        qq_prompt, "build_peer_chat_decision_prompt", _build_prompt
-    )
+    monkeypatch.setattr(qq_prompt, "build_peer_chat_decision_prompt", _build_prompt)
 
     if social_events_boom:
         import core.services.dual_role.social_events as social_module
@@ -403,9 +408,7 @@ def _patch_decider_deps(
         def _boom():
             raise RuntimeError("社交事件引擎不可用")
 
-        monkeypatch.setattr(
-            social_module, "get_social_event_engine", _boom
-        )
+        monkeypatch.setattr(social_module, "get_social_event_engine", _boom)
 
 
 # ============================================================
@@ -447,9 +450,7 @@ class TestPeerScriptLLMGenerator:
         await generator.generate(**BASE_KWARGS)
         assert host.raw_texts == ["RAW_SCRIPT_TEXT"]
 
-    async def test_generate_timeout_returns_empty_and_records_metric(
-        self, monkeypatch
-    ):
+    async def test_generate_timeout_returns_empty_and_records_metric(self, monkeypatch):
         """LLM 超时返回空列表，并计入 script_llm_timeout 指标。"""
         from core.services.active_care.peer_chat.peer_chat_metrics import (
             get_peer_chat_metrics,
@@ -476,9 +477,7 @@ class TestPeerScriptLLMGenerator:
         result = await generator.generate(**BASE_KWARGS)
         assert result == []
 
-    async def test_generate_enforce_round_limit_drops_overlong_script(
-        self, monkeypatch
-    ):
+    async def test_generate_enforce_round_limit_drops_overlong_script(self, monkeypatch):
         """轮数超过 6 时按解析失败丢弃（enforce_round_limit 默认 True）。"""
         from core.services.active_care.peer_chat.peer_chat_metrics import (
             get_peer_chat_metrics,
@@ -488,8 +487,7 @@ class TestPeerScriptLLMGenerator:
         metrics.reset()
         generator, _ = _make_generator()
         overlong = [
-            {"role": "aveline" if i % 2 == 0 else "ling", "content": f"第{i}句"}
-            for i in range(8)
+            {"role": "aveline" if i % 2 == 0 else "ling", "content": f"第{i}句"} for i in range(8)
         ]
         llm = _StubLLM(response="x")
         # parse_script 持续返回越界剧本 → 重试后仍越界 → 最终空列表
@@ -500,26 +498,19 @@ class TestPeerScriptLLMGenerator:
         assert metrics.get_snapshot()["parse_retries"] >= 1
         metrics.reset()
 
-    async def test_generate_allows_overlong_when_round_limit_disabled(
-        self, monkeypatch
-    ):
+    async def test_generate_allows_overlong_when_round_limit_disabled(self, monkeypatch):
         """enforce_round_limit=False 时不限制轮数（供评估脚本观察模型真实轮数）。"""
         generator, _ = _make_generator()
         overlong = [
-            {"role": "aveline" if i % 2 == 0 else "ling", "content": f"第{i}句"}
-            for i in range(8)
+            {"role": "aveline" if i % 2 == 0 else "ling", "content": f"第{i}句"} for i in range(8)
         ]
         llm = _StubLLM(response="x")
         _patch_script_llm_deps(monkeypatch, llm, script=overlong)
 
-        result = await generator.generate(
-            **BASE_KWARGS, enforce_round_limit=False
-        )
+        result = await generator.generate(**BASE_KWARGS, enforce_round_limit=False)
         assert result == overlong
 
-    async def test_generate_drops_script_with_knowledge_violation(
-        self, monkeypatch
-    ):
+    async def test_generate_drops_script_with_knowledge_violation(self, monkeypatch):
         """知识防火墙判定越权时丢弃剧本（触发重试，重试仍越权则空列表）。"""
         generator, _ = _make_generator()
         llm = _StubLLM(response="x")
@@ -536,9 +527,7 @@ class TestPeerScriptLLMGenerator:
         result = await generator.generate(**BASE_KWARGS)
         assert result == []
 
-    async def test_generate_retry_path_succeeds_after_parse_failure(
-        self, monkeypatch
-    ):
+    async def test_generate_retry_path_succeeds_after_parse_failure(self, monkeypatch):
         """首次解析失败但重试成功时返回重试得到的剧本。
 
         实现方式：让 parse_script 第一次返回空、第二次返回可用剧本。
@@ -562,26 +551,20 @@ class TestPeerScriptLLMGenerator:
         )
         from core.services.active_care.peer_chat import peer_knowledge
 
-        monkeypatch.setattr(
-            peer_knowledge, "validate_peer_script", lambda *a, **k: []
-        )
+        monkeypatch.setattr(peer_knowledge, "validate_peer_script", lambda *a, **k: [])
 
         result = await generator.generate(**BASE_KWARGS)
         assert result == SIMPLE_SCRIPT
         assert calls["n"] >= 2
 
-    async def test_generate_negotiation_mode_appends_assignment_suffix(
-        self, monkeypatch
-    ):
+    async def test_generate_negotiation_mode_appends_assignment_suffix(self, monkeypatch):
         """协商模式下 user_prompt 必须追加分工输出格式要求，否则解析不到分工。"""
         generator, _ = _make_generator()
         llm = _StubLLM(response="x")
         _patch_script_llm_deps(monkeypatch, llm, script=SIMPLE_SCRIPT)
         from core.services.active_care.peer_chat import peer_knowledge
 
-        monkeypatch.setattr(
-            peer_knowledge, "validate_peer_script", lambda *a, **k: []
-        )
+        monkeypatch.setattr(peer_knowledge, "validate_peer_script", lambda *a, **k: [])
 
         reminders = [{"reminder_id": "r1", "title": "吃药提醒"}]
         await generator.generate(**BASE_KWARGS, negotiation_reminders=reminders)
@@ -590,18 +573,14 @@ class TestPeerScriptLLMGenerator:
         assert "<assignment>" in sent_user_prompt
         assert "吃药提醒" in sent_user_prompt
 
-    async def test_generate_without_negotiation_has_no_assignment_block(
-        self, monkeypatch
-    ):
+    async def test_generate_without_negotiation_has_no_assignment_block(self, monkeypatch):
         """普通模式不得混入协商输出格式（会让模型输出多余 JSON 块）。"""
         generator, _ = _make_generator()
         llm = _StubLLM(response="x")
         _patch_script_llm_deps(monkeypatch, llm, script=SIMPLE_SCRIPT)
         from core.services.active_care.peer_chat import peer_knowledge
 
-        monkeypatch.setattr(
-            peer_knowledge, "validate_peer_script", lambda *a, **k: []
-        )
+        monkeypatch.setattr(peer_knowledge, "validate_peer_script", lambda *a, **k: [])
 
         await generator.generate(**BASE_KWARGS)
         sent_user_prompt = llm.calls[-1]["messages"][1]["content"]
@@ -614,27 +593,21 @@ class TestPeerScriptLLMGenerator:
         _patch_script_llm_deps(monkeypatch, llm, script=SIMPLE_SCRIPT)
         from core.services.active_care.peer_chat import peer_knowledge
 
-        monkeypatch.setattr(
-            peer_knowledge, "validate_peer_script", lambda *a, **k: []
-        )
+        monkeypatch.setattr(peer_knowledge, "validate_peer_script", lambda *a, **k: [])
 
         await generator.generate(**BASE_KWARGS)
         messages = llm.calls[-1]["messages"]
         assert [m["role"] for m in messages] == ["system", "user"]
         assert messages[0]["content"] == "SYSTEM"
 
-    async def test_generate_proactive_assignment_mode_appends_suffix(
-        self, monkeypatch
-    ):
+    async def test_generate_proactive_assignment_mode_appends_suffix(self, monkeypatch):
         """主动关怀时段分工模式：必须追加时段划分后缀，并把双方状态原样透传。"""
         generator, _ = _make_generator()
         llm = _StubLLM(response="x")
         _patch_script_llm_deps(monkeypatch, llm, script=SIMPLE_SCRIPT)
         from core.services.active_care.peer_chat import peer_knowledge
 
-        monkeypatch.setattr(
-            peer_knowledge, "validate_peer_script", lambda *a, **k: []
-        )
+        monkeypatch.setattr(peer_knowledge, "validate_peer_script", lambda *a, **k: [])
 
         import core.services.active_care.prompt.proactive_assignment_prompts as prompts
 
@@ -644,9 +617,7 @@ class TestPeerScriptLLMGenerator:
             captured.update(kwargs)
             return "\n\nPROACTIVE_SUFFIX\n"
 
-        monkeypatch.setattr(
-            prompts, "build_proactive_assignment_negotiation_suffix", _build_suffix
-        )
+        monkeypatch.setattr(prompts, "build_proactive_assignment_negotiation_suffix", _build_suffix)
 
         await generator.generate(
             **BASE_KWARGS,
@@ -665,18 +636,14 @@ class TestPeerScriptLLMGenerator:
             "role_states": {"aveline": "工作中"},
         }
 
-    async def test_generate_timeout_config_falls_back_when_settings_read_fails(
-        self, monkeypatch
-    ):
+    async def test_generate_timeout_config_falls_back_when_settings_read_fails(self, monkeypatch):
         """读超时配置抛异常时必须回退到 45 秒，而不是让异常冒泡。"""
         generator, _ = _make_generator()
         llm = _StubLLM(response="x")
         _patch_script_llm_deps(monkeypatch, llm, script=SIMPLE_SCRIPT)
         from core.services.active_care.peer_chat import peer_knowledge
 
-        monkeypatch.setattr(
-            peer_knowledge, "validate_peer_script", lambda *a, **k: []
-        )
+        monkeypatch.setattr(peer_knowledge, "validate_peer_script", lambda *a, **k: [])
 
         import config.integrated_config as integrated_config
 
@@ -692,68 +659,55 @@ class TestPeerScriptLLMGenerator:
         assert result == SIMPLE_SCRIPT
         assert proxy.timeouts == [45.0]
 
-    async def test_generate_llm_failure_falls_back_to_deepseek(
-        self, monkeypatch
-    ):
-        """主 LLM 抛非超时异常时回退到 DeepSeekClient，回退成功仍返回剧本。"""
+    async def test_generate_llm_failure_falls_back_to_configured_route(self, monkeypatch):
+        """主 LLM 抛非超时异常时，按 model_routing 的兜底路由重试一次。"""
         generator, _ = _make_generator()
-        llm = _StubLLM(exc=RuntimeError("主 LLM 挂了"))
-        _patch_script_llm_deps(monkeypatch, llm, script=SIMPLE_SCRIPT)
         from core.services.active_care.peer_chat import peer_knowledge
 
-        monkeypatch.setattr(
-            peer_knowledge, "validate_peer_script", lambda *a, **k: []
-        )
-        monkeypatch.setenv("DEEPSEEK_API_KEY_QQBOT1", "sk-test")
+        monkeypatch.setattr(peer_knowledge, "validate_peer_script", lambda *a, **k: [])
 
-        import core.llm.openai_compat.deepseek_client as deepseek_client
+        class _FailoverLLM:
+            """首次调用失败，兜底路由成功。"""
 
-        created = {}
-        chat_kwargs = []
-
-        class _FallbackLLM:
-            """替身回退客户端：记录构造参数与调用参数。"""
-
-            def __init__(self, **kwargs):
-                created.update(kwargs)
+            def __init__(self):
+                self.calls = []
 
             async def chat(self, messages, **kwargs):
-                chat_kwargs.append(kwargs)
+                self.calls.append(kwargs)
+                if kwargs.get("model_path") == "stub/script/model":
+                    raise RuntimeError("主 LLM 挂了")
                 return "FALLBACK_TEXT"
 
-        monkeypatch.setattr(deepseek_client, "DeepSeekClient", _FallbackLLM)
+        llm = _FailoverLLM()
+        _patch_script_llm_deps(monkeypatch, llm, script=SIMPLE_SCRIPT)
 
         result = await generator.generate(**BASE_KWARGS)
-        assert result == SIMPLE_SCRIPT
-        assert created["model"] == "deepseek-v4-flash"
-        assert created["api_key"] == "sk-test"
-        assert chat_kwargs == [{"temperature": 0.9, "max_tokens": 800}]
 
-    async def test_generate_llm_failure_without_fallback_key_raises(
-        self, monkeypatch
-    ):
-        """无回退 API Key 时必须显式报错，而不是静默返回空剧本。"""
+        assert result == SIMPLE_SCRIPT
+        assert [c["model_path"] for c in llm.calls] == [
+            "stub/script/model",
+            "cloud:stub/fallback-model",
+        ]
+        assert llm.calls[-1]["temperature"] == 0.9
+        assert llm.calls[-1]["max_new_tokens"] == 800
+
+    async def test_generate_llm_failure_without_fallback_route_raises(self, monkeypatch):
+        """兜底路由缺失时必须显式报错，而不是静默返回空剧本。"""
         generator, _ = _make_generator()
         llm = _StubLLM(exc=RuntimeError("主 LLM 挂了"))
-        _patch_script_llm_deps(monkeypatch, llm)
-        monkeypatch.delenv("DEEPSEEK_API_KEY_QQBOT1", raising=False)
-        monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+        _patch_script_llm_deps(monkeypatch, llm, fallback_model="")
 
-        with pytest.raises(RuntimeError, match="无回退 API Key"):
+        with pytest.raises(RuntimeError, match="未配置可用兜底路由"):
             await generator.generate(**BASE_KWARGS)
 
-    async def test_generate_logs_raw_preview_when_debug_enabled(
-        self, monkeypatch
-    ):
+    async def test_generate_logs_raw_preview_when_debug_enabled(self, monkeypatch):
         """debug.peer_chat 打开时应输出原文预览（默认不落盘）。"""
         generator, _ = _make_generator()
         llm = _StubLLM(response="RAW")
         _patch_script_llm_deps(monkeypatch, llm, script=SIMPLE_SCRIPT)
         from core.services.active_care.peer_chat import peer_knowledge
 
-        monkeypatch.setattr(
-            peer_knowledge, "validate_peer_script", lambda *a, **k: []
-        )
+        monkeypatch.setattr(peer_knowledge, "validate_peer_script", lambda *a, **k: [])
 
         module = peer_script_llm_module()
         monkeypatch.setattr(module, "is_debug_enabled", lambda key: True)
@@ -772,9 +726,7 @@ class TestPeerScriptLLMGenerator:
         await generator.generate(**BASE_KWARGS)
         assert any("raw_preview" in str(args) for _, args in logged)
 
-    async def test_generate_swallows_metrics_failure_on_timeout(
-        self, monkeypatch
-    ):
+    async def test_generate_swallows_metrics_failure_on_timeout(self, monkeypatch):
         """超时路径里指标模块不可用时，仍应返回空剧本。"""
         generator, _ = _make_generator()
         llm = _StubLLM(response="x")
@@ -794,9 +746,7 @@ class TestPeerScriptLLMGenerator:
         assert result == []
         assert len(proxy.timeouts) == 1
 
-    async def test_generate_swallows_metrics_failure_on_parse_retry(
-        self, monkeypatch
-    ):
+    async def test_generate_swallows_metrics_failure_on_parse_retry(self, monkeypatch):
         """解析失败重试路径里指标模块不可用时，仍应走完重试并返回空剧本。"""
         generator, _ = _make_generator()
         llm = _StubLLM(response="x")
@@ -813,18 +763,14 @@ class TestPeerScriptLLMGenerator:
         result = await generator.generate(**BASE_KWARGS)
         assert result == []
 
-    async def test_generate_swallows_metrics_failure_on_success(
-        self, monkeypatch
-    ):
+    async def test_generate_swallows_metrics_failure_on_success(self, monkeypatch):
         """成功路径里指标模块不可用时，仍应正常返回剧本。"""
         generator, _ = _make_generator()
         llm = _StubLLM(response="x")
         _patch_script_llm_deps(monkeypatch, llm, script=SIMPLE_SCRIPT)
         from core.services.active_care.peer_chat import peer_knowledge
 
-        monkeypatch.setattr(
-            peer_knowledge, "validate_peer_script", lambda *a, **k: []
-        )
+        monkeypatch.setattr(peer_knowledge, "validate_peer_script", lambda *a, **k: [])
 
         from core.services.active_care.peer_chat import peer_chat_metrics
 
@@ -836,9 +782,7 @@ class TestPeerScriptLLMGenerator:
         result = await generator.generate(**BASE_KWARGS)
         assert result == SIMPLE_SCRIPT
 
-    async def test_generate_retry_exception_is_logged_and_returns_empty(
-        self, monkeypatch
-    ):
+    async def test_generate_retry_exception_is_logged_and_returns_empty(self, monkeypatch):
         """重试阶段抛异常时应记日志并返回空剧本，不让异常冒泡。"""
         generator, _ = _make_generator()
         llm = _StubLLM(response="x")
@@ -858,6 +802,7 @@ class TestPeerScriptLLMGenerator:
 # peer_script_dispatch.py
 # ============================================================
 
+
 class _StubAvelineService:
     """替身 AvelineService：记录 dispatch 调用，可编程 delivered。"""
 
@@ -874,9 +819,7 @@ def _patch_dispatch_deps(monkeypatch, service):
     """替换 dispatch 依赖的 AvelineService 与 cid 构造函数。"""
     import core.core_engine.service_singletons as singletons
 
-    monkeypatch.setattr(
-        singletons, "get_aveline_service", lambda: service
-    )
+    monkeypatch.setattr(singletons, "get_aveline_service", lambda: service)
     import clients.bots.qq.utils as qq_utils
 
     monkeypatch.setattr(
@@ -907,21 +850,19 @@ class TestDispatchScript:
         monkeypatch.setattr(singletons, "get_aveline_service", lambda: None)
 
         sent, notify, content = await peer_script_dispatch.dispatch_script(
-            script=SIMPLE_SCRIPT, role_id="aveline", peer_role_id="ling",
+            script=SIMPLE_SCRIPT,
+            role_id="aveline",
+            peer_role_id="ling",
             cfg=DISPATCH_CFG,
         )
         assert (sent, notify, content) == (False, False, "")
 
-    async def test_dispatch_logs_routing_and_delay_when_debug_enabled(
-        self, monkeypatch
-    ):
+    async def test_dispatch_logs_routing_and_delay_when_debug_enabled(self, monkeypatch):
         """debug.peer_script 打开时，两条路由分支与消息间延迟都要落日志。"""
         service = _StubAvelineService()
         _patch_dispatch_deps(monkeypatch, service)
 
-        monkeypatch.setattr(
-            peer_script_dispatch, "is_debug_enabled", lambda key: True
-        )
+        monkeypatch.setattr(peer_script_dispatch, "is_debug_enabled", lambda key: True)
         logged = []
 
         class _Logger:
@@ -943,7 +884,9 @@ class TestDispatchScript:
         )
 
         sent, _notify, _content = await peer_script_dispatch.dispatch_script(
-            script=SIMPLE_SCRIPT, role_id="aveline", peer_role_id="ling",
+            script=SIMPLE_SCRIPT,
+            role_id="aveline",
+            peer_role_id="ling",
             cfg=DISPATCH_CFG,
         )
 
@@ -954,15 +897,15 @@ class TestDispatchScript:
         # 只有非末句才需要延迟日志（2 条 → 1 次）
         assert sum(1 for t in texts if "剧本延迟" in t) == 1
 
-    async def test_dispatch_routes_each_line_to_correct_conversation(
-        self, monkeypatch
-    ):
+    async def test_dispatch_routes_each_line_to_correct_conversation(self, monkeypatch):
         """每一行按 line_role 路由到对应角色的 conversation 与目标 QQ。"""
         service = _StubAvelineService()
         _patch_dispatch_deps(monkeypatch, service)
 
         sent, _, _ = await peer_script_dispatch.dispatch_script(
-            script=SIMPLE_SCRIPT, role_id="aveline", peer_role_id="ling",
+            script=SIMPLE_SCRIPT,
+            role_id="aveline",
+            peer_role_id="ling",
             cfg=DISPATCH_CFG,
         )
         assert sent is True
@@ -984,7 +927,9 @@ class TestDispatchScript:
         _patch_dispatch_deps(monkeypatch, service)
 
         await peer_script_dispatch.dispatch_script(
-            script=SIMPLE_SCRIPT, role_id="aveline", peer_role_id="ling",
+            script=SIMPLE_SCRIPT,
+            role_id="aveline",
+            peer_role_id="ling",
             cfg=DISPATCH_CFG,
         )
         # content 保持纯台词
@@ -1002,7 +947,9 @@ class TestDispatchScript:
             {"role": "ye", "content": "不该出现"},
         ]
         await peer_script_dispatch.dispatch_script(
-            script=script, role_id="aveline", peer_role_id="ling",
+            script=script,
+            role_id="aveline",
+            peer_role_id="ling",
             cfg=DISPATCH_CFG,
         )
         assert len(service.calls) == 1
@@ -1018,14 +965,14 @@ class TestDispatchScript:
             {"role": "ling", "content": "有内容"},
         ]
         await peer_script_dispatch.dispatch_script(
-            script=script, role_id="aveline", peer_role_id="ling",
+            script=script,
+            role_id="aveline",
+            peer_role_id="ling",
             cfg=DISPATCH_CFG,
         )
         assert len(service.calls) == 1
 
-    async def test_dispatch_sets_notify_only_for_last_line_mention(
-        self, monkeypatch
-    ):
+    async def test_dispatch_sets_notify_only_for_last_line_mention(self, monkeypatch):
         """仅当最后一行 mention_user 时才通知主人（避免中途刷屏）。"""
         service = _StubAvelineService()
         _patch_dispatch_deps(monkeypatch, service)
@@ -1035,7 +982,9 @@ class TestDispatchScript:
             {"role": "ling", "content": "最后一句", "mention_user": True},
         ]
         _, notify, content = await peer_script_dispatch.dispatch_script(
-            script=script, role_id="aveline", peer_role_id="ling",
+            script=script,
+            role_id="aveline",
+            peer_role_id="ling",
             cfg=DISPATCH_CFG,
         )
         assert notify is True
@@ -1051,7 +1000,9 @@ class TestDispatchScript:
             {"role": "ling", "content": "最后一句", "mention_user": False},
         ]
         _, notify, content = await peer_script_dispatch.dispatch_script(
-            script=script, role_id="aveline", peer_role_id="ling",
+            script=script,
+            role_id="aveline",
+            peer_role_id="ling",
             cfg=DISPATCH_CFG,
         )
         assert notify is False
@@ -1063,7 +1014,9 @@ class TestDispatchScript:
         _patch_dispatch_deps(monkeypatch, service)
 
         sent, _, _ = await peer_script_dispatch.dispatch_script(
-            script=SIMPLE_SCRIPT, role_id="aveline", peer_role_id="ling",
+            script=SIMPLE_SCRIPT,
+            role_id="aveline",
+            peer_role_id="ling",
             cfg=DISPATCH_CFG,
         )
         assert sent is False
@@ -1074,7 +1027,9 @@ class TestDispatchScript:
         _patch_dispatch_deps(monkeypatch, service)
 
         await peer_script_dispatch.dispatch_script(
-            script=SIMPLE_SCRIPT, role_id="aveline", peer_role_id="ling",
+            script=SIMPLE_SCRIPT,
+            role_id="aveline",
+            peer_role_id="ling",
             cfg=DISPATCH_CFG,
         )
         assert service.calls[0]["original_primary_conversation_id"] == "private_10001"
@@ -1084,6 +1039,7 @@ class TestDispatchScript:
 # ============================================================
 # peer_script_hooks.py
 # ============================================================
+
 
 class _StubHookHost:
     """替身 ActiveCareExecutor：记录 write_diary_entry / trigger_message 调用。"""
@@ -1112,9 +1068,7 @@ def _patch_hook_deps(monkeypatch, *, append_calls=None, heal_service=None):
 
     import core.services.auto_heal.heal_service as heal_module
 
-    monkeypatch.setattr(
-        heal_module, "get_auto_heal_service", lambda: heal_service
-    )
+    monkeypatch.setattr(heal_module, "get_auto_heal_service", lambda: heal_service)
 
 
 HOOK_CFG = {
@@ -1133,8 +1087,13 @@ class TestRunPeerPostHooks:
         _patch_hook_deps(monkeypatch)
 
         await peer_script_hooks.run_peer_post_hooks(
-            script=SIMPLE_SCRIPT, role_id="aveline", peer_role_id="ling",
-            cfg=HOOK_CFG, should_notify_user=False, notify_content="", host=host,
+            script=SIMPLE_SCRIPT,
+            role_id="aveline",
+            peer_role_id="ling",
+            cfg=HOOK_CFG,
+            should_notify_user=False,
+            notify_content="",
+            host=host,
         )
         assert len(host.diary_calls) == 1
         entry = host.diary_calls[0]
@@ -1149,8 +1108,13 @@ class TestRunPeerPostHooks:
         _patch_hook_deps(monkeypatch, append_calls=appends)
 
         await peer_script_hooks.run_peer_post_hooks(
-            script=SIMPLE_SCRIPT, role_id="aveline", peer_role_id="ling",
-            cfg=HOOK_CFG, should_notify_user=False, notify_content="", host=host,
+            script=SIMPLE_SCRIPT,
+            role_id="aveline",
+            peer_role_id="ling",
+            cfg=HOOK_CFG,
+            should_notify_user=False,
+            notify_content="",
+            host=host,
         )
         assert len(appends) == 2
         assert all(c["conversation_id"] == "peer_aveline" for c in appends)
@@ -1168,8 +1132,13 @@ class TestRunPeerPostHooks:
             {"role": "ling", "content": ""},
         ]
         await peer_script_hooks.run_peer_post_hooks(
-            script=script, role_id="aveline", peer_role_id="ling",
-            cfg=HOOK_CFG, should_notify_user=False, notify_content="", host=host,
+            script=script,
+            role_id="aveline",
+            peer_role_id="ling",
+            cfg=HOOK_CFG,
+            should_notify_user=False,
+            notify_content="",
+            host=host,
         )
         assert len(appends) == 1
 
@@ -1179,9 +1148,13 @@ class TestRunPeerPostHooks:
         _patch_hook_deps(monkeypatch)
 
         await peer_script_hooks.run_peer_post_hooks(
-            script=SIMPLE_SCRIPT, role_id="aveline", peer_role_id="ling",
-            cfg=HOOK_CFG, should_notify_user=True,
-            notify_content="问主人周末有没有空", host=host,
+            script=SIMPLE_SCRIPT,
+            role_id="aveline",
+            peer_role_id="ling",
+            cfg=HOOK_CFG,
+            should_notify_user=True,
+            notify_content="问主人周末有没有空",
+            host=host,
         )
         assert len(host.trigger_calls) == 1
         call = host.trigger_calls[0]
@@ -1196,8 +1169,13 @@ class TestRunPeerPostHooks:
         _patch_hook_deps(monkeypatch)
 
         await peer_script_hooks.run_peer_post_hooks(
-            script=SIMPLE_SCRIPT, role_id="aveline", peer_role_id="ling",
-            cfg=HOOK_CFG, should_notify_user=False, notify_content="", host=host,
+            script=SIMPLE_SCRIPT,
+            role_id="aveline",
+            peer_role_id="ling",
+            cfg=HOOK_CFG,
+            should_notify_user=False,
+            notify_content="",
+            host=host,
         )
         assert host.trigger_calls == []
 
@@ -1214,14 +1192,17 @@ class TestRunPeerPostHooks:
         monkeypatch.setattr(singletons, "get_aveline_service", lambda: _BadService())
         import core.services.auto_heal.heal_service as heal_module
 
-        monkeypatch.setattr(
-            heal_module, "get_auto_heal_service", lambda: None
-        )
+        monkeypatch.setattr(heal_module, "get_auto_heal_service", lambda: None)
 
         # 不抛异常即为通过
         await peer_script_hooks.run_peer_post_hooks(
-            script=SIMPLE_SCRIPT, role_id="aveline", peer_role_id="ling",
-            cfg=HOOK_CFG, should_notify_user=True, notify_content="x", host=host,
+            script=SIMPLE_SCRIPT,
+            role_id="aveline",
+            peer_role_id="ling",
+            cfg=HOOK_CFG,
+            should_notify_user=True,
+            notify_content="x",
+            host=host,
         )
         assert len(host.diary_calls) == 1
         assert len(host.trigger_calls) == 1

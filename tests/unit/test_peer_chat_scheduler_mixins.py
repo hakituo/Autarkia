@@ -36,6 +36,7 @@ from core.services.active_care.peer_chat.scheduler_sleep_gate import (
 # 最小宿主构造器
 # ============================================================
 
+
 def _make_health_host():
     """构造只带健康追踪字段的最小宿主。"""
 
@@ -81,6 +82,7 @@ def health_host():
 # ============================================================
 # scheduler_health.py
 # ============================================================
+
 
 class TestPeerChatHealthMixin:
     """成功/失败计数、退避间隔、健康快照。"""
@@ -291,6 +293,7 @@ class TestPeerChatHealthMixin:
 # scheduler_lifecycle.py
 # ============================================================
 
+
 def _make_lifecycle_host():
     """构造生命周期宿主：不真正起循环，用替身记录 start/stop 行为。"""
 
@@ -456,9 +459,7 @@ class TestPeerChatLifecycleMixin:
         class _Engine:
             _running = True
 
-        monkeypatch.setattr(
-            engine_module, "get_character_daily_engine", lambda: _Engine()
-        )
+        monkeypatch.setattr(engine_module, "get_character_daily_engine", lambda: _Engine())
         assert real_impl() is True
 
     def test_is_character_daily_active_false_when_engine_none(self, monkeypatch):
@@ -466,9 +467,7 @@ class TestPeerChatLifecycleMixin:
         real_impl = PeerChatLifecycleMixin._is_character_daily_active
         import core.services.character_daily.engine as engine_module
 
-        monkeypatch.setattr(
-            engine_module, "get_character_daily_engine", lambda: None
-        )
+        monkeypatch.setattr(engine_module, "get_character_daily_engine", lambda: None)
         assert real_impl() is False
 
     def test_loop_crash_logs_and_schedules_restart(self, monkeypatch):
@@ -537,6 +536,7 @@ class TestPeerChatLifecycleMixin:
 # scheduler_sleep_gate.py
 # ============================================================
 
+
 class _StubSleepState:
     def __init__(self, phase):
         self.phase = phase
@@ -563,9 +563,7 @@ def _make_sleep_gate_host(monkeypatch, phases_by_role=None, connections=None, st
 
     if phases_by_role is not None:
         stub_manager = _StubSleepManager(phases_by_role)
-        monkeypatch.setattr(
-            gate_module, "get_sleep_manager", lambda: stub_manager, raising=False
-        )
+        monkeypatch.setattr(gate_module, "get_sleep_manager", lambda: stub_manager, raising=False)
         # mixin 内部是函数体内 import，因此必须 patch 包级导出
         import core.services.life_simulation as life_pkg
 
@@ -888,6 +886,7 @@ class TestIsUserSleeping:
         这是多角色遍历里的 `except Exception: continue`：一个角色的存储出问题，
         不应连带影响其他角色的睡眠判定。
         """
+
         class _FlakyStorage:
             """aveline 读状态抛异常，ling 正常返回晚安态。"""
 
@@ -961,26 +960,20 @@ class TestIsUserSleeping:
         monkeypatch.setattr(
             qq_main.QQAdapter,
             "get_active_instances",
-            classmethod(
-                lambda cls: [{"adapter": _Adapter()}, {"adapter": None}]
-            ),
+            classmethod(lambda cls: [{"adapter": _Adapter()}, {"adapter": None}]),
         )
 
         host = _make_sleep_gate_host(monkeypatch)
         assert host._resolve_master_qq_id() == "123456"
 
-    def test_resolve_master_qq_id_returns_empty_when_lookup_fails(
-        self, monkeypatch
-    ):
+    def test_resolve_master_qq_id_returns_empty_when_lookup_fails(self, monkeypatch):
         """活跃实例查询抛异常时返回空串，不把异常抛给调度器。"""
         import clients.bots.qq.main as qq_main
 
         def _boom(cls):
             raise RuntimeError("QQ 未启动")
 
-        monkeypatch.setattr(
-            qq_main.QQAdapter, "get_active_instances", classmethod(_boom)
-        )
+        monkeypatch.setattr(qq_main.QQAdapter, "get_active_instances", classmethod(_boom))
 
         host = _make_sleep_gate_host(monkeypatch)
         assert host._resolve_master_qq_id() == ""

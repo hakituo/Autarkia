@@ -39,9 +39,9 @@ class QQOfficialConfig:
     role_name: str = ""
     
     # 小悠后端连接
-    xiaoyou_ws_url: str = "ws://127.0.0.1:8000/api/v1/ws"
-    xiaoyou_http_base_url: str = ""
-    xiaoyou_access_token: str = ""
+    autarkia_ws_url: str = "ws://127.0.0.1:8000/api/v1/ws"
+    autarkia_http_base_url: str = ""
+    autarkia_access_token: str = ""
     
     # 主人QQ号
     master_qq_id: str = ""
@@ -145,8 +145,8 @@ class QQOfficialConfig:
         env_mappings = {
             "app_id": ["QQ_OFFICIAL_APP_ID"],
             "app_secret": ["QQ_OFFICIAL_APP_SECRET"],
-            "master_qq_id": ["QQ_OFFICIAL_MASTER_QQ_ID", "XIAOYOU_QQ_MASTER_ID"],
-            "xiaoyou_access_token": ["XIAOYOU_ACCESS_TOKEN"],
+            "master_qq_id": ["QQ_OFFICIAL_MASTER_QQ_ID", "AUTARKIA_QQ_MASTER_ID"],
+            "autarkia_access_token": ["AUTARKIA_ACCESS_TOKEN"],
             "profile_filename": ["QQ_OFFICIAL_PERSONA_FILE"],
             "sandbox_mode": ["QQ_OFFICIAL_SANDBOX"],
         }

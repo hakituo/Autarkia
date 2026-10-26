@@ -1,27 +1,26 @@
 package com.aveline.ai.mobile.presentation.settings
 
-import com.aveline.ai.mobile.domain.models.AIModel
-import com.aveline.ai.mobile.domain.models.ResponseLength
+import com.aveline.ai.mobile.services.endpoint.resolver.EndpointCandidateProbe
 
 /**
- * 设置界面 UI 状态
+ * 设置界面 UI 状态。
  *
- * 包含权限状态、后端配置、模型选择、语音设置等所有设置相关状态。
- * [ConnectionTestResult] 定义在 SettingsViewModel.kt 底部。
+ * 设置页已从五个 Tab 收成一页分组列表：这里只保留列表需要的开关、地址槽位、
+ * 当前通道与版本信息；模型 / 回复长度 / 语音等已从设置页移除。
  */
 data class SettingsUiState(
-    // 权限状态
+    // 权限（无障碍与 Shizuku 由界面层检测，避免 ViewModel 依赖系统服务）
     val hasUsageStatsPermission: Boolean = false,
     val hasNotificationPermission: Boolean = false,
 
     // 隐私 / 同步
     val isContextSyncEnabled: Boolean = true,
     val residentModeEnabled: Boolean = false,
-    /** 开启常驻模式时,若不在电池优化白名单则置 true,UI 弹引导对话框 */
+    /** 开启常驻模式时，若不在电池优化白名单则置 true，UI 弹引导对话框 */
     val showBatteryOptimizationRequest: Boolean = false,
 
-    // 后端配置
-    /** 手动锁定的后端地址；留空 = 自动在局域网/公网之间选择 */
+    // 地址槽位
+    /** 手动锁定的后端地址；留空 = 自动在局域网 / 组网 / 公网之间选择 */
     val backendUrl: String = "",
     /** 局域网地址槽位（自动发现或手填），在家优先走它 */
     val lanUrl: String = "",
@@ -31,7 +30,7 @@ data class SettingsUiState(
     val tunnelUrl: String = "",
     /** 当前生效地址（裁决结果），只读展示 */
     val activeUrl: String = "",
-    /** 当前生效通道的中文名（局域网 / 组网 / 公网 / 手动锁定 / 未确定），只读展示 */
+    /** 当前生效通道的中文名（局域网 / 组网 / 公网 / 手动锁定 / 未确定） */
     val activeChannel: String = "",
     /**
      * 当前生效地址这次裁决到底通不通。
@@ -40,70 +39,48 @@ data class SettingsUiState(
      * 否则用户看到的还是「当前通道：局域网」，会以为问题在别处。
      */
     val activeReachable: Boolean = true,
+    /** 当前生效地址最近一次探测延迟；没探过或不可达时为 null */
+    val activeLatencyMs: Long? = null,
     val accessToken: String = "",
     val isTestingConnection: Boolean = false,
+    /** 重新裁决 / 保存地址后的重探中，与「测试连接」分开，两个按钮各自显示 loading。 */
+    val isReprobing: Boolean = false,
     val connectionTestResult: ConnectionTestResult? = null,
-    val showSaveConfirm: Boolean = false,
-    /**
-     * 地址槽位里有「改了但还没生效」的内容。
-     *
-     * 三个自动槽位边打字边落盘、但还要等一次重新裁决才生效；手动锁定槽位则**只在点
-     * 「保存」时落盘**。所以只要输入框里的值和已保存的值不一致，就必须在界面上明说 ——
-     * 否则用户会以为「我填了地址没生效」（实测：填了外部域名，界面一直显示局域网）。
-     */
-    val hasUnsavedChanges: Boolean = false,
 
-    // 模型选择
-    val availableModels: List<AIModel> = emptyList(),
-    val selectedModel: AIModel? = null,
-    val isLoadingModels: Boolean = false,
-    val modelLoadError: String? = null,
+    // 网络页候选探测
+    val candidateProbes: List<EndpointCandidateProbe> = emptyList(),
+    val isProbingCandidates: Boolean = false,
 
-    // 语音 / 响应
-    val selectedVoiceId: String = "",
-    val responseLength: ResponseLength = ResponseLength.NORMAL,
+    // 对话
     val autoTtsEnabled: Boolean = false,
+    /** 括号里的动作 / 场景描写是否渲染成居中旁白 */
+    val stageDirectionEnabled: Boolean = true,
 
     // 数据 / 版本
     val appVersion: String = "1.0.0",
     val buildVersion: String = "1",
     val showClearConfirm: Boolean = false,
     val isClearing: Boolean = false,
-    /** 清除历史失败时的错误信息,非 null 表示需向用户展示 */
+    /** 清除历史失败时的错误信息，非 null 表示需向用户展示 */
     val clearError: String? = null
 ) {
-    /**
-     * 地址槽位是否合法：至少填了一个，且填了的都是合法 URL。
-     *
-     * 四个槽位都可能为空（纯自动发现模式），所以不能要求每个都合法；
-     * 但填了就必须合法 —— 留着一条错的地址会让裁决器白等一个超时。
-     */
-    val isBackendUrlValid: Boolean
-        get() {
-            val filled = listOf(backendUrl, lanUrl, vpnUrl, tunnelUrl)
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-            return filled.isNotEmpty() && filled.none { isInvalidBackendUrl(it) }
-        }
-
-    /** 两项权限是否全部授予 */
-    val allPermissionsGranted: Boolean
-        get() = hasUsageStatsPermission && hasNotificationPermission
-
-    /** 未授予的权限数量 */
-    val missingPermissionsCount: Int
-        get() = listOf(hasUsageStatsPermission, hasNotificationPermission)
-            .count { !it }
+    /** 状态卡上的地址：去掉协议头，长域名交给 maxLines 截断。 */
+    val activeAddress: String
+        get() = addressWithoutScheme(activeUrl)
 }
+
+/** 连接测试结果 */
+data class ConnectionTestResult(
+    val success: Boolean,
+    val message: String
+)
 
 private val BACKEND_URL_PATTERN = Regex("^(https?://).+")
 
 /**
- * 地址槽位是否「填了但格式不对」，供 UI 标红。
+ * 地址槽位是否「填了但格式不对」，供输入框标红与保存按钮禁用。
  *
- * 放在顶层而不是 SettingsUiState 里：网络分区（SettingsGeneralSections）拿到的是
- * 三个字符串而不是整个 state，两边必须共用同一套判断，否则会出现「保存按钮可点、
- * 输入框却标红」这种自相矛盾的界面。
+ * 留空合法：局域网 / 组网 / 公网 / 手动锁定都允许为空（空 = 该通道未启用）。
  */
 internal fun isInvalidBackendUrl(value: String): Boolean {
     val trimmed = value.trim()

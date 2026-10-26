@@ -49,7 +49,9 @@ class PersonaViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             runCatching {
-                val personas = personaRepository.getPersonasRaw().getOrThrow()
+                // 走进程内缓存：人设列表是角色详情面板的首屏内容，
+                // 每次打开都打网络只会让面板白屏转圈（缓存在增删改时自动失效）。
+                val personas = personaRepository.getPersonasRawCached().getOrThrow()
                 // 角色默认音色：从 persona 响应的 default_voice 取（用于显示"当前用哪个"）。
                 val defaultVoices = mutableMapOf<String, String>()
                 personas.forEach { element ->

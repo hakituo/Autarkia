@@ -10,12 +10,12 @@ core/character/configs/variants/qq_accounts_secret.json 读取。
   QQ 号改为 1744805213；核心 scope 与人设仍注册为 rushuang（persona_scope）。
 
 因此本脚本区分两层命名：
-- `rid`（tt / ye）：multi_qq_config.json 的 key 与 XIAOYOU_QQ_BOT_NUMBER_<RID> 后缀；
+- `rid`（tt / ye）：multi_qq_config.json 的 key 与 AUTARKIA_QQ_BOT_NUMBER_<RID> 后缀；
 - `persona_scope`（rushuang / ye）：personas.py、自主角色白名单使用的核心 scope。
 
 校验点：
 1. clients/bots/multi_qq_config.json 已含 tt/ye 角色配置（端口 3003/3004、人设文件存在）
-2. .env 已配置 XIAOYOU_QQ_BOT_NUMBER_TT/YE 与 DEEPSEEK_API_KEY_Rushuang/Yeye
+2. .env 已配置 AUTARKIA_QQ_BOT_NUMBER_TT/YE 与 DEEPSEEK_API_KEY_Rushuang/Yeye
 3. NapCat 配置文件（onebot11_<qq>.json）存在且 WebSocket 端口匹配 3003/3004
 4. personas.py 已注册 ye/rushuang（get_all_role_ids / get_peer_role_ids）
 5. good_morning/goodnight 的 QQ 人设解析（personas.get_qq_profile_filename，权威源 multi_qq_config.json）已含 tt/ye
@@ -127,7 +127,7 @@ def main() -> int:
     print("\n=== 2. .env 环境变量 ===")
     env = _load_dotenv_dict(PROJECT_ROOT / ".env")
     for rid, info in NEW_ACCOUNTS.items():
-        env_key = f"XIAOYOU_QQ_BOT_NUMBER_{rid.upper()}"
+        env_key = f"AUTARKIA_QQ_BOT_NUMBER_{rid.upper()}"
         if info["qq"] is None:
             print(f"  [WARN] {rid} 缺少真实 QQ 号（secret 文件缺失），跳过 {env_key} 数值比对")
         else:

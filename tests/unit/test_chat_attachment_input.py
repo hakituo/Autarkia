@@ -43,16 +43,16 @@ def test_split_message_keeps_caption_and_lists_every_attachment():
 
 
 def test_split_message_uses_placeholder_when_only_attachments():
-    text, attachments = split_chat_attachment_message(
-        "[附件: /output/uploads/a.pdf]"
-    )
+    text, attachments = split_chat_attachment_message("[附件: /output/uploads/a.pdf]")
 
     assert text == "（用户发送了附件）"
     assert len(attachments) == 1
 
 
 def test_split_message_drops_untrusted_references():
-    original = "[附件: /etc/passwd]\n[附件: /output/uploads/../secret.txt]\n[附件: /output/uploads/a.exe]"
+    original = (
+        "[附件: /etc/passwd]\n[附件: /output/uploads/../secret.txt]\n[附件: /output/uploads/a.exe]"
+    )
     text, attachments = split_chat_attachment_message(original)
 
     assert text == original

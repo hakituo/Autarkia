@@ -204,7 +204,13 @@ async def llm_merge_preferences(
         except Exception:
             model_hint = ""
     if not model_hint:
-        model_hint = "cloud:deepseek:deepseek-v4-flash"
+        # 最后兜底也走 YAML 的 default_chat_model，避免代码里再写一份供应商路由。
+        try:
+            from config.model_config import get_default_chat_model
+
+            model_hint = get_default_chat_model("")
+        except Exception:
+            model_hint = ""
 
     items_text = _build_items_text(items)
     user_prompt = PREFERENCE_MERGE_USER_PROMPT_TEMPLATE.format(items_text=items_text)

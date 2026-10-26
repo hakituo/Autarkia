@@ -373,9 +373,7 @@ class TestRunSubprocessWithTimeout:
     @pytest.mark.asyncio
     async def test_timeout_kills_and_waits_then_reraises(self, monkeypatch):
         proc = _FakeProc(returncode=None)
-        monkeypatch.setattr(
-            async_subprocess, "asyncio", _FakeAsyncio(proc, raise_timeout=True)
-        )
+        monkeypatch.setattr(async_subprocess, "asyncio", _FakeAsyncio(proc, raise_timeout=True))
 
         with pytest.raises(asyncio.TimeoutError):
             await run_subprocess_with_timeout(["sleep", "999"], timeout=1)

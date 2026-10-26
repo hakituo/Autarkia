@@ -129,8 +129,9 @@ def _patch_settings(monkeypatch, reference_audio=None):
     monkeypatch.setattr(mod, "get_settings", lambda: _SettingsStub(reference_audio))
 
 
-def _patch_runtime(monkeypatch, *, frozen=False, executable="C:/app/python.exe",
-                   meipass=None, root=None):
+def _patch_runtime(
+    monkeypatch, *, frozen=False, executable="C:/app/python.exe", meipass=None, root=None
+):
     fake_sys = SimpleNamespace(frozen=frozen, executable=executable)
     if meipass is not None:
         fake_sys._MEIPASS = meipass
@@ -153,15 +154,23 @@ def _spy_bytes(engine, monkeypatch, result=b"RIFF", exc=None):
     return calls
 
 
-def _setup_bytes(engine, monkeypatch, *, get_plan=None, reference_audio=None,
-                 lock=False, root=None, frozen=False, executable="C:/app/python.exe",
-                 meipass=None):
+def _setup_bytes(
+    engine,
+    monkeypatch,
+    *,
+    get_plan=None,
+    reference_audio=None,
+    lock=False,
+    root=None,
+    frozen=False,
+    executable="C:/app/python.exe",
+    meipass=None,
+):
     """synthesize_bytes 的通用环境：假 session + 设置 + 资源锁。"""
     session = FakeSession(get_plan=get_plan)
     _patch_session(monkeypatch, session)
     _patch_settings(monkeypatch, reference_audio)
-    _patch_runtime(monkeypatch, frozen=frozen, executable=executable, meipass=meipass,
-                   root=root)
+    _patch_runtime(monkeypatch, frozen=frozen, executable=executable, meipass=meipass, root=root)
     lock_obj = _FakeLock() if lock else None
     monkeypatch.setattr(mod, "get_resource_lock", (lambda: lock_obj) if lock else None)
     return session, lock_obj
@@ -179,7 +188,7 @@ class TestSynthesize:
         monkeypatch.setattr(engine, "_synthesize_impl", _impl)
         result = await engine.synthesize("你好", speed=1.1)
         assert result is expected
-        assert observed == [True]          # 合成期间为 True
+        assert observed == [True]  # 合成期间为 True
         assert engine._is_generating is False  # finally 复位
 
     async def test_flag_reset_on_failure(self, engine, monkeypatch):
@@ -208,10 +217,16 @@ class TestSynthesizeImpl:
         assert result.tolist() == [1.0, 2.0, 3.0]
         assert calls == [("你好", {"speed": 1.3})]
 
-    @pytest.mark.parametrize("kwargs", [
-        {"lang": "en"}, {"text_lang": "ja"}, {"text_language": "ko"},
-        {"lang": "en", "text_lang": "ja"}, {},
-    ])
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"lang": "en"},
+            {"text_lang": "ja"},
+            {"text_language": "ko"},
+            {"lang": "en", "text_lang": "ja"},
+            {},
+        ],
+    )
     async def test_language_resolution_branches(self, engine, monkeypatch, tmp_path, kwargs):
         _patch_settings(monkeypatch, "ref.wav")
         _patch_runtime(monkeypatch, root=str(tmp_path))
@@ -228,14 +243,19 @@ class TestSynthesizeImpl:
         _patch_runtime(monkeypatch, root=str(tmp_path))
         calls = _spy_bytes(engine, monkeypatch)
 
-        await engine._synthesize_impl("hi", batch_size=3, speed_factor=1.2, pitch=2,
-                                      prompt_text="pt", prompt_lang="ja")
+        await engine._synthesize_impl(
+            "hi", batch_size=3, speed_factor=1.2, pitch=2, prompt_text="pt", prompt_lang="ja"
+        )
 
-        assert calls[0][1] == {"batch_size": 3, "speed_factor": 1.2, "pitch": 2,
-                               "prompt_text": "pt", "prompt_lang": "ja"}
+        assert calls[0][1] == {
+            "batch_size": 3,
+            "speed_factor": 1.2,
+            "pitch": 2,
+            "prompt_text": "pt",
+            "prompt_lang": "ja",
+        }
 
-    async def test_none_optional_params_kept_in_raw_kwargs(self, engine, monkeypatch,
-                                                           tmp_path):
+    async def test_none_optional_params_kept_in_raw_kwargs(self, engine, monkeypatch, tmp_path):
         _patch_settings(monkeypatch, "ref.wav")
         _patch_runtime(monkeypatch, root=str(tmp_path))
         calls = _spy_bytes(engine, monkeypatch)
@@ -247,13 +267,17 @@ class TestSynthesizeImpl:
 
     # ---------- 非 frozen 路径解析（通过 warning 日志观察解析结果）----------
 
-    @pytest.mark.parametrize("ref_audio,ref_kw,expected_tail", [
-        (None, None, ("ref_audio", "female", "ref_calm.wav")),
-        ("ref.wav", None, ("ref.wav",)),
-        (None, "custom/ref.wav", ("custom", "ref.wav")),
-    ])
-    async def test_non_frozen_ref_resolution(self, engine, monkeypatch, tmp_path,
-                                             log_records, ref_audio, ref_kw, expected_tail):
+    @pytest.mark.parametrize(
+        "ref_audio,ref_kw,expected_tail",
+        [
+            (None, None, ("ref_audio", "female", "ref_calm.wav")),
+            ("ref.wav", None, ("ref.wav",)),
+            (None, "custom/ref.wav", ("custom", "ref.wav")),
+        ],
+    )
+    async def test_non_frozen_ref_resolution(
+        self, engine, monkeypatch, tmp_path, log_records, ref_audio, ref_kw, expected_tail
+    ):
         _patch_settings(monkeypatch, ref_audio)
         _patch_runtime(monkeypatch, root=str(tmp_path))
         _spy_bytes(engine, monkeypatch)
@@ -265,11 +289,11 @@ class TestSynthesizeImpl:
             expected = os.path.abspath(os.path.join(str(tmp_path), *expected_tail))
         else:
             expected = os.path.join(str(tmp_path), *expected_tail)
-        assert any(f"does not exist locally: {expected}" in r.getMessage()
-                   for r in log_records)
+        assert any(f"does not exist locally: {expected}" in r.getMessage() for r in log_records)
 
-    async def test_existing_ref_audio_does_not_warn(self, engine, monkeypatch, tmp_path,
-                                                    log_records):
+    async def test_existing_ref_audio_does_not_warn(
+        self, engine, monkeypatch, tmp_path, log_records
+    ):
         ref = tmp_path / "ref.wav"
         ref.write_bytes(b"x")
         _patch_settings(monkeypatch, None)
@@ -296,19 +320,24 @@ class TestSynthesizeImpl:
         internal.mkdir()
         (internal / "ref.wav").write_bytes(b"x")
         _patch_settings(monkeypatch, "ref.wav")
-        _patch_runtime(monkeypatch, frozen=True, executable=str(tmp_path / "app.exe"),
-                       meipass=str(internal))
+        _patch_runtime(
+            monkeypatch, frozen=True, executable=str(tmp_path / "app.exe"), meipass=str(internal)
+        )
         _spy_bytes(engine, monkeypatch)
 
         await engine._synthesize_impl("hi")
         assert not any("does not exist locally" in r.getMessage() for r in log_records)
 
-    @pytest.mark.parametrize("ref_kw,expected_tail", [
-        (None, ("ref_audio", "female", "ref_calm.wav")),
-        ("rel.wav", ("rel.wav",)),
-    ])
-    async def test_frozen_fallback_and_relative(self, engine, monkeypatch, tmp_path,
-                                                log_records, ref_kw, expected_tail):
+    @pytest.mark.parametrize(
+        "ref_kw,expected_tail",
+        [
+            (None, ("ref_audio", "female", "ref_calm.wav")),
+            ("rel.wav", ("rel.wav",)),
+        ],
+    )
+    async def test_frozen_fallback_and_relative(
+        self, engine, monkeypatch, tmp_path, log_records, ref_kw, expected_tail
+    ):
         _patch_settings(monkeypatch, "ref.wav")
         _patch_runtime(monkeypatch, frozen=True, executable=str(tmp_path / "app.exe"))
         _spy_bytes(engine, monkeypatch)
@@ -317,8 +346,7 @@ class TestSynthesizeImpl:
         await engine._synthesize_impl("hi", **kwargs)
 
         expected = os.path.join(str(tmp_path), *expected_tail)
-        assert any(f"does not exist locally: {expected}" in r.getMessage()
-                   for r in log_records)
+        assert any(f"does not exist locally: {expected}" in r.getMessage() for r in log_records)
 
     # ---------- 错误分支 ----------
 
@@ -354,8 +382,12 @@ class TestSynthesizeBytes:
     @pytest.mark.parametrize("lock,body", [(True, b"WAVDATA"), (False, b"WAV")])
     async def test_success(self, engine, monkeypatch, tmp_path, lock, body):
         session, lock_obj = _setup_bytes(
-            engine, monkeypatch, get_plan=[FakeResponse(200, body=body)],
-            lock=lock, root=str(tmp_path))
+            engine,
+            monkeypatch,
+            get_plan=[FakeResponse(200, body=body)],
+            lock=lock,
+            root=str(tmp_path),
+        )
 
         assert await engine.synthesize_bytes("你好", speed=1.5) == body
         params = session.get_calls[0]["params"]
@@ -365,59 +397,85 @@ class TestSynthesizeBytes:
         assert (lock_obj.calls if lock_obj else []) == ([("TTS", True)] if lock else [])
 
     async def test_empty_body_returns_none(self, engine, monkeypatch, tmp_path):
-        _setup_bytes(engine, monkeypatch, get_plan=[FakeResponse(200, body=b"")],
-                     root=str(tmp_path))
+        _setup_bytes(
+            engine, monkeypatch, get_plan=[FakeResponse(200, body=b"")], root=str(tmp_path)
+        )
         assert await engine.synthesize_bytes("hi") is None
 
-    @pytest.mark.parametrize("lock,status,text", [
-        (False, 500, "boom"), (True, 404, "missing"),
-    ])
-    async def test_non_200_raises_api_error(self, engine, monkeypatch, tmp_path,
-                                            lock, status, text):
-        _setup_bytes(engine, monkeypatch, get_plan=[FakeResponse(status, text=text)],
-                     lock=lock, root=str(tmp_path))
+    @pytest.mark.parametrize(
+        "lock,status,text",
+        [
+            (False, 500, "boom"),
+            (True, 404, "missing"),
+        ],
+    )
+    async def test_non_200_raises_api_error(
+        self, engine, monkeypatch, tmp_path, lock, status, text
+    ):
+        _setup_bytes(
+            engine,
+            monkeypatch,
+            get_plan=[FakeResponse(status, text=text)],
+            lock=lock,
+            root=str(tmp_path),
+        )
         with pytest.raises(RuntimeError, match=f"GPT-SoVITS API Error: {status} - {text}"):
             await engine.synthesize_bytes("hi")
 
     async def test_connection_error_wrapped_and_cooldown(self, engine, monkeypatch, tmp_path):
-        _setup_bytes(engine, monkeypatch,
-                     get_plan=[aiohttp.ClientError("connection refused")], root=str(tmp_path))
+        _setup_bytes(
+            engine,
+            monkeypatch,
+            get_plan=[aiohttp.ClientError("connection refused")],
+            root=str(tmp_path),
+        )
 
         with pytest.raises(RuntimeError, match="服务未启动或不可用"):
             await engine.synthesize_bytes("hi")
         assert engine._control_unavailable_until > 0.0
 
     async def test_non_connection_error_reraised(self, engine, monkeypatch, tmp_path):
-        _setup_bytes(engine, monkeypatch, get_plan=[ValueError("bad params")],
-                     root=str(tmp_path))
+        _setup_bytes(engine, monkeypatch, get_plan=[ValueError("bad params")], root=str(tmp_path))
 
         with pytest.raises(ValueError, match="bad params"):
             await engine.synthesize_bytes("hi")
         assert engine._control_unavailable_until == 0.0
 
-    @pytest.mark.parametrize("kwargs,expected_lang", [
-        ({}, "zh"), ({"lang": "en"}, "en"), ({"text_lang": "ja"}, "ja"),
-        ({"text_language": "ko"}, "ko"),
-    ])
-    async def test_language_resolution(self, engine, monkeypatch, tmp_path, kwargs,
-                                       expected_lang):
+    @pytest.mark.parametrize(
+        "kwargs,expected_lang",
+        [
+            ({}, "zh"),
+            ({"lang": "en"}, "en"),
+            ({"text_lang": "ja"}, "ja"),
+            ({"text_language": "ko"}, "ko"),
+        ],
+    )
+    async def test_language_resolution(self, engine, monkeypatch, tmp_path, kwargs, expected_lang):
         session, _ = _setup_bytes(
-            engine, monkeypatch, get_plan=[FakeResponse(200, body=b"W")], root=str(tmp_path))
+            engine, monkeypatch, get_plan=[FakeResponse(200, body=b"W")], root=str(tmp_path)
+        )
         await engine.synthesize_bytes("hi", **kwargs)
         assert session.get_calls[0]["params"]["text_lang"] == expected_lang
 
     async def test_optional_params_included(self, engine, monkeypatch, tmp_path):
         session, _ = _setup_bytes(
-            engine, monkeypatch, get_plan=[FakeResponse(200, body=b"W")], root=str(tmp_path))
-        await engine.synthesize_bytes("hi", batch_size=2, speed_factor=0.9, pitch=1,
-                                      prompt_text="p")
+            engine, monkeypatch, get_plan=[FakeResponse(200, body=b"W")], root=str(tmp_path)
+        )
+        await engine.synthesize_bytes(
+            "hi", batch_size=2, speed_factor=0.9, pitch=1, prompt_text="p"
+        )
         params = session.get_calls[0]["params"]
-        assert (params["batch_size"], params["speed_factor"], params["pitch"],
-                params["prompt_text"]) == (2, 0.9, 1, "p")
+        assert (
+            params["batch_size"],
+            params["speed_factor"],
+            params["pitch"],
+            params["prompt_text"],
+        ) == (2, 0.9, 1, "p")
 
     async def test_optional_params_none_dropped(self, engine, monkeypatch, tmp_path):
         session, _ = _setup_bytes(
-            engine, monkeypatch, get_plan=[FakeResponse(200, body=b"W")], root=str(tmp_path))
+            engine, monkeypatch, get_plan=[FakeResponse(200, body=b"W")], root=str(tmp_path)
+        )
         await engine.synthesize_bytes("hi", batch_size=None, speed_factor=None, pitch=None)
         params = session.get_calls[0]["params"]
         assert "batch_size" not in params and "speed_factor" not in params
@@ -425,48 +483,70 @@ class TestSynthesizeBytes:
 
     async def test_relative_ref_audio_absolutized(self, engine, monkeypatch, tmp_path):
         session, _ = _setup_bytes(
-            engine, monkeypatch, get_plan=[FakeResponse(200, body=b"W")], root=str(tmp_path))
+            engine, monkeypatch, get_plan=[FakeResponse(200, body=b"W")], root=str(tmp_path)
+        )
         await engine.synthesize_bytes("hi", ref_audio_path="custom/ref.wav")
         expected = os.path.abspath(os.path.join(str(tmp_path), "custom", "ref.wav"))
         assert session.get_calls[0]["params"]["ref_audio_path"] == expected
 
     async def test_non_frozen_relative_default_ref(self, engine, monkeypatch, tmp_path):
         session, _ = _setup_bytes(
-            engine, monkeypatch, get_plan=[FakeResponse(200, body=b"W")],
-            reference_audio="ref.wav", root=str(tmp_path))
+            engine,
+            monkeypatch,
+            get_plan=[FakeResponse(200, body=b"W")],
+            reference_audio="ref.wav",
+            root=str(tmp_path),
+        )
         await engine.synthesize_bytes("hi")
-        assert session.get_calls[0]["params"]["ref_audio_path"] == \
-            os.path.join(str(tmp_path), "ref.wav")
+        assert session.get_calls[0]["params"]["ref_audio_path"] == os.path.join(
+            str(tmp_path), "ref.wav"
+        )
 
     async def test_frozen_default_ref_resolution(self, engine, monkeypatch, tmp_path):
         session, _ = _setup_bytes(
-            engine, monkeypatch, get_plan=[FakeResponse(200, body=b"W")],
-            frozen=True, executable=str(tmp_path / "app.exe"))
+            engine,
+            monkeypatch,
+            get_plan=[FakeResponse(200, body=b"W")],
+            frozen=True,
+            executable=str(tmp_path / "app.exe"),
+        )
         await engine.synthesize_bytes("hi")
-        assert session.get_calls[0]["params"]["ref_audio_path"] == \
-            os.path.join(str(tmp_path), "ref_audio", "female", "ref_calm.wav")
+        assert session.get_calls[0]["params"]["ref_audio_path"] == os.path.join(
+            str(tmp_path), "ref_audio", "female", "ref_calm.wav"
+        )
 
     async def test_frozen_relative_ref_uses_executable_dir(self, engine, monkeypatch, tmp_path):
         session, _ = _setup_bytes(
-            engine, monkeypatch, get_plan=[FakeResponse(200, body=b"W")],
-            reference_audio="ref.wav", frozen=True,
-            executable=str(tmp_path / "app.exe"))
+            engine,
+            monkeypatch,
+            get_plan=[FakeResponse(200, body=b"W")],
+            reference_audio="ref.wav",
+            frozen=True,
+            executable=str(tmp_path / "app.exe"),
+        )
         await engine.synthesize_bytes("hi", ref_audio_path="rel.wav")
-        assert session.get_calls[0]["params"]["ref_audio_path"] == \
-            os.path.join(str(tmp_path), "rel.wav")
+        assert session.get_calls[0]["params"]["ref_audio_path"] == os.path.join(
+            str(tmp_path), "rel.wav"
+        )
 
     @pytest.mark.parametrize("external_exists", [True, False])
-    async def test_frozen_external_or_internal_ref(self, engine, monkeypatch, tmp_path,
-                                                   external_exists):
+    async def test_frozen_external_or_internal_ref(
+        self, engine, monkeypatch, tmp_path, external_exists
+    ):
         internal = tmp_path / "internal"
         internal.mkdir()
         (internal / "ref.wav").write_bytes(b"x")
         if external_exists:
             (tmp_path / "ref.wav").write_bytes(b"x")
         session, _ = _setup_bytes(
-            engine, monkeypatch, get_plan=[FakeResponse(200, body=b"W")],
-            reference_audio="ref.wav", frozen=True,
-            executable=str(tmp_path / "app.exe"), meipass=str(internal))
+            engine,
+            monkeypatch,
+            get_plan=[FakeResponse(200, body=b"W")],
+            reference_audio="ref.wav",
+            frozen=True,
+            executable=str(tmp_path / "app.exe"),
+            meipass=str(internal),
+        )
 
         await engine.synthesize_bytes("hi")
 

@@ -74,17 +74,13 @@ def _patch_env(monkeypatch, *, mem, settings=None):
     monkeypatch.setattr(llmm, "Llama", _FakeLlama)
     monkeypatch.setattr(llmm, "check_memory_pressure", lambda: mem)
     if settings is not None:
-        monkeypatch.setattr(
-            "config.integrated_config.get_settings", lambda: settings
-        )
+        monkeypatch.setattr("config.integrated_config.get_settings", lambda: settings)
 
     class _RM:
         def mark_model_loaded(self, name, loaded):
             pass
 
-    monkeypatch.setattr(
-        "core.resource_manager.get_resource_manager", lambda: _RM()
-    )
+    monkeypatch.setattr("core.resource_manager.get_resource_manager", lambda: _RM())
 
 
 def test_setup_memory_pressure_with_gpu_blocks(manager, monkeypatch, gguf):

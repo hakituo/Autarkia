@@ -1,0 +1,75 @@
+/* 呼吸灯层：照搬 web 前端 BreathingSystem 的三团光斑与关键控件脉动 */
+
+/* 光斑固定在页面最底层，正文压在它上面 */
+.breathing {
+  position: fixed; inset: 0; z-index: -1;
+  overflow: hidden; pointer-events: none;
+}
+
+/* 观感对齐 React 版（rounded-full + blur-[100px] 的大圆），但实现换成 radial-gradient：
+   filter: blur(100px) 是几十万像素的高斯核，只要它参与动画就逼浏览器逐帧重栅格化，
+   而软边光斑本来就是「中心实、边缘化」的衰减，渐变免费且画出来一样。
+   同理，动画只推 opacity，不推 transform：缩放会让光斑重新栅格化。 */
+.breathing i {
+  position: absolute; display: block; border-radius: 50%;
+  animation: breathe 5s cubic-bezier(0.4, 0, 0.6, 1) infinite alternate;
+  will-change: opacity;
+}
+.breathing .b1 {
+  top: -20%; left: -10%; width: 60%; height: 60%;
+  background: radial-gradient(closest-side, var(--accent), transparent 72%);
+}
+/* 延迟 speed*0.25，与 React 版第二团的 delay 对齐 */
+.breathing .b2 {
+  bottom: -20%; right: -10%; width: 60%; height: 60%;
+  background: radial-gradient(closest-side, var(--out), transparent 72%);
+  animation-delay: 1.25s;
+}
+/* 第三团最弱：React 版用 intensity*0.7 + blur(80px)，这里换成更紧的衰减半径 */
+.breathing .b3 {
+  top: 40%; left: 40%; width: 40%; height: 40%;
+  background: radial-gradient(closest-side, var(--hit), transparent 62%);
+  animation-duration: 6.5s; animation-delay: 2.25s;
+}
+
+/* 聊天页光斑是 0.3–0.6，看板要压正文，压到 0.06–0.16 才不糊字 */
+@keyframes breathe {
+  from { opacity: .06; }
+  to { opacity: .16; }
+}
+
+/* 小节标题前的竖条、KPI 底部色条共用的呼吸高光。
+   高光写死在元素上，关键帧里只留 opacity——box-shadow 进关键帧等于每帧重绘外发光，
+   而这两处一共十几个元素，是页面卡顿的另一半来源。 */
+.card-head h2::before,
+.kpi::after {
+  box-shadow: 0 0 10px rgba(76, 154, 255, .45);
+  animation: breathe-accent 3.6s cubic-bezier(0.4, 0, 0.6, 1) infinite alternate;
+}
+@keyframes breathe-accent {
+  from { opacity: .55; }
+  to { opacity: 1; }
+}
+
+@keyframes breathe-dot {
+  from { opacity: .35; transform: scale(.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.status { display: inline-flex; align-items: center; gap: 7px; }
+.status::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--hit); box-shadow: 0 0 8px rgba(52, 199, 89, .8);
+  animation: breathe-dot 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite alternate;
+}
+.status.err::before { background: var(--danger); box-shadow: 0 0 8px rgba(255, 93, 93, .8); }
+
+/* 每张卡的呼吸错开一点，整页才不会像在同一节奏上闪 */
+.kpi:nth-child(2n)::after { animation-delay: .9s; }
+.kpi:nth-child(3n)::after { animation-delay: 1.7s; }
+
+/* 系统级「减弱动态效果」优先：光斑留下，动画停掉 */
+@media (prefers-reduced-motion: reduce) {
+  .breathing i, .status::before, .card-head h2::before, .kpi::after { animation: none; }
+  .breathing i { opacity: .1; }
+}

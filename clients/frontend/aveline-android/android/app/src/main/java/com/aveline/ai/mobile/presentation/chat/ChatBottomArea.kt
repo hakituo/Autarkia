@@ -17,10 +17,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
-import com.aveline.ai.mobile.services.VoiceInputState
 
 /**
- * 聊天页底部区域（从 ChatScreen.kt 拆出）：上传/待发/识别/转写提示条 + 输入栏 + “+”更多面板。
+ * 聊天页底部区域（从 ChatScreen.kt 拆出）：上传/待发/识别提示条 + 输入栏（含原位语音态）+ “+”更多面板。
  *
  * 底部 inset 统一在这一层处理，输入栏与更多面板共享同一份：
  * 输入栏自己不再随“面板是否展开”改内边距，高度恒定，
@@ -40,7 +39,8 @@ internal fun ChatBottomArea(
     onToggleMore: () -> Unit,
     onVoiceInput: () -> Unit,
     onRemovePendingAttachment: (Int) -> Unit,
-    onStopVoice: () -> Unit,
+    onVoiceFinish: () -> Unit,
+    onVoiceCancel: () -> Unit,
     onPickImages: () -> Unit,
     onPickDocuments: () -> Unit
 ) {
@@ -75,18 +75,8 @@ internal fun ChatBottomArea(
             ImageAnalyzingBar(modifier = Modifier.fillMaxWidth())
         }
 
-        if (uiState.isRecording ||
-            uiState.voiceInputState is VoiceInputState.Processing
-        ) {
-            ChatVoiceTranscribingBar(
-                partialText = uiState.voicePartialText,
-                amplitude = uiState.voiceAmplitude,
-                isProcessing = uiState.voiceInputState is VoiceInputState.Processing,
-                onStop = onStopVoice,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
+        // 语音态不另挂横幅：录音时输入栏自己原位变成转写面板（见 ChatBottomBar）。
+        // 收尾解码期间也不再显示"正在识别"——停止那一刻文本已经落进输入框了。
         ChatBottomBar(
             text = uiState.inputText,
             onTextChange = onTextChange,
@@ -100,7 +90,11 @@ internal fun ChatBottomArea(
             isRecording = uiState.isRecording,
             hasPendingAttachment = uiState.lastUploadedImageUrl != null ||
                 uiState.pendingAttachments.isNotEmpty() || uiState.pendingVideoUrl != null,
-            showMorePanel = showMorePanel
+            showMorePanel = showMorePanel,
+            voicePartialText = uiState.voicePartialText,
+            voiceAmplitude = uiState.voiceAmplitude,
+            onVoiceCancel = onVoiceCancel,
+            onVoiceFinish = onVoiceFinish
         )
 
         // 用 expandVertically / shrinkVertically（从底部生长）而不是 slideInVertically：

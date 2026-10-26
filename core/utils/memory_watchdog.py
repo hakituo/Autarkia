@@ -29,7 +29,7 @@ from typing import Dict, List, Optional, Any, Tuple
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-# 使用项目统一 logger，确保日志同时写入 xiaoyou_main.log 和控制台
+# 使用项目统一 logger，确保日志同时写入 autarkia_main.log 和控制台
 # （之前用 get_logger(__name__) 只到 root logger，不写文件）
 from core.utils.logger import get_logger
 from core.utils.shared_roots import get_logs_root

@@ -104,9 +104,7 @@ def test_neighbor_view_excludes_root_and_orders_by_distance():
     assert view["root_id"] == "root"
     assert ids and "root" not in ids
     assert view["nodes"][0]["graph_distance"] == 1
-    assert view["nodes"][0]["relation_label"] == relation_label(
-        view["nodes"][0]["relation"]
-    )
+    assert view["nodes"][0]["relation_label"] == relation_label(view["nodes"][0]["relation"])
     assert view["truncated"] is False
     # 边必须闭合在 root + 邻居上
     allowed = set(ids) | {"root"}
@@ -218,7 +216,9 @@ def test_anchor_view_groups_same_day_and_topic():
         {
             "a1": _memory("a1", "第一条", timestamp=100.0, weight=2.0, topics=["记忆系统"]),
             "a2": _memory("a2", "第二条", timestamp=101.0, weight=7.0, topics=["记忆系统"]),
-            "b1": _memory("b1", "另一天的记录", timestamp=200000.0, weight=1.0, topics=["记忆系统"]),
+            "b1": _memory(
+                "b1", "另一天的记录", timestamp=200000.0, weight=1.0, topics=["记忆系统"]
+            ),
             "c1": _memory("c1", "别的话题", timestamp=102.0, weight=1.0, topics=["做饭"]),
         }
     )

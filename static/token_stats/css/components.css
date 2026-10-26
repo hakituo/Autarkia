@@ -1,0 +1,252 @@
+/* 组件层：表单控件、表格、图表、提示框与排行条 */
+
+button, select, input {
+  font: inherit; color: var(--text);
+  background: #0e141c; border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 10px; outline: none;
+  transition: border-color .15s, background .15s;
+}
+button { cursor: pointer; }
+button:hover { border-color: #33404f; background: #111823; }
+button.primary { background: #1b6fe0; border-color: #1b6fe0; color: #fff; }
+button.primary:hover { background: #2c81f5; }
+button.ghost { background: transparent; }
+button.mini { padding: 4px 8px; font-size: 12px; }
+input:focus, select:focus { border-color: var(--accent); }
+
+/* 图表 */
+.chart-card { margin-bottom: 14px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+.chart-wrap {
+  position: relative; overflow-x: auto; overflow-y: hidden;
+  padding-bottom: 4px; overscroll-behavior: contain; scroll-behavior: smooth;
+  max-width: 100%;
+}
+.chart-wrap svg { display: block; }
+.bar-group { cursor: pointer; }
+.bar-group:hover .bar-hit,
+.bar-group:hover .bar-miss,
+.bar-group:hover .bar-out { filter: brightness(1.18); }
+.hover-line { pointer-events: none; }
+
+/* 提示框 */
+.tooltip {
+  position: fixed; z-index: 60; pointer-events: none;
+  min-width: 210px; padding: 10px 12px;
+  background: #0b1119; border: 1px solid #2c3a4b; border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  font-size: 12px; opacity: 0; transform: translateY(3px);
+  transition: opacity .1s, transform .1s;
+}
+.tooltip.show { opacity: 1; transform: translateY(0); }
+.tt-title { font-weight: 600; margin-bottom: 7px; font-variant-numeric: tabular-nums; }
+.tt-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 2px 0; }
+.tt-row .k { color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.tt-row .v { font-variant-numeric: tabular-nums; }
+.tt-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.tt-sep { height: 1px; background: #223040; margin: 6px 0; }
+.tt-total .v { font-weight: 600; }
+
+/* 表格 */
+.table-scroll {
+  overflow: auto; max-height: 380px;
+  overscroll-behavior: contain;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .015);
+  scroll-behavior: smooth;
+}
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: #131b25; color: var(--muted);
+  font-size: 11px; font-weight: 500; letter-spacing: .3px;
+  text-align: right; padding: 9px 8px; border-bottom: 1px solid var(--border);
+  white-space: nowrap; cursor: pointer; user-select: none;
+  transition: color .15s, background .15s;
+}
+thead th:hover { background: #18222e; color: var(--text); }
+thead th:first-child { text-align: left; }
+thead th.sorted { color: var(--text); }
+thead th .arrow { color: var(--accent); font-size: 10px; margin-left: 3px; }
+tbody td {
+  text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap; font-size: 12px;
+}
+tbody td:first-child { text-align: left; }
+tbody tr { transition: background .12s; }
+tbody tr:hover td { background: #16202c; }
+tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+tbody tr:last-child td { border-bottom: 0; }
+tfoot td {
+  position: sticky; bottom: 0; background: #131b25;
+  text-align: right; padding: 8px 10px; font-weight: 600;
+  border-top: 1px solid var(--border); white-space: nowrap;
+}
+tfoot td:first-child { text-align: left; }
+.name-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.rate-wrap { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.rate-bar { height: 5px; border-radius: 3px; background: var(--hit); opacity: .75; }
+.share-bar { height: 4px; border-radius: 2px; background: var(--accent); opacity: .55; margin-top: 4px; }
+/* 成本列：有价才给金额色，「无价」压灰，避免和 0 元混淆 */
+.money-cell { color: var(--money); }
+.money-cell.none { color: var(--muted-2); }
+
+/* 请求来源排行 */
+.rank-list {
+  display: flex; flex-direction: column; gap: 12px;
+  max-height: 300px; overflow-y: auto; padding-right: 6px;
+  overscroll-behavior: contain;
+}
+.rank-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.rank-name {
+  font-size: 12.5px; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rank-val { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rank-bar {
+  height: 6px; border-radius: 999px; background: #16202c;
+  margin: 5px 0 4px; overflow: hidden;
+}
+.rank-bar i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #2c6fc4, #4c9aff);
+}
+.rank-meta { font-size: 10.5px; color: var(--muted-2); }
+
+/* 日期选择器：点击弹出小日历 */
+.date-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; text-align: left; padding: 7px 10px;
+}
+.date-btn.filled .date-btn-text { color: var(--text); }
+.date-btn-text { color: var(--muted); font-variant-numeric: tabular-nums; }
+.date-btn-icon { width: 14px; height: 14px; color: var(--muted-2); flex: 0 0 auto; }
+.date-btn:hover .date-btn-icon { color: var(--accent); }
+
+.date-popup {
+  position: absolute; z-index: 80; display: none;
+  width: 244px; padding: 10px;
+  background: #101720; border: 1px solid #2a3644; border-radius: 12px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .6);
+}
+.date-popup.open { display: block; }
+
+.dp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.dp-title { font-size: 12.5px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.dp-nav {
+  width: 26px; height: 26px; padding: 0; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border-color: transparent; color: var(--muted); font-size: 15px;
+}
+.dp-nav:hover { background: #18222e; color: var(--text); }
+
+.dp-week {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+  margin-bottom: 4px;
+}
+.dp-week span { text-align: center; font-size: 11px; color: var(--muted-2); padding: 2px 0; }
+
+.dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.dp-cell {
+  padding: 0; height: 28px; border-radius: 7px; border: 1px solid transparent;
+  background: transparent; color: var(--text); font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.dp-cell:hover { background: #1a2430; border-color: #2b3a4a; }
+.dp-cell.muted { color: var(--muted-2); }
+.dp-cell.active { background: #1b6fe0; border-color: #1b6fe0; color: #fff; }
+
+.dp-foot {
+  display: flex; justify-content: space-between; gap: 8px;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-soft);
+}
+.dp-mini { padding: 4px 10px; font-size: 12px; border-radius: 7px; color: var(--muted); }
+
+/* 通用文字块 */
+.empty { color: var(--muted-2); text-align: center; padding: 26px 0; }
+.note { color: var(--muted-2); font-size: 11.5px; margin-top: 10px; line-height: 1.7; }
+.note b { color: var(--muted); font-weight: 500; }
+.warn { color: #e3b341; }
+.loading { opacity: .45; pointer-events: none; }
+
+.tabs { display: inline-flex; gap: 4px; }
+.tabs button { font-size: 12px; padding: 5px 10px; border-radius: 7px; background: transparent; color: var(--muted); }
+.tabs button.active { background: #1a2430; color: var(--text); border-color: #2b3a4a; }
+
+/* 成本构成：一条横向堆叠条 + 逐项清单 */
+.cost-bar {
+  display: flex; height: 16px; border-radius: 8px; overflow: hidden;
+  background: #16202c; border: 1px solid var(--border-soft);
+}
+.cost-bar i { display: block; height: 100%; transition: width .3s ease; }
+.cost-bar i:hover { filter: brightness(1.2); }
+.cost-list { display: flex; flex-direction: column; gap: 7px; margin-top: 12px; }
+.cost-item {
+  display: grid; grid-template-columns: 10px 1fr auto auto; align-items: center; gap: 9px;
+  font-size: 12px;
+}
+.cost-item i { width: 9px; height: 9px; border-radius: 2px; }
+.cost-item .amt { font-variant-numeric: tabular-nums; color: var(--text); }
+.cost-item .pct { font-variant-numeric: tabular-nums; color: var(--muted-2); min-width: 44px; text-align: right; }
+.cost-total {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-soft);
+}
+.cost-total .amt { font-size: 25px; font-weight: 600; color: var(--money); font-variant-numeric: tabular-nums; }
+.cost-total .sub { font-size: 11.5px; color: var(--muted-2); }
+
+/* 计价覆盖率进度条 */
+.cover { display: flex; align-items: center; gap: 9px; margin-top: 12px; font-size: 11.5px; color: var(--muted); }
+.cover-bar { flex: 1; height: 6px; border-radius: 999px; background: #16202c; overflow: hidden; }
+.cover-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #2fb395, #5ee3c0); }
+
+/* 价目表来源状态 */
+.src-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.src {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; padding: 3px 9px; border-radius: 999px;
+  background: #0e141c; border: 1px solid var(--border); color: var(--muted);
+}
+.src .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted-2); }
+.src.ok .dot { background: var(--hit); box-shadow: 0 0 6px rgba(52, 199, 89, .7); }
+.src.bad .dot { background: var(--danger); box-shadow: 0 0 6px rgba(255, 93, 93, .7); }
+.src.bad { color: #ffb3b3; border-color: #4a2b31; }
+.src.skip .dot { opacity: .4; }
+
+/* 价目面板的一级列表：只放用得最多的几个模型，单价按每 1M tokens */
+.price-list { display: flex; flex-direction: column; gap: 7px; margin: 2px 0 12px; }
+.price-item {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 2px 10px; align-items: baseline;
+  padding: 7px 9px; border-radius: 8px;
+  background: rgba(255, 255, 255, .025); border: 1px solid var(--border-soft);
+}
+.price-item .name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.price-item .use { font-size: 11px; color: var(--muted-2); }
+.price-item .amt { font-size: 12px; }
+.price-item .rates {
+  grid-column: 1 / -1; font-size: 11px; color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 二级菜单：没价的模型默认收起，只留一行计数，不抢一级的注意力 */
+.sub-menu { border-top: 1px solid var(--border-soft); padding-top: 9px; }
+.sub-menu summary { cursor: pointer; font-size: 12px; color: var(--muted); list-style: none; }
+.sub-menu summary::-webkit-details-marker { display: none; }
+.sub-menu summary::before { content: "▸"; margin-right: 6px; color: var(--muted-2); }
+.sub-menu[open] summary::before { content: "▾"; }
+.sub-menu .gap-list { padding-left: 16px; }
+
+/* 待补价模型清单 */
+.gap-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.gap-item {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
+  padding: 7px 9px; border-radius: 8px;
+  background: rgba(255, 255, 255, .025); border: 1px solid var(--border-soft);
+}
+.gap-item .name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gap-item .amt { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.gap-item .why { grid-column: 1 / -1; font-size: 11px; color: var(--muted-2); }
+

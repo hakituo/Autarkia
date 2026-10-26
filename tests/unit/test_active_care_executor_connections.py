@@ -44,6 +44,17 @@ def test_user_response_handler_scans_connections_silently():
 def test_connection_state_log_only_emits_on_change():
     resolver = QQConnectionResolver()
 
-    assert resolver._should_emit_state_log("multi_qq_config_connections", [("aveline", "a.json")]) is True
-    assert resolver._should_emit_state_log("multi_qq_config_connections", [("aveline", "a.json")]) is False
-    assert resolver._should_emit_state_log("multi_qq_config_connections", [("aveline", "a.json"), ("ling", "b.json")]) is True
+    assert (
+        resolver._should_emit_state_log("multi_qq_config_connections", [("aveline", "a.json")])
+        is True
+    )
+    assert (
+        resolver._should_emit_state_log("multi_qq_config_connections", [("aveline", "a.json")])
+        is False
+    )
+    assert (
+        resolver._should_emit_state_log(
+            "multi_qq_config_connections", [("aveline", "a.json"), ("ling", "b.json")]
+        )
+        is True
+    )

@@ -104,10 +104,7 @@ def test_quality_to_rating_has_no_history_compat():
 
 
 def _history(qualities, start: float, step: int = 86400):
-    return [
-        {"timestamp": start + i * step, "quality": q}
-        for i, q in enumerate(qualities)
-    ]
+    return [{"timestamp": start + i * step, "quality": q} for i, q in enumerate(qualities)]
 
 
 def test_rebuild_is_deterministic():
@@ -123,9 +120,7 @@ def test_rebuild_is_deterministic():
 def test_rebuild_handles_unsorted_history():
     history = _history([4, 3, 4], BEFORE, step=86400 * 2)
     ordered = rebuild_fsrs_card_from_history({"history": history})
-    shuffled = rebuild_fsrs_card_from_history(
-        {"history": [history[2], history[0], history[1]]}
-    )
+    shuffled = rebuild_fsrs_card_from_history({"history": [history[2], history[0], history[1]]})
     assert ordered.stability == shuffled.stability
     assert ordered.due == shuffled.due
 
@@ -148,9 +143,7 @@ def test_numerous_like_case_not_overestimated():
         reviewed = scheduler.review_card(
             wrong_card,
             rating,
-            review_datetime=datetime.fromtimestamp(
-                event["timestamp"], timezone.utc
-            ),
+            review_datetime=datetime.fromtimestamp(event["timestamp"], timezone.utc),
         )
         wrong_card = reviewed[0] if isinstance(reviewed, tuple) else reviewed
 
@@ -212,9 +205,7 @@ def test_rebuild_until_excludes_current_event():
     data = {"history": base + [current]}
     assert rebuild_fsrs_card_from_history(data).last_review is not None
     partial = rebuild_fsrs_card_from_history(data, until=current["timestamp"])
-    assert partial.last_review == datetime.fromtimestamp(
-        base[0]["timestamp"], timezone.utc
-    )
+    assert partial.last_review == datetime.fromtimestamp(base[0]["timestamp"], timezone.utc)
 
 
 # ---------------------------------------------------------------------------
@@ -299,9 +290,7 @@ def test_new_card_first_rating_is_not_double_counted(monkeypatch):
     assert data["fsrs_stability"] == pytest.approx(expected_card.stability)
     assert data["fsrs_difficulty"] == pytest.approx(expected_card.difficulty)
     assert data["fsrs_due"] == pytest.approx(expected_card.due.timestamp())
-    assert data["fsrs_last_review"] == pytest.approx(
-        expected_card.last_review.timestamp()
-    )
+    assert data["fsrs_last_review"] == pytest.approx(expected_card.last_review.timestamp())
     assert len(data["history"]) == 1
 
 
@@ -318,15 +307,11 @@ def test_pre_appended_history_double_counts_the_current_rating(monkeypatch):
     monkeypatch.setattr(fsrs.time, "time", lambda: fixed)
     when = datetime.fromtimestamp(fixed, timezone.utc)
 
-    single = create_daily_scheduler().review_card(
-        Card(), Rating.Good, review_datetime=when
-    )[0]
+    single = create_daily_scheduler().review_card(Card(), Rating.Good, review_datetime=when)[0]
 
     buggy_data = {"history": [{"timestamp": fixed, "quality": 3}]}
     rebuilt = rebuild_fsrs_card_from_history(buggy_data)
-    doubled = create_daily_scheduler().review_card(
-        rebuilt, Rating.Good, review_datetime=when
-    )[0]
+    doubled = create_daily_scheduler().review_card(rebuilt, Rating.Good, review_datetime=when)[0]
 
     assert doubled.difficulty < single.difficulty
     assert doubled.stability == pytest.approx(single.stability)

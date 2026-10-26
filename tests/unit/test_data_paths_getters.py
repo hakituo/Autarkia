@@ -6,6 +6,7 @@
 路径断言全部基于注入的临时项目根（patch dp.get_project_root），
 不触碰真实 companion_data，也不断言本机真实路径。
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -79,8 +80,14 @@ _NOARG_GETTERS = [
     ("get_xiaolu_data_dir", ("companion_data", "xiaolu_data")),
     ("get_yeye_data_dir", ("companion_data", "yeye_data")),
     ("get_dual_role_data_dir", ("companion_data", "dual_role")),
-    ("get_dual_role_reminder_assignment_path", ("companion_data", "dual_role", "reminder_assignment_today.json")),
-    ("get_proactive_assignment_path", ("companion_data", "dual_role", "proactive_assignment_today.json")),
+    (
+        "get_dual_role_reminder_assignment_path",
+        ("companion_data", "dual_role", "reminder_assignment_today.json"),
+    ),
+    (
+        "get_proactive_assignment_path",
+        ("companion_data", "dual_role", "proactive_assignment_today.json"),
+    ),
     ("get_user_daily_dir", ("companion_data", "user_data", "daily")),
     ("get_user_daily_records_dir", ("companion_data", "user_data", "daily_records")),
     ("get_user_chat_history_dir", ("companion_data", "user_data", "chat_history")),
@@ -88,7 +95,10 @@ _NOARG_GETTERS = [
     ("get_user_schedule_dir", ("companion_data", "user_data", "schedule")),
     ("get_user_status_dir", ("companion_data", "user_data", "status")),
     ("get_user_reminders_file", ("companion_data", "user_data", "reminders.json")),
-    ("get_user_latest_device_context_file", ("companion_data", "user_data", "latest_device_context.json")),
+    (
+        "get_user_latest_device_context_file",
+        ("companion_data", "user_data", "latest_device_context.json"),
+    ),
     ("get_aveline_life_dir", ("companion_data", "aveline_data", "aveline_life")),
     ("get_aveline_life_records_dir", ("companion_data", "aveline_data", "life_records")),
     ("get_ling_life_dir", ("companion_data", "ling_data", "ling_life")),
@@ -116,23 +126,71 @@ _ARG_GETTERS = [
     ("get_role_data_dir", ("aveline",), ("companion_data", "aveline_data")),
     ("get_role_data_dir", ("ling",), ("companion_data", "ling_data")),
     ("get_role_chat_history_dir", ("ling",), ("companion_data", "ling_data", "chat_history")),
-    ("get_chat_history_dir_for_conversation", ("core_ling",), ("companion_data", "ling_data", "chat_history")),
-    ("get_chat_history_dir_for_conversation", (None,), ("companion_data", "aveline_data", "chat_history")),
+    (
+        "get_chat_history_dir_for_conversation",
+        ("core_ling",),
+        ("companion_data", "ling_data", "chat_history"),
+    ),
+    (
+        "get_chat_history_dir_for_conversation",
+        (None,),
+        ("companion_data", "aveline_data", "chat_history"),
+    ),
     ("get_role_daily_dir", ("ling",), ("companion_data", "ling_data", "daily")),
     ("get_daily_dir_for_conversation", ("core_ling",), ("companion_data", "ling_data", "daily")),
     ("get_active_care_dir", ("ling",), ("companion_data", "ling_data", "active_care")),
     ("get_active_care_dir", (None,), ("companion_data", "aveline_data", "active_care")),
     ("get_role_memories_dir", ("ling",), ("companion_data", "ling_data", "memories")),
-    ("get_memories_dir_for_conversation", ("core_ling",), ("companion_data", "ling_data", "memories")),
-    ("get_sessions_file_for_scope", ("ling",), ("companion_data", "ling_data", "memories", "sessions.json")),
-    ("get_role_profiles_dir", ("aveline",), ("companion_data", "aveline_data", "persona_data", "profiles")),
-    ("get_role_profiles_dir", (None,), ("companion_data", "aveline_data", "persona_data", "profiles")),
-    ("get_role_profiles_dir", ("user",), ("companion_data", "aveline_data", "persona_data", "profiles")),
-    ("get_role_profiles_dir", ("dual_role",), ("companion_data", "aveline_data", "persona_data", "profiles")),
-    ("get_role_profile_path", ("ling", "Ling", "Aveline"), ("companion_data", "ling_data", "persona_data", "profiles", "Ling_Aveline.json")),
-    ("get_role_profile_path", (None, "", ""), ("companion_data", "aveline_data", "persona_data", "profiles", "Role_default.json")),
-    ("get_user_people_profile_path", ("ling",), ("companion_data", "user_data", "people_profiles", "ling.json")),
-    ("get_user_people_profile_path", ("",), ("companion_data", "user_data", "people_profiles", "unknown.json")),
+    (
+        "get_memories_dir_for_conversation",
+        ("core_ling",),
+        ("companion_data", "ling_data", "memories"),
+    ),
+    (
+        "get_sessions_file_for_scope",
+        ("ling",),
+        ("companion_data", "ling_data", "memories", "sessions.json"),
+    ),
+    (
+        "get_role_profiles_dir",
+        ("aveline",),
+        ("companion_data", "aveline_data", "persona_data", "profiles"),
+    ),
+    (
+        "get_role_profiles_dir",
+        (None,),
+        ("companion_data", "aveline_data", "persona_data", "profiles"),
+    ),
+    (
+        "get_role_profiles_dir",
+        ("user",),
+        ("companion_data", "aveline_data", "persona_data", "profiles"),
+    ),
+    (
+        "get_role_profiles_dir",
+        ("dual_role",),
+        ("companion_data", "aveline_data", "persona_data", "profiles"),
+    ),
+    (
+        "get_role_profile_path",
+        ("ling", "Ling", "Aveline"),
+        ("companion_data", "ling_data", "persona_data", "profiles", "Ling_Aveline.json"),
+    ),
+    (
+        "get_role_profile_path",
+        (None, "", ""),
+        ("companion_data", "aveline_data", "persona_data", "profiles", "Role_default.json"),
+    ),
+    (
+        "get_user_people_profile_path",
+        ("ling",),
+        ("companion_data", "user_data", "people_profiles", "ling.json"),
+    ),
+    (
+        "get_user_people_profile_path",
+        ("",),
+        ("companion_data", "user_data", "people_profiles", "unknown.json"),
+    ),
 ]
 
 
@@ -164,7 +222,9 @@ def test_study_root_uses_settings(monkeypatch):
     import config.integrated_config as ic
 
     calls = []
-    monkeypatch.setattr(dp, "resolve_cross_platform_path", lambda raw: calls.append(raw) or Path("/sentinel"))
+    monkeypatch.setattr(
+        dp, "resolve_cross_platform_path", lambda raw: calls.append(raw) or Path("/sentinel")
+    )
 
     class _Study:
         study_root = "/data/study"
@@ -183,7 +243,9 @@ def test_study_root_fallback(monkeypatch, scenario):
     import config.integrated_config as ic
 
     calls = []
-    monkeypatch.setattr(dp, "resolve_cross_platform_path", lambda raw: calls.append(raw) or Path("/sentinel"))
+    monkeypatch.setattr(
+        dp, "resolve_cross_platform_path", lambda raw: calls.append(raw) or Path("/sentinel")
+    )
     if scenario == "raises":
 
         def _boom():
@@ -215,6 +277,7 @@ def test_study_daily_dirs(tmp_path, monkeypatch):
     monkeypatch.setattr(dp, "get_study_root_dir", lambda: tmp_path / "study")
     assert dp.get_study_daily_dir() == (tmp_path / "study" / "Daily").resolve()
     date = datetime(2024, 3, 7)
-    assert dp.get_study_daily_date_dir(date) == (
-        tmp_path / "study" / "Daily" / "2024" / "03" / "07"
-    ).resolve()
+    assert (
+        dp.get_study_daily_date_dir(date)
+        == (tmp_path / "study" / "Daily" / "2024" / "03" / "07").resolve()
+    )

@@ -35,19 +35,13 @@ class TestBuildMessage:
         self, beacon: UDPBeaconService, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         # 后端没启用组网时必须整段省略：客户端据此区分「后端没有组网入口」与「信标没发全」
-        monkeypatch.setattr(
-            "core.services.discovery.udp_beacon.find_vpn_address", lambda: None
-        )
+        monkeypatch.setattr("core.services.discovery.udp_beacon.find_vpn_address", lambda: None)
         assert beacon.build_message("192.0.2.1") == (
             f"{BROADCAST_MAGIC}|http://192.0.2.1:8000"
         )
 
-    def test_uses_configured_http_port(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr(
-            "core.services.discovery.udp_beacon.find_vpn_address", lambda: None
-        )
+    def test_uses_configured_http_port(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("core.services.discovery.udp_beacon.find_vpn_address", lambda: None)
         custom = UDPBeaconService(http_port=9001)
         assert custom.build_message("10.0.0.5") == f"{BROADCAST_MAGIC}|http://10.0.0.5:9001"
 

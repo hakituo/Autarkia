@@ -4,6 +4,7 @@
 1. 知识点级段落必须真的出现在给 LLM 的结构化上下文里；
 2. 靠提示答出的不能被写进「独立答对」，否则总结会夸大掌握程度。
 """
+
 from __future__ import annotations
 
 from core.services.study.summary_generator import StudySummaryGenerator

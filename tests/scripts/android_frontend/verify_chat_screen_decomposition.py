@@ -12,7 +12,7 @@
 5. ChatScreen.kt 不再使用内联全限定名（如 androidx.compose.material3.MaterialTheme）
 6. 本次涉及的文件没有未使用的 import
 
-运行：d:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe tests/scripts/android_frontend/verify_chat_screen_decomposition.py
+运行：d:\\AI\\autarkia\\venv_core\\Scripts\\python.exe tests/scripts/android_frontend/verify_chat_screen_decomposition.py
 """
 
 import re

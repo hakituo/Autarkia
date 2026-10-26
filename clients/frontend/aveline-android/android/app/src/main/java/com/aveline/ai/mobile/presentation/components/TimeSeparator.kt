@@ -13,7 +13,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -50,8 +49,7 @@ fun TimeSeparator(
         Text(
             text = formattedTime,
             style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.Light,
-                letterSpacing = 1.2.sp,
+                fontWeight = FontWeight.Light
             ),
             color = TextTertiary,
             modifier = Modifier.padding(horizontal = 12.dp)

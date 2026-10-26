@@ -6,6 +6,7 @@
 - 文件 IO 全部落在 ``tmp_path``，不触碰仓库真实 data 目录；
 - 随机抽取（quiz）只断言长度与集合关系，不断言具体元素，避免 flaky。
 """
+
 from __future__ import annotations
 
 import datetime
@@ -192,9 +193,7 @@ def test_pending_reason_historical_backlog_and_none(mgr):
     """无历史 -> 历史补漏；同日非 lapse -> 已处理；非法日期 -> None。"""
     assert mgr._pending_reason("2026/08/05", {}) == "historical_backlog"
     # 从未进入 progress（history 为空）
-    assert (
-        mgr._pending_reason("2026/08/05", {"history": []}) == "historical_backlog"
-    )
+    assert mgr._pending_reason("2026/08/05", {"history": []}) == "historical_backlog"
 
     # daily 记录晚于最后一次复习 -> 历史补漏
     older = {"history": [{"timestamp": _ts(2026, 8, 1), "quality": 4}]}
@@ -249,9 +248,7 @@ def test_filter_persisted_review_batch(mgr):
     assert result[0]["pending_reason"] == "historical_backlog"
 
     # 已完成（同日成功复习）的条目被剔除
-    progress = {
-        "beta": {"history": [{"timestamp": _ts(2026, 8, 1), "quality": 4}]}
-    }
+    progress = {"beta": {"history": [{"timestamp": _ts(2026, 8, 1), "quality": 4}]}}
     filtered = mgr._filter_persisted_review_batch(entries, progress)
     assert [r["word"] for r in filtered] == ["alpha"]
 
@@ -260,9 +257,7 @@ def test_merge_new_entries_no_change_and_backlog(mgr):
     persisted = [{"word": "a", "pending_reason": "historical_backlog"}]
     # 全部重复 -> 原样返回
     assert (
-        mgr._merge_new_entries(
-            persisted, [{"word": "A", "pending_reason": "historical_backlog"}]
-        )
+        mgr._merge_new_entries(persisted, [{"word": "A", "pending_reason": "historical_backlog"}])
         == persisted
     )
     # 空 key 被跳过，新历史补漏追加队尾
@@ -313,9 +308,7 @@ def test_scan_review_entries_prioritizes_recent_retry(mgr):
     progress = {
         "retry": {"history": [{"timestamp": _ts(2026, 8, 5), "quality": 1}]},
     }
-    dated = mgr._collect_dated_sources(
-        datetime.date(2026, 8, 10)
-    )
+    dated = mgr._collect_dated_sources(datetime.date(2026, 8, 10))
     entries = mgr._scan_review_entries(progress, dated, 0)
     words = [e["word"] for e in entries]
     assert words[0] == "retry"
@@ -450,9 +443,7 @@ def test_collect_source_signatures_bad_today_and_bad_dates(mgr, monkeypatch):
 
 def test_collect_dated_sources_skips_invalid(mgr, monkeypatch):
     _write_day(mgr.base_dir, "2026/08/01", "alpha\n")
-    monkeypatch.setattr(
-        mgr, "list_dates", lambda: ["bogus", "2026/08/01", TODAY_STR]
-    )
+    monkeypatch.setattr(mgr, "list_dates", lambda: ["bogus", "2026/08/01", TODAY_STR])
     dated = mgr._collect_dated_sources(datetime.date(2026, 8, 10))
     assert dated == [(datetime.date(2026, 8, 1), "2026/08/01")]
 
@@ -468,9 +459,7 @@ def test_sync_source_signatures_three_paths(mgr, monkeypatch):
     # 2) 差异全部来自本管理器自写 -> 刷新快照并返回 False
     mgr._self_written = dict(current)
     mgr._update_review_batch_fields  # 存在性
-    dword.safe_json_dump(
-        {"review_date": TODAY_STR, "entries": []}, mgr._review_batch_state_path
-    )
+    dword.safe_json_dump({"review_date": TODAY_STR, "entries": []}, mgr._review_batch_state_path)
     assert mgr._sync_source_signatures({"source_signatures": {}}) is False
     state = dword.safe_json_load(mgr._review_batch_state_path, default={})
     assert state.get("source_signatures") == current
@@ -500,17 +489,13 @@ def test_persist_self_write_variants(mgr):
     # 状态不是 dict -> 早退
     mgr._persist_self_write("2026/08/01", "sig")
     # review_date 不匹配 -> 早退
-    dword.safe_json_dump(
-        {"review_date": "1999/01/01"}, mgr._review_batch_state_path
-    )
+    dword.safe_json_dump({"review_date": "1999/01/01"}, mgr._review_batch_state_path)
     mgr._persist_self_write("2026/08/01", "sig")
     state = dword.safe_json_load(mgr._review_batch_state_path, default={})
     assert "self_written_signatures" not in state
 
     # 正常写入
-    dword.safe_json_dump(
-        {"review_date": TODAY_STR}, mgr._review_batch_state_path
-    )
+    dword.safe_json_dump({"review_date": TODAY_STR}, mgr._review_batch_state_path)
     mgr._persist_self_write("2026/08/01", "sig")
     state = dword.safe_json_load(mgr._review_batch_state_path, default={})
     assert state["self_written_signatures"] == {"2026/08/01": "sig"}
@@ -520,17 +505,12 @@ def test_persist_self_write_variants(mgr):
     dword.safe_json_dump(state, mgr._review_batch_state_path)
     mgr._persist_self_write("2026/08/01", "sig")
     assert (
-        dword.safe_json_load(mgr._review_batch_state_path, default={})[
-            "selected_at"
-        ]
-        == "keep-me"
+        dword.safe_json_load(mgr._review_batch_state_path, default={})["selected_at"] == "keep-me"
     )
 
 
 def test_persist_self_write_oserror(mgr, monkeypatch):
-    dword.safe_json_dump(
-        {"review_date": TODAY_STR}, mgr._review_batch_state_path
-    )
+    dword.safe_json_dump({"review_date": TODAY_STR}, mgr._review_batch_state_path)
 
     def _boom(*a, **k):
         raise OSError("boom")
@@ -547,26 +527,20 @@ def test_update_review_batch_fields(mgr):
     assert not os.path.exists(mgr._review_batch_state_path)
 
     # review_date 不匹配 -> 早退
-    dword.safe_json_dump(
-        {"review_date": "1999/01/01", "keep": True}, mgr._review_batch_state_path
-    )
+    dword.safe_json_dump({"review_date": "1999/01/01", "keep": True}, mgr._review_batch_state_path)
     mgr._update_review_batch_fields({"x": 1})
     state = dword.safe_json_load(mgr._review_batch_state_path, default={})
     assert state == {"review_date": "1999/01/01", "keep": True}
 
     # 正常更新
-    dword.safe_json_dump(
-        {"review_date": TODAY_STR, "entries": []}, mgr._review_batch_state_path
-    )
+    dword.safe_json_dump({"review_date": TODAY_STR, "entries": []}, mgr._review_batch_state_path)
     mgr._update_review_batch_fields({"x": 1})
     state = dword.safe_json_load(mgr._review_batch_state_path, default={})
     assert state["x"] == 1
 
 
 def test_update_review_batch_fields_oserror(mgr, monkeypatch):
-    dword.safe_json_dump(
-        {"review_date": TODAY_STR, "entries": []}, mgr._review_batch_state_path
-    )
+    dword.safe_json_dump({"review_date": TODAY_STR, "entries": []}, mgr._review_batch_state_path)
 
     def _boom(*a, **k):
         raise OSError("boom")
@@ -694,17 +668,13 @@ def test_persist_review_queue_oserror(mgr, monkeypatch):
         raise OSError("boom")
 
     monkeypatch.setattr(dword, "safe_json_dump", _boom)
-    result = mgr.persist_review_queue(
-        [{"word": "a", "review_source": "fsrs"}], 0
-    )
+    result = mgr.persist_review_queue([{"word": "a", "review_source": "fsrs"}], 0)
     assert [r["word"] for r in result] == ["a"]
     assert not os.path.exists(mgr._review_queue_state_path)
 
 
 def test_sync_review_queue_creates_when_absent(mgr):
-    result = mgr.sync_review_queue(
-        [{"word": "a", "review_source": "daily_backlog"}], 0
-    )
+    result = mgr.sync_review_queue([{"word": "a", "review_source": "daily_backlog"}], 0)
     assert [r["word"] for r in result] == ["a"]
     assert mgr.get_persisted_review_queue() is not None
 
@@ -737,9 +707,7 @@ def test_sync_review_queue_merges_and_reorders(mgr):
 
 
 def test_sync_review_queue_prepends_when_no_daily_locked(mgr):
-    mgr.persist_review_queue(
-        [{"word": "a", "review_source": "fsrs"}], 0
-    )
+    mgr.persist_review_queue([{"word": "a", "review_source": "fsrs"}], 0)
     synced = mgr.sync_review_queue(
         [
             {"word": "a", "review_source": "fsrs"},
@@ -751,12 +719,8 @@ def test_sync_review_queue_prepends_when_no_daily_locked(mgr):
 
 
 def test_sync_review_queue_unchanged_returns_existing(mgr):
-    locked = mgr.persist_review_queue(
-        [{"word": "a", "review_source": "fsrs"}], 0
-    )
-    synced = mgr.sync_review_queue(
-        [{"word": "a", "review_source": "fsrs"}], 0
-    )
+    locked = mgr.persist_review_queue([{"word": "a", "review_source": "fsrs"}], 0)
+    synced = mgr.sync_review_queue([{"word": "a", "review_source": "fsrs"}], 0)
     assert synced == locked
 
 
@@ -771,9 +735,7 @@ def test_write_review_queue_state_skip_and_write(mgr):
         mgr._review_queue_state_path,
     )
     # 与现有规范化结果一致 -> 早退，selected_at 不变
-    mgr._write_review_queue_state(
-        [{"word": "a", "review_source": "fsrs", "source_date": None}], 0
-    )
+    mgr._write_review_queue_state([{"word": "a", "review_source": "fsrs", "source_date": None}], 0)
     state = dword.safe_json_load(mgr._review_queue_state_path, default={})
     assert state["selected_at"] == "keep-me"
 

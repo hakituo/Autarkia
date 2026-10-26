@@ -1,17 +1,22 @@
-@file:Suppress("DEPRECATION")
-
 package com.aveline.ai.mobile.presentation.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -20,6 +25,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,11 +33,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,15 +48,32 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.aveline.ai.mobile.presentation.theme.ControlAccent
+import com.aveline.ai.mobile.presentation.theme.ControlBarSurface
+import com.aveline.ai.mobile.presentation.theme.ControlFaint
+import com.aveline.ai.mobile.presentation.theme.ControlInk
+import com.aveline.ai.mobile.presentation.theme.ControlMute
+import com.aveline.ai.mobile.presentation.theme.ControlOnInk
 
-/** 输入区域组件（QQ/微信风格）。 */
+/**
+ * 聊天输入栏（控件语言来自设计稿「Aveline Android Controls」）。
+ *
+ * 结构：一个 26dp 圆角的中性底容器，上面是可换行的输入区，下面一排动作
+ * 「+ / 麦克风 / 发送」。语音态由外部通过 [voicePanel] 原位替换掉这三行，
+ * 容器本身（圆角、底色、描边、录音时的强调色呼吸描边）保持不变，
+ * 所以点麦克风时输入栏是"变形"而不是"多出一条横幅"。
+ *
+ * @param isRecording 语音态：容器描边换成强调色呼吸圈
+ * @param voicePanel 语音态内容（实时转写 + 波形 + 取消/完成），为空时显示普通输入态
+ */
 @Composable
 fun InputArea(
     text: String,
@@ -61,12 +83,12 @@ fun InputArea(
     onVoiceInput: (() -> Unit)? = null,
     onInputPressed: (() -> Unit)? = null,
     onInputFocused: (() -> Unit)? = null,
+    // 录音期间不再禁用输入框：语音态直接把输入区换掉了，
+    // 普通输入框不会在录音时抢焦点，也就不会出现"键盘突然掉下去"。
     isRecording: Boolean = false,
-    // 这里曾经有个 `enabled: Boolean = true` 形参，唯一调用方 ChatBottomBar 写死传 true，
-    // 于是 `enabled && ...` 全是死逻辑、还让人误以为输入栏整体可以禁用。已删掉；
-    // 真正需要禁用输入框的是录音态（见下面的 `!isRecording`）。
     hasPendingAttachment: Boolean = false,
     applyBottomInsets: Boolean = true,
+    voicePanel: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -77,170 +99,169 @@ fun InputArea(
         Modifier
     }
 
+    // 录音时容器描边按 1.6s 在 35% ~ 90% 之间呼吸，别的状态用一条 9% 白描边
+    val ringTransition = rememberInfiniteTransition(label = "voice_ring")
+    val ringAlpha by ringTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1_600, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "voice_ring_alpha"
+    )
+    val shape = RoundedCornerShape(26.dp)
+    val outline = if (isRecording) ControlAccent.copy(alpha = ringAlpha) else Color(0x17FFFFFF)
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .then(bottomInsetsModifier)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         color = Color.Transparent,
         tonalElevation = 0.dp
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                .clip(shape)
+                .background(ControlBarSurface)
+                .border(1.dp, outline, shape)
+                .padding(start = 18.dp, end = 8.dp, top = 14.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            if (onVoiceInput != null) {
-                IconButton(
-                    onClick = onVoiceInput,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(if (isRecording) Color(0x1AEF4444) else Color(0x1AFFFFFF))
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Mic,
-                        contentDescription = if (isRecording) "停止录音" else "语音输入",
-                        tint = if (isRecording) Color(0xFFEF4444) else Color(0x99FFFFFF),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 40.dp, max = 120.dp)
-                    .pointerInput(onInputPressed) {
-                        val callback = onInputPressed ?: return@pointerInput
-                        awaitEachGesture {
-                            awaitFirstDown(
-                                requireUnconsumed = false,
-                                pass = PointerEventPass.Initial
-                            )
-                            callback()
-                        }
-                    }
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0x1AFFFFFF))
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                BasicTextField(
-                    value = text,
-                    onValueChange = onTextChange,
-                    enabled = !isRecording,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
-                    cursorBrush = SolidColor(Color.White),
-                    // 输入法自带的动作键不再发送：退回多行输入的默认行为，
-                    // 回车 / 换行键只负责换行（配合 maxLines = 4），发送只由右侧纸飞机按钮触发。
-                    // 之前是 ImeAction.Send + KeyboardActions(onSend = ...)，键盘上的"发送"键会
-                    // 直接捅进 onSend()，用户想换行却被发了出去。
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+            if (voicePanel != null) {
+                voicePanel()
+            } else {
+                DraftInput(
+                    text = text,
+                    onTextChange = onTextChange,
+                    onInputPressed = onInputPressed,
+                    onInputFocused = onInputFocused,
                     interactionSource = interactionSource,
-                    maxLines = 4,
-                    // 不画占位文案（「输入消息…」/「正在输入…」）：空输入框就是空输入框，
-                    // 和传统 IM 一致，也不再用输入栏暗示「她还没回」。
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { state ->
-                            if (state.isFocused) onInputFocused?.invoke()
-                        }
-                        .semantics { contentDescription = "消息输入框" }
+                    modifier = Modifier.fillMaxWidth()
                 )
-            }
-
-            if (canSend || onAttach != null) {
-                // 同一个按钮只有两种语义：发送 > 更多。生成期间**不再**切成红色「停止」键 ——
-                // 那是等待态的残留视觉，和已经去掉的「正在输入」占位属于同一套提示。
-                //
-                // 生成期间允许再发一条：后端收到同一会话的新请求会 cancel 上一轮
-                // （stream_orchestrator 的 prev_task），所以"边生成边发"只会有最新一轮产出。
-                val actionEnabled = when {
-                    // 录音中一切动作都停：结束录音有自己的入口（ChatVoiceTranscribingBar），
-                    // 这里若可点，输入框里那段文字会在录音还没转完时被误发出去。
-                    isRecording -> false
-                    canSend -> true
-                    else -> onAttach != null
-                }
-                val containerColor by animateColorAsState(
-                    targetValue = if (canSend) Color(0x2A38BDF8) else Color(0x1AFFFFFF),
-                    animationSpec = tween(durationMillis = 200),
-                    label = "input_action_container"
+                ActionRow(
+                    canSend = canSend,
+                    onAttach = onAttach,
+                    onVoiceInput = onVoiceInput,
+                    onSend = onSend
                 )
-                val iconTint by animateColorAsState(
-                    targetValue = if (canSend) Color(0xFFE2E8F0) else Color(0x99FFFFFF),
-                    animationSpec = tween(durationMillis = 200),
-                    label = "input_action_tint"
-                )
-                IconButton(
-                    onClick = {
-                        if (canSend) onSend() else onAttach?.invoke()
-                    },
-                    enabled = actionEnabled,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(containerColor)
-                        // M3 的"禁用变暗"是通过 LocalContentColor 生效的，而这里每个 Icon
-                        // 都显式传了 tint，把它覆盖掉了 —— 不加这层 alpha 就会出现
-                        // "亮着蓝底纸飞机、点下去没反应"的假按钮（这正是最初要查的问题）。
-                        .alpha(if (actionEnabled) 1f else 0.45f)
-                ) {
-                    SendMoreIcon(canSend = canSend, tint = iconTint)
-                }
             }
         }
     }
 }
 
+/** 输入区：多行、无占位文案（空就是空，和传统 IM 一致）。 */
 @Composable
-private fun SendMoreIcon(
-    canSend: Boolean,
-    tint: Color,
+private fun DraftInput(
+    text: String,
+    onTextChange: (String) -> Unit,
+    onInputPressed: (() -> Unit)?,
+    onInputFocused: (() -> Unit)?,
+    interactionSource: MutableInteractionSource,
     modifier: Modifier = Modifier
 ) {
-    val sendProgress by animateFloatAsState(
-        targetValue = if (canSend) 1f else 0f,
-        animationSpec = tween(durationMillis = 220),
-        label = "send_more_progress"
-    )
-    val plusProgress = 1f - sendProgress
-
     Box(
         modifier = modifier
-            .size(22.dp)
-            .semantics { contentDescription = if (canSend) "发送" else "更多" },
-        contentAlignment = Alignment.Center
+            .pointerInput(onInputPressed) {
+                val callback = onInputPressed ?: return@pointerInput
+                awaitEachGesture {
+                    awaitFirstDown(
+                        requireUnconsumed = false,
+                        pass = PointerEventPass.Initial
+                    )
+                    callback()
+                }
+            }
+            .padding(end = 10.dp),
+        contentAlignment = Alignment.CenterStart
     ) {
-        Icon(
-            imageVector = Icons.Filled.Add,
-            contentDescription = null,
-            tint = tint,
+        BasicTextField(
+            value = text,
+            onValueChange = onTextChange,
+            textStyle = TextStyle(color = ControlInk, fontSize = 15.5.sp, lineHeight = 24.sp),
+            cursorBrush = SolidColor(ControlAccent),
+            // 输入法自带的动作键不发送：回车只负责换行，发送只走右侧箭头，
+            // 否则用户想换行却被发了出去。
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+            interactionSource = interactionSource,
+            maxLines = 4,
             modifier = Modifier
-                .size(22.dp)
-                .graphicsLayer {
-                    alpha = plusProgress
-                    scaleX = 0.7f + 0.3f * plusProgress
-                    scaleY = scaleX
-                    rotationZ = 45f * sendProgress
+                .fillMaxWidth()
+                .heightIn(min = 24.dp)
+                .onFocusChanged { state ->
+                    if (state.isFocused) onInputFocused?.invoke()
                 }
-        )
-        Icon(
-            imageVector = Icons.Filled.Send,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier
-                .size(20.dp)
-                .graphicsLayer {
-                    alpha = sendProgress
-                    scaleX = 0.6f + 0.4f * sendProgress
-                    scaleY = scaleX
-                    rotationZ = -45f * plusProgress
-                }
+                .semantics { contentDescription = "消息输入框" }
         )
     }
 }
 
+/**
+ * 动作行：「+」在左，麦克风与发送在右。
+ *
+ * 发送键常驻，没内容时按 38% 透明压暗（设计稿的禁用口径：只降透明度，不另画禁用态）；
+ * 附件、文件入口统一收进「+」的更多面板。
+ */
+@Composable
+private fun ActionRow(
+    canSend: Boolean,
+    onAttach: (() -> Unit)?,
+    onVoiceInput: (() -> Unit)?,
+    onSend: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = { onAttach?.invoke() },
+            enabled = onAttach != null,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Add,
+                contentDescription = "更多",
+                tint = if (onAttach != null) ControlFaint else ControlFaint.copy(alpha = 0.38f),
+                modifier = Modifier.size(22.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        if (onVoiceInput != null) {
+            IconButton(
+                onClick = onVoiceInput,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Mic,
+                    contentDescription = "语音输入",
+                    tint = ControlMute,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .alpha(if (canSend) 1f else 0.38f)
+                .clip(CircleShape)
+                .background(ControlInk)
+                .clickable(enabled = canSend, onClick = onSend)
+                .semantics { contentDescription = "发送" },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ArrowUpward,
+                contentDescription = null,
+                tint = ControlOnInk,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}

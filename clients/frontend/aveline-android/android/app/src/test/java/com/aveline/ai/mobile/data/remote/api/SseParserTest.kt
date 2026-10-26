@@ -46,9 +46,10 @@ class SseParserTest {
                 """"error_code":"EMPTY_CONTENT","details":{},"request_id":"abc","timestamp":1.0}"""
         val event = SseParser.parse(bare)
         assertTrue("裸 JSON 错误必须被识别，实际=$event", event is StreamEvent.Error)
-        val message = (event as StreamEvent.Error).message
-        assertTrue("错误要带 error_code 便于定位，实际=$message", message.contains("EMPTY_CONTENT"))
-        assertTrue("错误要带可读文案，实际=$message", message.contains("消息内容不能为空"))
+        val error = event as StreamEvent.Error
+        assertEquals("EMPTY_CONTENT", error.errorCode)
+        assertTrue("展示文案要带 error_code，实际=${error.describe()}", error.describe().contains("EMPTY_CONTENT"))
+        assertTrue("错误要带可读文案，实际=${error.describe()}", error.describe().contains("消息内容不能为空"))
     }
 
     @Test
@@ -57,11 +58,49 @@ class SseParserTest {
         assertEquals(StreamEvent.Error("服务暂时不可用"), SseParser.parse(bare))
     }
 
-    /** FastAPI 校验错误的 detail 是数组，不能因为取 jsonPrimitive 而抛异常。 */
+    /** FastAPI 校验错误的 detail 是数组，不能因为取 jsonPrimitive 而抛异常，且要把 msg 读出来。 */
     @Test
-    fun `detail 为数组的校验错误不会崩溃`() {
+    fun `detail 为数组的校验错误能读出 FastAPI 的 msg`() {
         val bare = """{"detail":[{"loc":["body"],"msg":"field required","type":"value_error"}]}"""
-        assertNull("detail 是数组时取不到文案，应安静忽略而不是抛异常", SseParser.parse(bare))
+        val event = SseParser.parse(bare)
+        assertTrue("detail 数组要能解析成文案，实际=$event", event is StreamEvent.Error)
+        val message = (event as StreamEvent.Error).message
+        assertTrue("要带上 FastAPI 的 msg，实际=$message", message.contains("field required"))
+        assertTrue("要带上出错字段位置，实际=$message", message.contains("body"))
+    }
+
+    /** 后端 error 事件里的 error_code 与 details 必须一起展示，别再只剩一句笼统文案。 */
+    @Test
+    fun `SSE error 事件带出 error_code 与上游详情`() {
+        val line =
+            """data: {"type":"error","message":"这次输入被上游模型判定为敏感内容而拒绝（HTTP 422）",""" +
+                """"error_code":"non_retryable","details":{"error_type":"LLMStreamError",""" +
+                """"raw_error":"API returned 422","upstream_status":422,""" +
+                """"upstream_body":"input new_sensitive (1026)"}}"""
+        val error = SseParser.parse(line) as StreamEvent.Error
+        assertEquals("non_retryable", error.errorCode)
+        val text = error.describe()
+        assertTrue("要显示错误码，实际=$text", text.contains("non_retryable"))
+        assertTrue("要显示上游状态码，实际=$text", text.contains("422"))
+        assertTrue("要显示上游原话，实际=$text", text.contains("new_sensitive"))
+    }
+
+    /** HTTP 非 2xx 的后端原因在 errorBody 里，422 不能只显示 "Unprocessable Entity"。 */
+    @Test
+    fun `HTTP 422 errorBody 读得出后端原因`() {
+        val body = """{"detail":[{"loc":["body","message"],"msg":"Field required"}]}"""
+        val error = errorFromHttpResponse(422, "Unprocessable Entity", body)
+        assertEquals(422, error.httpStatus ?: -1)
+        val text = error.describe()
+        assertTrue("要显示 HTTP 状态码，实际=$text", text.contains("HTTP 422"))
+        assertTrue("要显示后端原因，实际=$text", text.contains("Field required"))
+    }
+
+    /** 非 JSON 的错误体也不能只剩一个状态码。 */
+    @Test
+    fun `HTTP 非 2xx 非 JSON 错误体保留原文`() {
+        val error = errorFromHttpResponse(502, "Bad Gateway", "<html>bad gateway</html>")
+        assertTrue("要保留原始错误体，实际=${error.describe()}", error.describe().contains("bad gateway"))
     }
 
     /** 成功响应不应该被当成错误，否则会把一次正常回复变成报错。 */

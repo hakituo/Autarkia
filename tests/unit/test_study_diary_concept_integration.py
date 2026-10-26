@@ -5,6 +5,7 @@
 2. 知识点日汇总的当天行为 / 当前快照两层口径；
 3. 渲染进日记句子时「靠提示答出」不能被算成「自己答出」。
 """
+
 from __future__ import annotations
 
 from core.services.journal.persona_exports import (
@@ -245,7 +246,15 @@ def test_summary_builder_without_concepts_is_backward_compatible(study_sandbox):
     )
 
     assert summary["concepts"] == {}
-    for key in ("date", "vocab", "session", "subjects", "overview", "next_day_blueprint", "suggestion"):
+    for key in (
+        "date",
+        "vocab",
+        "session",
+        "subjects",
+        "overview",
+        "next_day_blueprint",
+        "suggestion",
+    ):
         assert key in summary
 
 
@@ -299,4 +308,3 @@ def test_digest_reads_same_date_as_events_written(study_sandbox):
 
     assert digest["date"] == project_date, "摘要日期与事件落盘日期口径不一致"
     assert "简谐运动" in digest["concepts"]["taught"]
-

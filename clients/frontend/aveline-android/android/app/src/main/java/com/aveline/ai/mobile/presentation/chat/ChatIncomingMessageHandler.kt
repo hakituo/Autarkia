@@ -31,7 +31,14 @@ class ChatIncomingMessageHandler(
     private val getSessionId: () -> String?,
     private val resolveProfileFilenameForSession: (String?) -> String?,
     /** 媒体本地仓库：WS 推送的图片/动图收到即落盘，换后端后历史媒体不丢。 */
-    private val localMediaStore: LocalMediaStore? = null
+    private val localMediaStore: LocalMediaStore? = null,
+    /**
+     * 设置页「动作描写」开关的实时读取。
+     *
+     * 用 lambda 而不是布尔快照：分段发生在每条消息到达时，必须取当时的值，
+     * 否则用户改了设置还要等下一次构造才生效。
+     */
+    private val isStageDirectionEnabled: () -> Boolean = { true }
 ) {
     companion object {
         private const val TAG = "ChatIncomingMessageHandler"
@@ -46,7 +53,10 @@ class ChatIncomingMessageHandler(
 
         val sessionId = getSessionId()
         val messageId = generateMessageId()
-        val segments = ChatTextProcessor.smartSegmentText(text)
+        val segments = ChatTextProcessor.smartSegmentText(
+            text = text,
+            stageDirectionEnabled = isStageDirectionEnabled()
+        )
 
         if (segments.isEmpty()) {
             uiState.update { it.copy(isTyping = false, showTypingIndicator = false) }

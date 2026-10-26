@@ -186,6 +186,118 @@ def build_knowledge_buckets(
     }
 
 
+def build_knowledge_buckets_multi(
+    *,
+    participants: List[str],
+    names_by_role: Dict[str, str],
+    bio_state_by_role: Dict[str, Any],
+    master_history_by_role: Dict[str, str],
+    time_str: str = "",
+) -> Dict[str, Any]:
+    """多人版知识分桶：每个参与者一份视角，互相之间只共享可观察事实。
+
+    与两人版的判定口径一致：
+    - 私有状态（精力/心情/饥饿）只有本人知道；
+    - 当前活动/生病是同住或熟人可观察的公共事实；
+    - 与主人的私聊只归本人，跨关系转述由 Validator 兜底拦。
+    """
+    members = [str(p).strip().lower() for p in participants if str(p).strip()]
+    observable = {
+        rid: _observable_desc(bio_state_by_role.get(rid))
+        for rid in members
+    }
+    private = {
+        rid: _private_desc(bio_state_by_role.get(rid))
+        for rid in members
+    }
+
+    shared_parts: List[str] = []
+    if time_str:
+        shared_parts.append(f"当前时间：{time_str}")
+    for rid in members:
+        name = names_by_role.get(rid, rid)
+        desc = observable.get(rid) or ""
+        if desc:
+            shared_parts.append(f"{name}：{desc}")
+
+    views: Dict[str, Dict[str, str]] = {}
+    for rid in members:
+        others = [
+            f"{names_by_role.get(other, other)}：{observable.get(other) or '看不出在做什么'}"
+            for other in members
+            if other != rid
+        ]
+        views[rid] = {
+            "private_state": private.get(rid) or "",
+            "known_about_others": "；".join(others),
+            "master_material": filter_secret_lines(
+                str(master_history_by_role.get(rid) or "")
+            ),
+        }
+
+    return {
+        "time_str": time_str,
+        "shared_context": "，".join(shared_parts) if shared_parts else "",
+        "views": views,
+        "participants": members,
+    }
+
+
+def validate_peer_script_multi(
+    script: List[Dict[str, Any]],
+    knowledge: Dict[str, Any],
+) -> List[str]:
+    """多人版剧本校验：角色 id 合法性 + 私有状态越权 + 保密信号。"""
+    if not script:
+        return []
+    k = knowledge or {}
+    members = [
+        str(p).strip().lower() for p in (k.get("participants") or []) if str(p).strip()
+    ]
+    views = k.get("views") or {}
+    violations: List[str] = []
+
+    for idx, line in enumerate(script):
+        speaker = str(line.get("role") or "").strip().lower()
+        content = str(line.get("content") or "").strip()
+        if not content:
+            continue
+        if members and speaker not in members:
+            violations.append(
+                f"第{idx + 1}条角色非法：'{speaker}' 不在参与者 {members} 内"
+            )
+            continue
+
+        for marker in _SCRIPT_SECRECY_MARKERS:
+            if marker in content:
+                violations.append(
+                    f"第{idx + 1}条隐私风险：出现保密信号『{marker}』"
+                )
+                break
+
+        speaker_known = str((views.get(speaker) or {}).get("known_about_others") or "")
+        for other in members:
+            if other == speaker:
+                continue
+            other_private = str((views.get(other) or {}).get("private_state") or "")
+            if not other_private:
+                continue
+            for kw in _PRIVATE_STATE_KEYWORDS:
+                if kw in other_private and kw not in speaker_known and kw in content:
+                    other_name = str(other)
+                    violations.append(
+                        f"第{idx + 1}条越权：{speaker}提到{other_name}的私有状态『{kw}』"
+                    )
+                    break
+
+    if violations:
+        logger.warning(
+            "Peer Chat: 多人剧本校验未通过 %d 项: %s",
+            len(violations), " | ".join(violations),
+        )
+    return violations
+
+
 # ============================================================
 # ⑥ Validator：剧本越权 / 隐私泄漏 / 私密信号代码级检查
 # ============================================================

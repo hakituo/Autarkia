@@ -113,7 +113,7 @@ def test_scheduler_resolve_peer_qq_id_generic_env():
     """测试 peer_chat_scheduler 的通用 env var 解析"""
     print("=== 测试 peer_chat_scheduler 通用 env var 解析 ===")
     # 测试 N 角色通用 env var 格式
-    with patch.dict(os.environ, {"XIAOYOU_QQ_BOT_NUMBER_NEWROLE": "99999999"}):
+    with patch.dict(os.environ, {"AUTARKIA_QQ_BOT_NUMBER_NEWROLE": "99999999"}):
         # 不能直接实例化 PeerChatScheduler(依赖太多),只测试 _resolve_peer_qq_id 逻辑
         # 通过 mock 验证 env var 读取
         from config.settings_adapters import get_multi_qq_role_config
@@ -123,16 +123,16 @@ def test_scheduler_resolve_peer_qq_id_generic_env():
         assert role_cfg is None, "未注册角色应返回 None"
 
         # 模拟 _resolve_peer_qq_id 的 env var 兜底逻辑
-        env_key_generic = f"XIAOYOU_QQ_BOT_NUMBER_{'newrole'.upper()}"
+        env_key_generic = f"AUTARKIA_QQ_BOT_NUMBER_{'newrole'.upper()}"
         val = os.getenv(env_key_generic, "").strip()
         assert val == "99999999", f"通用 env var 应读到 '99999999',实际 '{val}'"
-        print(f"  XIAOYOU_QQ_BOT_NUMBER_NEWROLE → '{val}' (N 角色通用 env var)")
+        print(f"  AUTARKIA_QQ_BOT_NUMBER_NEWROLE → '{val}' (N 角色通用 env var)")
 
     # 测试向后兼容 env var
-    with patch.dict(os.environ, {"XIAOYOU_QQ_BOT_NUMBER": "11111111"}):
-        val = os.getenv("XIAOYOU_QQ_BOT_NUMBER", "").strip()
+    with patch.dict(os.environ, {"AUTARKIA_QQ_BOT_NUMBER": "11111111"}):
+        val = os.getenv("AUTARKIA_QQ_BOT_NUMBER", "").strip()
         assert val == "11111111", f"向后兼容 env var 应读到 '11111111',实际 '{val}'"
-        print(f"  XIAOYOU_QQ_BOT_NUMBER → '{val}' (向后兼容)")
+        print(f"  AUTARKIA_QQ_BOT_NUMBER → '{val}' (向后兼容)")
 
     print("  [PASS] peer_chat_scheduler 通用 env var 解析正确\n")
 
@@ -184,19 +184,19 @@ def test_multi_qq_adapter_env_collection():
     print("=== 测试 multi_qq_adapter env var 收集 ===")
     # 模拟 N 角色 env var
     test_env = {
-        "XIAOYOU_QQ_BOT_NUMBER": "11111111",
-        "XIAOYOU_QQ_BOT_NUMBER_LING": "22222222",
-        "XIAOYOU_QQ_BOT_NUMBER_NEWROLE": "33333333",
+        "AUTARKIA_QQ_BOT_NUMBER": "11111111",
+        "AUTARKIA_QQ_BOT_NUMBER_LING": "22222222",
+        "AUTARKIA_QQ_BOT_NUMBER_NEWROLE": "33333333",
     }
     with patch.dict(os.environ, test_env, clear=False):
         # 模拟 load_multi_config 的 env var 收集逻辑
         role_qq_from_env = {
-            "aveline": os.getenv("XIAOYOU_QQ_BOT_NUMBER", "").strip(),
-            "ling": os.getenv("XIAOYOU_QQ_BOT_NUMBER_LING", "").strip(),
+            "aveline": os.getenv("AUTARKIA_QQ_BOT_NUMBER", "").strip(),
+            "ling": os.getenv("AUTARKIA_QQ_BOT_NUMBER_LING", "").strip(),
         }
         for env_key, env_val in os.environ.items():
-            if env_key.startswith("XIAOYOU_QQ_BOT_NUMBER_"):
-                role_suffix = env_key[len("XIAOYOU_QQ_BOT_NUMBER_"):].lower()
+            if env_key.startswith("AUTARKIA_QQ_BOT_NUMBER_"):
+                role_suffix = env_key[len("AUTARKIA_QQ_BOT_NUMBER_"):].lower()
                 if role_suffix and env_val.strip():
                     role_qq_from_env[role_suffix] = env_val.strip()
 

@@ -16,7 +16,7 @@
    拆分逻辑；渲染历史日期（非当前画像）时关闭时效标注。
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.daily.verify_health_freshness
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.daily.verify_health_freshness
 """
 
 import json

@@ -93,6 +93,31 @@ python scripts/study/vocabulary/generate_sense_rankings.py \
 - 完整重建：`python scripts/study/vocabulary/build_wordbooks.py --write`（会自动备份到 `Words/backups/`）。
 - 运行时增量：`core/tools/study/english/wordbook_sync.py`，取词发现未收录词时后台流式扫描 ECDICT 只补缺失词，不需要整体重建 77 万行词表。
 
+## 开源词书覆盖层
+
+ECDICT 的部分词条义项偏旧或不完整（例如 `layoff` 没有“裁员”、`basin` 没有“流域”）。
+`build_qwerty_overlay.py` 从开源词书项目
+[Qwerty Learner](https://github.com/RealKai42/qwerty-learner) 的
+CET4/CET6/考研/托福/雅思/GRE 六套词书中抽取释义，只保留当前全量词书已有的词头，
+输出 `config/study/vocabulary_qwerty_translations.json`。
+
+```bash
+# 需要先把六套词库放到 external/qwerty-learner/dicts/（external/ 不入库）
+python scripts/study/vocabulary/build_qwerty_overlay.py --write
+```
+
+构建时的优先级：
+
+```text
+manual vocabulary_sense_overrides
+    > Qwerty 开源词书覆盖层（主释义）
+    > learner sense ranking（仅在覆盖层内部重排）
+    > ECDICT（覆盖层没有的词，以及被折叠的「更多/专业释义」）
+```
+
+覆盖层没有覆盖的词仍然完全走 ECDICT；覆盖层覆盖的词，ECDICT 义项会去重后进入
+`extended_translations`，在 App 中通过「更多/专业释义」折叠展示，不会丢失。
+
 ## 构建
 
 默认 ranking 文件会自动加载，也可显式指定：

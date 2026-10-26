@@ -1,6 +1,6 @@
 """验证「学习模式误触发/无法退出」与「醒来后卡在晚安模式」两个修复（2026-09-21）
 
-背景（来自真实日志 logs/2026/9/21/xiaoyou_main.log）：
+背景（来自真实日志 logs/2026/9/21/autarkia_main.log）：
 
 问题 1 —— 莫名进入学习模式且退不出来：
     [23:05:47] [Native Tool] Executing: enter_study_mode
@@ -29,7 +29,7 @@ D) core/services/active_care/core/sleep_session_manager.py
    - 新增白天兜底退出：晚安后持续活跃满阈值即退出，不依赖单句意图
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.prompt.verify_study_mode_and_awake_exit
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.prompt.verify_study_mode_and_awake_exit
 """
 
 import asyncio

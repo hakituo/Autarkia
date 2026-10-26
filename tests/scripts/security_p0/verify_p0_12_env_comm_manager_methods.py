@@ -68,7 +68,7 @@ def check_file_storage_has_list_keys() -> list[str]:
         return issues
 
     # 用临时目录测试
-    tmpdir = tempfile.mkdtemp(prefix="xiaoyou_test_storage_")
+    tmpdir = tempfile.mkdtemp(prefix="autarkia_test_storage_")
     try:
         storage = FileBasedSharedStorage(storage_dir=tmpdir)
         # 写入 3 个 key
@@ -138,7 +138,7 @@ def check_check_messages_from_shared_storage_full_chain() -> list[str]:
         Message,
     )
 
-    tmpdir = tempfile.mkdtemp(prefix="xiaoyou_test_chain_")
+    tmpdir = tempfile.mkdtemp(prefix="autarkia_test_chain_")
     try:
         manager = EnvironmentCommunicationManager(env_id="chain_env")
         # 替换 shared_storage 为临时目录版本

@@ -35,6 +35,7 @@ from core.services.active_care.peer_chat.proactive_assignment_parser import (
 # negotiation_parser —— 提醒分工
 # ============================================================
 
+
 class TestParseAssignmentsFromScript:
     """提醒分工解析：标签块 / 兜底 / 容错。"""
 
@@ -267,6 +268,7 @@ class TestBuildReminderListText:
 # proactive_assignment_parser —— 主动关怀时段分工
 # ============================================================
 
+
 class TestParseProactiveAssignmentFromScript:
     """时段分工解析：时段校验 + persona 归一。"""
 
@@ -492,6 +494,7 @@ class TestBuildSlotListText:
 # ============================================================
 # _safe_parse_assignments —— 两个解析器共用的私有 JSON 入口
 # ============================================================
+
 
 class TestSafeParseAssignmentsContract:
     """直接校验两个模块级私有 helper 的文档化契约。

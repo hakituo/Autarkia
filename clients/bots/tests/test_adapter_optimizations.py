@@ -13,7 +13,7 @@ from clients.bots.handlers.openclaw import OpenClawHandler
 from clients.bots.qq.face import QQFaceInjector
 from clients.bots.qq.main import QQAdapter
 from clients.bots.qq.utils import extract_leading_reaction_delay, strip_all_reaction_delay_tags
-from clients.bots.qq.session.session import XiaoyouSession
+from clients.bots.qq.session.session import AutarkiaSession
 from clients.bots.qq.utils import _split_message_for_qq
 from core.agents.chat_agent_components.persona_system.prompt.qq_integration import build_qq_reaction_delay_prompt
 
@@ -176,7 +176,7 @@ class TestQQFaceInjector(unittest.TestCase):
 
 class TestQQSessionTypingDelay(unittest.TestCase):
     def test_surprise_delay_applies_once(self):
-        session = XiaoyouSession("private_1", _FakeAdapter([]))
+        session = AutarkiaSession("private_1", _FakeAdapter([]))
         with patch("clients.bots.qq_adapter_session.QQ_TYPING_DELAY_SURPRISE_PROBABILITY", 1.0), patch(
             "clients.bots.qq_adapter_session.QQ_TYPING_DELAY_SURPRISE_MIN_SECONDS", 120.0
         ), patch("clients.bots.qq_adapter_session.QQ_TYPING_DELAY_SURPRISE_MAX_SECONDS", 120.0), patch(
@@ -188,7 +188,7 @@ class TestQQSessionTypingDelay(unittest.TestCase):
         self.assertLess(second_delay, 120.0)
 
     def test_bionic_profile_adjusts_base_delay(self):
-        session = XiaoyouSession("private_2", _FakeAdapter([]))
+        session = AutarkiaSession("private_2", _FakeAdapter([]))
         session._bionic_profile = {"delay": {"base_multiplier": 1.5}}
         with patch("clients.bots.qq_adapter_session.random.uniform", return_value=1.0):
             delay = session._calc_typing_delay("测试仿生延迟")
@@ -197,7 +197,7 @@ class TestQQSessionTypingDelay(unittest.TestCase):
 
 class TestQQSessionSplitSend(unittest.IsolatedAsyncioTestCase):
     async def test_default_reply_should_not_enable_surprise_delay(self):
-        session = XiaoyouSession("private_3", _FakeAdapter([]))
+        session = AutarkiaSession("private_3", _FakeAdapter([]))
         session._send_response = AsyncMock()
         with patch.object(session, "_calc_typing_delay", return_value=0.01) as mock_delay, patch(
             "clients.bots.qq_adapter_session.asyncio.sleep", new=AsyncMock()
@@ -208,7 +208,7 @@ class TestQQSessionSplitSend(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(bool(first_call_kwargs.get("allow_surprise_delay", True)))
 
     async def test_full_response_should_split_on_slash_n_markers(self):
-        session = XiaoyouSession("private_5", _FakeAdapter([]))
+        session = AutarkiaSession("private_5", _FakeAdapter([]))
         session._cfg.qq_max_bubble_len = 150
         session._cfg.qq_min_split_len = 40
         session._cfg.auto_tts_for_voice_input = False
@@ -222,7 +222,7 @@ class TestQQSessionSplitSend(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sent_chunks, ["就", "像", "这", "样"])
 
     async def test_stream_buffer_should_preserve_remaining_newlines(self):
-        session = XiaoyouSession("private_6", _FakeAdapter([]))
+        session = AutarkiaSession("private_6", _FakeAdapter([]))
         session._cfg.qq_max_bubble_len = 150
         session._cfg.qq_min_split_len = 40
         session._load_bionic_profile = AsyncMock()
@@ -263,7 +263,7 @@ class TestQQReactionDelay(unittest.TestCase):
 
 class TestQQSessionReactionDelay(unittest.IsolatedAsyncioTestCase):
     async def test_send_full_response_should_wait_reaction_delay_before_first_chunk(self):
-        session = XiaoyouSession("private_4", _FakeAdapter([]))
+        session = AutarkiaSession("private_4", _FakeAdapter([]))
         session._split_disabled = True
         session._send_response = AsyncMock()
         session._smart_sleep = AsyncMock()

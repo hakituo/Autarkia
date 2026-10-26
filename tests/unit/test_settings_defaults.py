@@ -19,7 +19,8 @@ def test_memory_settings_defaults():
     from config.settings_core import MemorySettings
 
     settings = MemorySettings()
-    assert settings.short_term_capacity == 60
+    assert settings.short_term_capacity == 120
+    assert settings.trim_threshold == 120
 
 
 def test_model_settings_defaults():
@@ -57,6 +58,7 @@ def test_config_backward_compat_mapping():
 
     # 重置缓存
     from config.integrated_config import reset_settings_cache
+
     reset_settings_cache()
 
     try:

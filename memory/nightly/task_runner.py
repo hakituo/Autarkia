@@ -136,6 +136,17 @@ class NightlyTaskRunner:
             results["distilled_count"] = 0
             results["distillation"] = "disabled"
         results["people_profiles"] = "deferred_to_global_gate"
+        # 按 segment 提取（v3 F3）：接在旧蒸馏之后，开关关着整段跳过，不改旧蒸馏行为
+        if self.config.get("segment_extraction_enabled", False):
+            try:
+                from .segment_jobs import extractors
+                from .segment_jobs.run import run_segment_jobs
+
+                extractors.ensure_default_factory()
+                results["segment_jobs"] = await run_segment_jobs(user_id, manager, self.config)
+            except Exception as exc:
+                logger.exception("按段提取失败: %s", type(exc).__name__)
+                results["segment_jobs"] = {"segment_extraction": "error"}
         return results
 
     async def execute_scope_tasks(
@@ -183,9 +194,7 @@ class NightlyTaskRunner:
             distillation_model,
         )
 
-    group_memories_by_time = staticmethod(
-        MemoryDistillationService.group_memories_by_time
-    )
+    group_memories_by_time = staticmethod(MemoryDistillationService.group_memories_by_time)
     generate_distillation_prompt = staticmethod(
         MemoryDistillationService.generate_distillation_prompt
     )
@@ -195,12 +204,8 @@ class NightlyTaskRunner:
     parse_batch_distillation_response = staticmethod(
         MemoryDistillationService.parse_batch_distillation_response
     )
-    empty_profile_signals = staticmethod(
-        MemoryDistillationService.empty_profile_signals
-    )
-    parse_profile_signals = staticmethod(
-        MemoryDistillationService.parse_profile_signals
-    )
+    empty_profile_signals = staticmethod(MemoryDistillationService.empty_profile_signals)
+    parse_profile_signals = staticmethod(MemoryDistillationService.parse_profile_signals)
     parse_batch_profile_signals = staticmethod(
         MemoryDistillationService.parse_batch_profile_signals
     )

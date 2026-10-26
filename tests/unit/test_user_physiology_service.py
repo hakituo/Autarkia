@@ -46,4 +46,3 @@ def test_user_physiology_flags_derive():
     assert "sleep_deprived" in urgent
     assert "low_spo2" in urgent
     assert "high_stress" in urgent
-

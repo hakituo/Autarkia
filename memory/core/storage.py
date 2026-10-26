@@ -635,21 +635,12 @@ def _add_memory_core(
     if role in {"user", "assistant"}:
         try:
             from core.agents.chat_agent_components.message_branch import (
-                branch_metadata_for_role,
-                get_request_branch_metadata,
+                request_branch_fields,
             )
 
-            request_branch = get_request_branch_metadata()
-            request_turn_id = (
-                str((request_branch or {}).get("assistant_message_id") or "").strip()
-            )
-            memory_turn_id = str(metadata.get("message_id") or "").strip()
-            # 只有 history.py 为当前这轮保存的 user/assistant 才允许继承 branch context。
-            # 请求期间派生出的其它后台任务即使复制了 ContextVar，也不会误标为这条世界线。
-            if request_turn_id and memory_turn_id == request_turn_id:
-                branch_fields = branch_metadata_for_role(request_branch, role)
-                if branch_fields:
-                    metadata.update(branch_fields)
+            branch_fields = request_branch_fields(role, str(metadata.get("message_id") or ""))
+            if branch_fields:
+                metadata.update(branch_fields)
         except Exception as exc:
             logger.debug("附加客户端消息树元数据失败: %s", exc)
 

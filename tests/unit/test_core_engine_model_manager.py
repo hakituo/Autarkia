@@ -92,9 +92,7 @@ def _fake_torch(available: bool = False, props=None, props_error: Exception = No
 
 def _fake_psutil():
     """构造假的 psutil 替身。"""
-    memory = SimpleNamespace(
-        total=16 * 1024**3, available=8 * 1024**3, percent=50.0
-    )
+    memory = SimpleNamespace(total=16 * 1024**3, available=8 * 1024**3, percent=50.0)
     return SimpleNamespace(
         cpu_percent=lambda interval=None: 12.5,
         virtual_memory=lambda: memory,
@@ -217,9 +215,7 @@ def _install_fake_transformers(monkeypatch, model_cls, tokenizer_cls):
     tf.AutoModelForCausalLM = model_cls
     tf.AutoModelForVision2Seq = model_cls
     monkeypatch.setitem(sys.modules, "transformers", tf)
-    monkeypatch.setitem(
-        sys.modules, "transformers.models", types.ModuleType("transformers.models")
-    )
+    monkeypatch.setitem(sys.modules, "transformers.models", types.ModuleType("transformers.models"))
     monkeypatch.setitem(
         sys.modules,
         "transformers.models.auto",
@@ -227,16 +223,12 @@ def _install_fake_transformers(monkeypatch, model_cls, tokenizer_cls):
     )
     tok_mod = types.ModuleType("transformers.models.auto.tokenization_auto")
     tok_mod.AutoTokenizer = tokenizer_cls
-    monkeypatch.setitem(
-        sys.modules, "transformers.models.auto.tokenization_auto", tok_mod
-    )
+    monkeypatch.setitem(sys.modules, "transformers.models.auto.tokenization_auto", tok_mod)
 
 
 def _models_dir() -> str:
     """按生产代码的算法推导出仓库下的 models 目录。"""
-    root = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(mm.__file__)))
-    )
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(mm.__file__))))
     return os.path.join(root, "models")
 
 
@@ -375,9 +367,7 @@ def test_init_sets_attributes_from_env_and_scans_once(monkeypatch):
     monkeypatch.setenv("MAX_MODELS", "3")
     monkeypatch.setenv("MODEL_MEMORY_THRESHOLD", "0.55")
     monkeypatch.setenv("GPU_MEMORY_THRESHOLD", "0.9")
-    monkeypatch.setattr(
-        ModelManager, "_detect_hardware_resources", lambda self: {"cpu_count": 8}
-    )
+    monkeypatch.setattr(ModelManager, "_detect_hardware_resources", lambda self: {"cpu_count": 8})
     scans = []
     monkeypatch.setattr(ModelManager, "scan_models", lambda self: scans.append(1))
 
@@ -465,14 +455,10 @@ def test_scan_models_registers_env_model_path(monkeypatch):
     dir_path = os.path.join(models_dir, "env-dir")
 
     mgr = _bare_manager()
-    monkeypatch.setattr(
-        mm, "os", _fake_os(exists=[models_dir, file_path], isfile=[file_path])
-    )
+    monkeypatch.setattr(mm, "os", _fake_os(exists=[models_dir, file_path], isfile=[file_path]))
     scanned = []
     monkeypatch.setattr(mgr, "_scan_llm_models", lambda d: scanned.append(("llm", d)))
-    monkeypatch.setattr(
-        mgr, "_scan_image_models", lambda d: scanned.append(("image", d))
-    )
+    monkeypatch.setattr(mgr, "_scan_image_models", lambda d: scanned.append(("image", d)))
     monkeypatch.setattr(
         mgr,
         "_register_cloud_clients_from_llm_module",
@@ -608,12 +594,8 @@ def test_register_cloud_clients_legacy_env(monkeypatch):
         "av2",
     }
     assert set(mgr._models) == expected
-    assert mgr._models["deepseek-v4-flash"].model_path == (
-        "cloud:deepseek:deepseek-v4-flash"
-    )
-    assert mgr._models["Kimi-K2.6"].model_path == (
-        "cloud:siliconflow:Pro/moonshotai/Kimi-K2.6"
-    )
+    assert mgr._models["deepseek-v4-flash"].model_path == ("cloud:deepseek:deepseek-v4-flash")
+    assert mgr._models["Kimi-K2.6"].model_path == ("cloud:siliconflow:Pro/moonshotai/Kimi-K2.6")
     assert all(info.model_type == "llm" for info in mgr._models.values())
 
 
@@ -631,9 +613,7 @@ def test_register_cloud_clients_respects_provider_and_model_whitelist(monkeypatc
             registered_cloud_providers=[" DeepSeek ", "", "minimax"],
             registered_cloud_models={"deepseek": ["deepseek-v4-pro"]},
             cloud_provider_keys={
-                "minimax": {
-                    "default": SimpleNamespace(models=["MiniMax-M3"], api_key="key")
-                }
+                "minimax": {"default": SimpleNamespace(models=["MiniMax-M3"], api_key="key")}
             },
         ),
     )
@@ -685,13 +665,9 @@ def test_register_cloud_clients_multi_key_dedupe_and_paths(monkeypatch):
     # 已存在同名模型 → 候选被去重，原注册不被覆盖
     assert mgr._models["shared-model"].model_path == "cloud:deepseek:shared-model"
     # default 别名不加后缀，路径为 cloud:provider:model
-    assert mgr._models["only-default"].model_path == (
-        "cloud:siliconflow:only-default"
-    )
+    assert mgr._models["only-default"].model_path == ("cloud:siliconflow:only-default")
     # 非 default 别名加后缀，路径为 cloud:provider:alias:model
-    assert mgr._models["shared-model (key2)"].model_path == (
-        "cloud:siliconflow:key2:shared-model"
-    )
+    assert mgr._models["shared-model (key2)"].model_path == ("cloud:siliconflow:key2:shared-model")
 
 
 def test_register_cloud_clients_skips_model_registered_concurrently(monkeypatch):
@@ -707,17 +683,13 @@ def test_register_cloud_clients_skips_model_registered_concurrently(monkeypatch)
     def _racy_register(model_name, model_type, model_path):
         original_register(model_name, model_type, model_path)
         if model_name == "deepseek-v4-flash":
-            original_register(
-                "deepseek-v4-pro", "llm", "cloud:deepseek:deepseek-v4-pro"
-            )
+            original_register("deepseek-v4-pro", "llm", "cloud:deepseek:deepseek-v4-pro")
 
     monkeypatch.setattr(mgr, "register_model", _racy_register)
 
     mgr._register_cloud_clients_from_llm_module()
 
-    assert mgr._models["deepseek-v4-pro"].model_path == (
-        "cloud:deepseek:deepseek-v4-pro"
-    )
+    assert mgr._models["deepseek-v4-pro"].model_path == ("cloud:deepseek:deepseek-v4-pro")
     assert set(mgr._models) == {"deepseek-v4-flash", "deepseek-v4-pro"}
 
 
@@ -746,9 +718,7 @@ def test_register_cloud_clients_handles_bad_multi_key_config(monkeypatch):
     monkeypatch.setattr(mm, "is_debug_enabled", lambda module: False)
     _patch_settings(
         monkeypatch,
-        _cloud_settings(
-            cloud_provider_keys={"siliconflow": {"default": _BadKeyConfig()}}
-        ),
+        _cloud_settings(cloud_provider_keys={"siliconflow": {"default": _BadKeyConfig()}}),
     )
 
     mgr._register_cloud_clients_from_llm_module()
@@ -784,9 +754,7 @@ def test_detect_hardware_resources_without_gpu(monkeypatch):
     mgr = _bare_manager()
     monkeypatch.setattr(mm, "psutil", _fake_psutil())
     monkeypatch.setattr(mm, "torch", None)
-    monkeypatch.setattr(
-        mm, "open", _FakeFile("", error=FileNotFoundError()), raising=False
-    )
+    monkeypatch.setattr(mm, "open", _FakeFile("", error=FileNotFoundError()), raising=False)
 
     result = mgr._detect_hardware_resources()
 
@@ -806,9 +774,7 @@ def test_detect_hardware_resources_with_gpu_and_nvml(monkeypatch):
     monkeypatch.setattr(mm, "psutil", _fake_psutil())
     props = SimpleNamespace(name="FakeGPU", total_memory=24 * 1024**3)
     monkeypatch.setattr(mm, "torch", _fake_torch(available=True, props=props))
-    monkeypatch.setattr(
-        mm, "open", _FakeFile("NVIDIA Jetson Orin"), raising=False
-    )
+    monkeypatch.setattr(mm, "open", _FakeFile("NVIDIA Jetson Orin"), raising=False)
 
     pynvml = types.ModuleType("pynvml")
     pynvml.nvmlInit = lambda: None
@@ -835,9 +801,7 @@ def test_detect_hardware_resources_gpu_props_failure(monkeypatch):
         "torch",
         _fake_torch(available=True, props_error=RuntimeError("no props")),
     )
-    monkeypatch.setattr(
-        mm, "open", _FakeFile("", error=OSError()), raising=False
-    )
+    monkeypatch.setattr(mm, "open", _FakeFile("", error=OSError()), raising=False)
 
     result = mgr._detect_hardware_resources()
 
@@ -888,9 +852,7 @@ def test_get_model_stats_counts_loaded_llm(monkeypatch):
         mgr.register_model(name, mtype, "/" + name)
         mgr._models[name].is_loaded = loaded
 
-    monkeypatch.setattr(
-        voice_pkg, "_tts_manager_instance", SimpleNamespace(engine=object())
-    )
+    monkeypatch.setattr(voice_pkg, "_tts_manager_instance", SimpleNamespace(engine=object()))
     detect_calls = []
     monkeypatch.setattr(
         ModelManager,
@@ -1007,9 +969,7 @@ def _patch_active_llm_deps(
 def test_detect_active_llm_without_backends(monkeypatch):
     """C++ 调度器未启用且无 LLM 模块时应原样返回。"""
     mgr = _bare_manager()
-    _patch_active_llm_deps(
-        monkeypatch, cpp=SimpleNamespace(enabled=False), llm=None
-    )
+    _patch_active_llm_deps(monkeypatch, cpp=SimpleNamespace(enabled=False), llm=None)
 
     assert mgr._detect_active_llm("None", 0) == ("None", 0)
 
@@ -1055,9 +1015,7 @@ def test_detect_active_llm_prefers_current_model_name(monkeypatch):
     """已初始化模型 + get_current_model_name 时，应以当前模型名为准。"""
     mgr = _bare_manager()
     status = {"type": "local", "init_state": "initialized", "model_path": "local-model"}
-    llm = SimpleNamespace(
-        get_status=lambda: status, get_current_model_name=lambda: "current"
-    )
+    llm = SimpleNamespace(get_status=lambda: status, get_current_model_name=lambda: "current")
     _patch_active_llm_deps(monkeypatch, cpp=SimpleNamespace(enabled=False), llm=llm)
 
     assert mgr._detect_active_llm("None", 0) == ("current", 1)
@@ -1067,9 +1025,7 @@ def test_detect_active_llm_non_hybrid_not_initialized(monkeypatch):
     """非 hybrid 且未初始化、当前模型名为 unknown 时不应改动入参。"""
     mgr = _bare_manager()
     status = {"type": "local", "status": "loading"}
-    llm = SimpleNamespace(
-        get_status=lambda: status, get_current_model_name=lambda: "unknown"
-    )
+    llm = SimpleNamespace(get_status=lambda: status, get_current_model_name=lambda: "unknown")
     _patch_active_llm_deps(monkeypatch, cpp=SimpleNamespace(enabled=False), llm=llm)
 
     assert mgr._detect_active_llm("None", 0) == ("None", 0)
@@ -1194,9 +1150,7 @@ def test_load_model_reloads_when_move_back_fails(monkeypatch):
     info.is_loaded = True
     info.is_offloaded = True
     info.model_obj = _Movable(fail=True)
-    monkeypatch.setattr(
-        mgr, "_load_model_by_type", lambda name, **kwargs: ("NEW", "TOK")
-    )
+    monkeypatch.setattr(mgr, "_load_model_by_type", lambda name, **kwargs: ("NEW", "TOK"))
 
     assert mgr.load_model("m") == "NEW"
     assert info.is_loaded is True
@@ -1271,9 +1225,7 @@ def test_load_model_reloads_when_wait_offload_restore_fails(monkeypatch):
         return lock
 
     monkeypatch.setattr(mgr, "_get_model_lock", _hook)
-    monkeypatch.setattr(
-        mgr, "_load_model_by_type", lambda name, **kwargs: ("RELOADED", "TOK")
-    )
+    monkeypatch.setattr(mgr, "_load_model_by_type", lambda name, **kwargs: ("RELOADED", "TOK"))
 
     assert mgr.load_model("m") == "RELOADED"
     assert info.is_loaded is True
@@ -1285,9 +1237,7 @@ def test_load_model_loads_and_propagates_failure(monkeypatch):
     mgr = _bare_manager()
     mgr.register_model("m", "llm", "/m")
     info = mgr._models["m"]
-    monkeypatch.setattr(
-        mgr, "_load_model_by_type", lambda name, **kwargs: ("MODEL", "TOK")
-    )
+    monkeypatch.setattr(mgr, "_load_model_by_type", lambda name, **kwargs: ("MODEL", "TOK"))
 
     assert mgr.load_model("m") == "MODEL"
     assert info.is_loaded is True
@@ -1503,9 +1453,7 @@ def test_load_transformers_model_cpu_device_without_to(monkeypatch):
 
     _install_fake_transformers(monkeypatch, _ModelCls, _Tok)
 
-    model, tokenizer = mgr._load_transformers_model(
-        "/m", {"device": "cpu"}, "AutoModelForCausalLM"
-    )
+    model, tokenizer = mgr._load_transformers_model("/m", {"device": "cpu"}, "AutoModelForCausalLM")
 
     assert model == "RAW-MODEL"
     assert tokenizer == "TOK"

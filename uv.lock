@@ -6760,7 +6760,7 @@ wheels = [
 ]
 
 [[package]]
-name = "xiaoyou-core"
+name = "autarkia"
 version = "2.3.0"
 source = { editable = "." }
 dependencies = [
@@ -6939,7 +6939,7 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.38.0,<0.39.0" },
     { name = "watchdog", specifier = ">=6.0.0,<7.0.0" },
     { name = "websockets", specifier = ">=11.0.3,<12.0.0" },
-    { name = "xiaoyou-core", extras = ["models", "voice", "image"], marker = "extra == 'local'" },
+    { name = "autarkia", extras = ["models", "voice", "image"], marker = "extra == 'local'" },
 ]
 provides-extras = ["dev", "docs", "voice", "image", "models", "local"]
 

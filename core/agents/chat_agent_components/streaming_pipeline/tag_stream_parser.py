@@ -39,10 +39,14 @@ class LLMStreamError(RuntimeError):
         *,
         raw: str = "",
         error_code: str = "UPSTREAM_LLM_ERROR",
+        details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(message)
         self.raw = raw or message
         self.error_code = error_code
+        # 上游 chunk 里可能带 {"status": 422, "body": "input new_sensitive ..."} 之类的详情，
+        # 旧实现整个丢掉，前端只能看到一句「AI 服务暂时不可用」。原样带到错误事件里。
+        self.details = details if isinstance(details, dict) else {}
 
 
 def _extract_stream_error(chunk: Dict[str, Any]) -> tuple[Optional[str], str]:
@@ -339,7 +343,12 @@ class StreamTagSession:
         # 上游错误必须抛出去，不能当"没内容的正常片段"忽略（见 LLMStreamError）
         error_msg, error_code = _extract_stream_error(chunk)
         if error_msg is not None:
-            raise LLMStreamError(error_msg, raw=error_msg, error_code=error_code)
+            raise LLMStreamError(
+                error_msg,
+                raw=error_msg,
+                error_code=error_code,
+                details=chunk.get("details"),
+            )
 
         # 累积原生 tool_calls
         if "tool_calls" in chunk:

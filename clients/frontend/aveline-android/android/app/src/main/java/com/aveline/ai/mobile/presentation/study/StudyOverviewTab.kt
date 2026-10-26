@@ -32,10 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.presentation.components.SectionCard
-import com.aveline.ai.mobile.presentation.theme.EmotionGreen
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
-import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 
 /**
@@ -153,7 +151,7 @@ private fun TodayStatCard(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = Primary,
+            tint = Accent,
             modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.height(6.dp))
@@ -394,11 +392,7 @@ private fun mapStatusToProgress(status: String): Float {
 /** 单个科目进度条 */
 @Composable
 private fun SubjectProgressBar(name: String, progress: Float) {
-    val color = when {
-        progress >= 0.7f -> EmotionGreen
-        progress >= 0.3f -> Primary
-        else -> TextTertiary
-    }
+    val color = if (progress >= 0.3f) Accent else TextTertiary
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),

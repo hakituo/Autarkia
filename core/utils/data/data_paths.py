@@ -836,6 +836,62 @@ def get_user_people_profile_path(person_id: str) -> Path:
     return (get_user_people_profiles_dir() / f"{safe_id}.json").resolve()
 
 
+def get_user_self_views_dir() -> Path:
+    """获取用户认知档案（主人卡）目录
+
+    路径: user_data/self_views/
+    存放格式: {scope}.json（如 aveline.json / ling.json）
+    """
+    _ensure_initialized()
+    return (get_user_data_dir() / "self_views").resolve()
+
+
+def get_user_self_view_path(scope: str) -> Path:
+    """获取某个角色的用户认知档案路径
+
+    路径: user_data/self_views/{scope}.json
+    非法 scope 兜底 user（跨角色共享区），避免把档案写到角色名单之外。
+    """
+    safe_scope = str(scope or "").strip().lower() or "user"
+    try:
+        from core.utils.data.scope_registry import get_registered_role_scopes
+
+        if safe_scope != "user" and safe_scope not in get_registered_role_scopes():
+            safe_scope = "user"
+    except Exception:
+        # 注册表读不到时退到角色注册表兜底（原则同 _is_injectable_scope）
+        if safe_scope != "user":
+            try:
+                from core.services.dual_role.personas import get_persona
+
+                if get_persona(safe_scope) is None:
+                    safe_scope = "user"
+            except Exception:
+                safe_scope = "user"
+    return (get_user_self_views_dir() / f"{safe_scope}.json").resolve()
+
+
+def get_user_self_views_pending_dir() -> Path:
+    """获取主人卡候选队列目录（正则筛出的待 LLM 复核事实）
+
+    路径: user_data/self_views/pending/
+    """
+    _ensure_initialized()
+    return (get_user_self_views_dir() / "pending").resolve()
+
+
+def get_user_self_view_pending_path(scope: str) -> Path:
+    """获取某角色的候选队列路径：user_data/self_views/pending/{scope}.jsonl
+
+    正则只做候选召回，绝不直接断言入库；候选在此排队，由夜间蒸馏
+    交给 LLM 逐条核实真伪后才写入 self_view。
+    """
+    safe_scope = str(scope or "").strip().lower() or "user"
+    if safe_scope == "pending":
+        safe_scope = "user"
+    return (get_user_self_views_pending_dir() / f"{safe_scope}.jsonl").resolve()
+
+
 def get_role_daily_dir(scope: Optional[str]) -> Path:
     _ensure_initialized()
     return (get_role_data_dir(scope) / "daily").resolve()

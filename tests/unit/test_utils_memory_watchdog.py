@@ -34,6 +34,7 @@ from core.utils import memory_watchdog as mw
 # 桩
 # ============================================================
 
+
 class _AsyncioProxy:
     """替换模块内 asyncio 引用：sleep 立即返回并记录时长，其余透传真实 asyncio。"""
 
@@ -60,8 +61,7 @@ class _GcProxy:
     同时结果会随进程状态漂移，断言不可靠。用受控的小集合既快又确定。
     """
 
-    def __init__(self, objects=None, referrers=None, referrers_map=None,
-                 get_objects_raises=False):
+    def __init__(self, objects=None, referrers=None, referrers_map=None, get_objects_raises=False):
         self._objects = objects
         self._referrers = referrers
         self._referrers_map = referrers_map
@@ -146,6 +146,7 @@ def watchdog(tmp_path):
 # 数据结构
 # ============================================================
 
+
 class TestDataclasses:
     def test_memory_snapshot_defaults(self):
         snap = mw.MemorySnapshot()
@@ -173,6 +174,7 @@ class TestDataclasses:
 # 单例
 # ============================================================
 
+
 class TestSingleton:
     def test_repeated_construction_keeps_first_config(self, tmp_path):
         first = mw.MemoryWatchdog(check_interval=11.0, log_dir=str(tmp_path / "a"))
@@ -192,7 +194,9 @@ class TestSingleton:
 
     def test_stop_memory_watchdog_stops_and_clears(self, monkeypatch):
         stopped = []
-        monkeypatch.setattr(mw, "_watchdog", type("_W", (), {"stop": lambda self: stopped.append(1)})())
+        monkeypatch.setattr(
+            mw, "_watchdog", type("_W", (), {"stop": lambda self: stopped.append(1)})()
+        )
 
         mw.stop_memory_watchdog()
 
@@ -208,6 +212,7 @@ class TestSingleton:
 # ============================================================
 # 初始化
 # ============================================================
+
 
 class TestInit:
     def test_default_log_dir_is_under_project_logs(self):
@@ -240,6 +245,7 @@ class TestInit:
 # ============================================================
 # start / stop
 # ============================================================
+
 
 class TestStartStop:
     def test_start_without_running_loop_degrades(self, watchdog):
@@ -314,6 +320,7 @@ class TestStartStop:
 # 监控循环
 # ============================================================
 
+
 class TestMonitorLoop:
     async def test_loop_exits_when_flag_cleared(self, watchdog, monkeypatch):
         proxy = _AsyncioProxy()
@@ -365,6 +372,7 @@ class TestMonitorLoop:
 # 快照与快速检查
 # ============================================================
 
+
 class TestSnapshot:
     def test_take_snapshot_fast_reads_psutil(self, watchdog):
         snap = watchdog._take_snapshot_fast()
@@ -389,7 +397,8 @@ class TestSnapshot:
 class TestCheckMemoryFast:
     def _stub_snapshot(self, watchdog, monkeypatch, rss):
         monkeypatch.setattr(
-            watchdog, "_take_snapshot_fast",
+            watchdog,
+            "_take_snapshot_fast",
             lambda: mw.MemorySnapshot(timestamp=1.0, process_rss_mb=rss, system_percent=50.0),
         )
 
@@ -462,6 +471,7 @@ class TestCheckMemoryFast:
 # 按需深度分析
 # ============================================================
 
+
 class TestDetailedSnapshot:
     def test_take_detailed_snapshot_collects_object_stats(self, watchdog, monkeypatch):
         monkeypatch.setattr(watchdog, "_analyze_objects", lambda: ({"list": 2}, {"list": 128}))
@@ -525,9 +535,7 @@ class TestLoadedModels:
         class _Rm:
             models = {"a": _Model(True), "b": _Model(False), "c": object()}
 
-        monkeypatch.setattr(
-            "core.resource_manager.get_resource_manager", lambda: _Rm()
-        )
+        monkeypatch.setattr("core.resource_manager.get_resource_manager", lambda: _Rm())
 
         assert watchdog._get_loaded_models() == ["a"]
 
@@ -614,7 +622,12 @@ class TestTracemalloc:
             assert isinstance(result, list)
             assert result
             assert set(result[0]) == {
-                "file", "line", "size_diff_mb", "size_mb", "count_diff", "count",
+                "file",
+                "line",
+                "size_diff_mb",
+                "size_mb",
+                "count_diff",
+                "count",
             }
             assert junk is not None
         finally:
@@ -655,8 +668,8 @@ class TestSampleLargeLists:
 
     #: ``est_bytes = len * 8 + 56``，达标门槛 10000 字节 → 长度需 >= 1243
     def test_finds_large_list_and_sorts_desc(self, watchdog, monkeypatch):
-        big = list(range(2000))      # 16056 字节
-        mid = list(range(1300))      # 10456 字节
+        big = list(range(2000))  # 16056 字节
+        mid = list(range(1300))  # 10456 字节
         monkeypatch.setattr(mw, "gc", _GcProxy(objects=[big, mid], referrers=[]))
 
         samples = watchdog.sample_large_lists(sample_size=50)
@@ -667,8 +680,8 @@ class TestSampleLargeLists:
 
     def test_skips_lists_below_size_floor(self, watchdog, monkeypatch):
         """长度不足 100、或估算字节数不足 10KB 的 list 一律跳过。"""
-        too_short = list(range(50))     # len < 100
-        too_small = list(range(137))    # 100 <= len，但 137*8+56 < 10000
+        too_short = list(range(50))  # len < 100
+        too_small = list(range(137))  # 100 <= len，但 137*8+56 < 10000
         keeper = list(range(1300))
         monkeypatch.setattr(
             mw, "gc", _GcProxy(objects=[too_short, too_small, keeper], referrers=[])
@@ -682,9 +695,7 @@ class TestSampleLargeLists:
     def test_skips_non_list_objects(self, watchdog, monkeypatch):
         """``gc.get_objects()`` 里绝大多数不是 list，非 list 必须直接跳过。"""
         big = list(range(2000))
-        monkeypatch.setattr(
-            mw, "gc", _GcProxy(objects=["text", 42, {"a": 1}, big], referrers=[])
-        )
+        monkeypatch.setattr(mw, "gc", _GcProxy(objects=["text", 42, {"a": 1}, big], referrers=[]))
 
         samples = watchdog.sample_large_lists(sample_size=50)
 
@@ -718,9 +729,7 @@ class TestSampleLargeLists:
     def test_referrer_class_is_reported_with_qualname(self, watchdog, monkeypatch):
         """引用者没有 __file__ 但有 __qualname__ 时（类/函数）退回 qualname。"""
         payload = list(range(2000))
-        monkeypatch.setattr(
-            mw, "gc", _GcProxy(objects=[payload], referrers=[mw.MemoryWatchdog])
-        )
+        monkeypatch.setattr(mw, "gc", _GcProxy(objects=[payload], referrers=[mw.MemoryWatchdog]))
 
         samples = watchdog.sample_large_lists(sample_size=50)
 
@@ -767,17 +776,21 @@ class TestAnalyzeLeakSource:
     @staticmethod
     def _fixture_objects():
         """返回 (大 list, 大 dict, 引用者 dict)。"""
-        big_list = list(range(600))                 # > 500 → 计入大 list
-        big_dict = {i: i for i in range(1100)}      # > 1000 → 计入大 dict
-        holder = {"holds": big_list}                # big_list 的第一个引用者
+        big_list = list(range(600))  # > 500 → 计入大 list
+        big_dict = {i: i for i in range(1100)}  # > 1000 → 计入大 dict
+        holder = {"holds": big_list}  # big_list 的第一个引用者
         return big_list, big_dict, holder
 
     def test_reports_structure_and_large_containers(self, watchdog, monkeypatch):
         big_list, big_dict, holder = self._fixture_objects()
-        monkeypatch.setattr(mw, "gc", _GcProxy(
-            objects=[big_list, big_dict, holder, "text", 42],
-            referrers_map={id(big_list): [holder], id(big_dict): [holder]},
-        ))
+        monkeypatch.setattr(
+            mw,
+            "gc",
+            _GcProxy(
+                objects=[big_list, big_dict, holder, "text", 42],
+                referrers_map={id(big_list): [holder], id(big_dict): [holder]},
+            ),
+        )
 
         result = watchdog.analyze_leak_source()
 
@@ -797,10 +810,14 @@ class TestAnalyzeLeakSource:
         """持有者按累计元素数降序，``top_n`` 截断生效。"""
         big_list, _, holder = self._fixture_objects()
         another = list(range(700))
-        monkeypatch.setattr(mw, "gc", _GcProxy(
-            objects=[big_list, another],
-            referrers_map={id(big_list): [holder], id(another): [mw]},
-        ))
+        monkeypatch.setattr(
+            mw,
+            "gc",
+            _GcProxy(
+                objects=[big_list, another],
+                referrers_map={id(big_list): [holder], id(another): [mw]},
+            ),
+        )
 
         result = watchdog.analyze_leak_source(top_n=1)
 
@@ -826,6 +843,7 @@ class TestAnalyzeLeakSource:
 # ============================================================
 # 状态与报告
 # ============================================================
+
 
 class TestStatusAndReport:
     def test_get_status_reports_growth(self, watchdog):
@@ -873,7 +891,9 @@ class TestStatusAndReport:
             mw.MemorySnapshot(process_rss_mb=150.0, process_vms_mb=250.0, system_percent=20.0),
         ]
         watchdog._growth_records.append(
-            mw.MemoryGrowthRecord(timestamp=1.0, delta_mb=50.0, delta_percent=50.0, source="fast_check")
+            mw.MemoryGrowthRecord(
+                timestamp=1.0, delta_mb=50.0, delta_percent=50.0, source="fast_check"
+            )
         )
 
         report = watchdog.report()
@@ -902,6 +922,7 @@ class TestStatusAndReport:
 # ============================================================
 # WebSocket
 # ============================================================
+
 
 class TestWebSocket:
     def test_subscribe_is_deduplicated(self, watchdog):
@@ -948,18 +969,21 @@ class TestWebSocket:
         await asyncio.sleep(0)
         await asyncio.sleep(0)
 
-        assert sent == [{
-            "type": "memory_snapshot",
-            "timestamp": 1.0,
-            "process_rss_mb": 10.0,
-            "system_percent": 5.0,
-        }]
+        assert sent == [
+            {
+                "type": "memory_snapshot",
+                "timestamp": 1.0,
+                "process_rss_mb": 10.0,
+                "system_percent": 5.0,
+            }
+        ]
         assert watchdog._ws_subscribers == [good]
 
 
 # ============================================================
 # 模块级便捷函数
 # ============================================================
+
 
 class TestModuleHelpers:
     def test_get_memory_status_uses_watchdog(self, watchdog, monkeypatch):

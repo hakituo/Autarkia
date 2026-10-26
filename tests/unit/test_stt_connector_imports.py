@@ -26,8 +26,14 @@ from multimodal import stt_connector as sc
 _SRC = Path(sc.__file__).read_text(encoding="utf-8")
 
 
-def _exec_fresh(monkeypatch, *, fail_torch=False, audio_present=False, audio_probe_raises=False,
-                asr_raises=False):
+def _exec_fresh(
+    monkeypatch,
+    *,
+    fail_torch=False,
+    audio_present=False,
+    audio_probe_raises=False,
+    asr_raises=False,
+):
     """在全新命名空间里重新执行模块源码，返回该命名空间。"""
     real_import = builtins.__import__
 

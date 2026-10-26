@@ -64,10 +64,14 @@ class _StubScriptLLM:
     """
 
     def __init__(self, script=None, raw_text=None, recorder=None):
-        self._script = script if script is not None else [
-            {"role": "aveline", "content": "今天吃什么"},
-            {"role": "ling", "content": "随便"},
-        ]
+        self._script = (
+            script
+            if script is not None
+            else [
+                {"role": "aveline", "content": "今天吃什么"},
+                {"role": "ling", "content": "随便"},
+            ]
+        )
         self._raw_text = raw_text
         self._recorder = recorder
         self.calls: List[Dict[str, Any]] = []
@@ -88,16 +92,12 @@ class _StubHost:
         self.storage = object()
 
 
-def _make_generator(
-    monkeypatch, *, script=None, cfg=None, sent=(True, False, ""), raw_text=None
-):
+def _make_generator(monkeypatch, *, script=None, cfg=None, sent=(True, False, ""), raw_text=None):
     """构造带替身子模块的生成器，并替换掉分发 / hooks / personas 解析。"""
     gen = PeerScriptGenerator(_StubHost())
     gen._config_loader = _StubConfigLoader(cfg)
     gen._context_gatherer = _StubContextGatherer()
-    gen._script_llm = _StubScriptLLM(
-        script, raw_text=raw_text, recorder=gen.record_raw_text
-    )
+    gen._script_llm = _StubScriptLLM(script, raw_text=raw_text, recorder=gen.record_raw_text)
 
     # personas.get_peer_role_id
     import core.services.dual_role.personas as personas
@@ -134,6 +134,7 @@ def _make_generator(
 # 主流程编排
 # ============================================================
 
+
 class TestGeneratePeerScriptHappyPath:
     """正常路径：五阶段依次执行。"""
 
@@ -168,9 +169,7 @@ class TestGeneratePeerScriptHappyPath:
 
     async def test_hooks_receive_notify_flags(self, monkeypatch):
         """hooks 收到分发的三个返回值（是否发送/是否通知/通知内容）。"""
-        gen = _make_generator(
-            monkeypatch, sent=(True, True, "记得吃药")
-        )
+        gen = _make_generator(monkeypatch, sent=(True, True, "记得吃药"))
 
         await gen.generate_peer_script(role_id="aveline", peer_qq_id="222")
         hook_call = gen._test_hooks["calls"][0]
@@ -280,9 +279,7 @@ class TestNegotiationMode:
 
     async def test_persists_from_raw_text_when_script_empty(self, monkeypatch):
         """剧本生成失败时仍尝试从 raw_text 兜底解析分工。"""
-        gen = _make_generator(
-            monkeypatch, script=[], raw_text="<assignment>{}</assignment>"
-        )
+        gen = _make_generator(monkeypatch, script=[], raw_text="<assignment>{}</assignment>")
         persisted = {"calls": []}
 
         async def _spy(raw_text, role_id, peer_role_id):
@@ -385,9 +382,7 @@ class TestProactiveAssignmentMode:
         )
 
         assert result is False
-        assert persisted["calls"] == [
-            "<proactive_assignment>{}</proactive_assignment>"
-        ]
+        assert persisted["calls"] == ["<proactive_assignment>{}</proactive_assignment>"]
 
     async def test_legacy_state_kwargs_forwarded(self, monkeypatch):
         """向后兼容的 aveline_state / ling_state 也要透传。"""
@@ -409,6 +404,7 @@ class TestProactiveAssignmentMode:
 # ============================================================
 # 分工落库的细节分支
 # ============================================================
+
 
 class _StubRegistry:
     """替身分工注册表。"""
@@ -445,9 +441,7 @@ class TestPersistNegotiationAssignments:
 
         import core.services.active_care.storage.reminder_assignment_registry as reg_mod
 
-        monkeypatch.setattr(
-            reg_mod, "get_reminder_assignment_registry", lambda: registry
-        )
+        monkeypatch.setattr(reg_mod, "get_reminder_assignment_registry", lambda: registry)
         raw = (
             "<assignment>"
             '{"assignments": ['
@@ -472,9 +466,7 @@ class TestPersistNegotiationAssignments:
 
         import core.services.active_care.storage.reminder_assignment_registry as reg_mod
 
-        monkeypatch.setattr(
-            reg_mod, "get_reminder_assignment_registry", lambda: registry
-        )
+        monkeypatch.setattr(reg_mod, "get_reminder_assignment_registry", lambda: registry)
 
         await gen._persist_negotiation_assignments("没有任何 JSON 块", "aveline", "ling")
 
@@ -509,9 +501,7 @@ class TestPersistProactiveAssignment:
 
         import core.services.active_care.storage.proactive_assignment_registry as reg_mod
 
-        monkeypatch.setattr(
-            reg_mod, "get_proactive_assignment_registry", lambda: registry
-        )
+        monkeypatch.setattr(reg_mod, "get_proactive_assignment_registry", lambda: registry)
         raw = (
             "<proactive_assignment>"
             '{"assignments": [{"time_slot": "morning", "lead": "aveline"}]}'
@@ -530,9 +520,7 @@ class TestPersistProactiveAssignment:
 
         import core.services.active_care.storage.proactive_assignment_registry as reg_mod
 
-        monkeypatch.setattr(
-            reg_mod, "get_proactive_assignment_registry", lambda: registry
-        )
+        monkeypatch.setattr(reg_mod, "get_proactive_assignment_registry", lambda: registry)
 
         await gen._persist_proactive_assignment("没有块", "aveline", "ling")
 
@@ -560,6 +548,7 @@ class TestPersistProactiveAssignment:
 # ============================================================
 # 兼容入口与辅助方法
 # ============================================================
+
 
 class TestCompatibilityEntries:
     """拆分后保留的兼容入口应正确委托。"""

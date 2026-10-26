@@ -1,0 +1,17 @@
+{
+  "//": "只做类型校验、不产出任何文件。看板由 FastAPI 直接托管 static/，没有构建产物，因此不引入打包链路。",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["js/**/*.js"]
+}

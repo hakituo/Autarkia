@@ -56,6 +56,8 @@ MERGE_TEXT_RICHER = "text_richer"
 MERGE_DATED_STATE = "dated_state"
 #: 按角色存的作息 / 当日计划状态：按内嵌时间逐角色取新的一份（mtime 不可比）。
 MERGE_LIFE_STATE = "life_state_newest"
+MERGE_VOCAB = "vocab_progress_union"  # 进度按单词并集：同词取末次复习状态，history 合并
+MERGE_WORD_LIST = "word_list_union"  # 每日生词日志按单词并集：同词取较大次数
 
 
 @dataclass(frozen=True)
@@ -64,10 +66,8 @@ class SyncItem:
 
     Attributes:
         group: 分组名，用于 ``--groups`` 过滤。
-        base: 基准根，取 ``BASE_PROJECT`` / ``BASE_USER_DATA`` / ``BASE_STUDY`` /
-            ``BASE_COMPANION``。
-        rel: 相对基准根的路径（POSIX 分隔符）；支持 ``*`` / ``**`` 通配符，
-            命中项统一换算成「相对基准根」的具体路径。
+        base: 基准根，取 ``BASE_PROJECT`` / ``BASE_USER_DATA`` / ``BASE_STUDY`` / ``BASE_COMPANION``。
+        rel: 相对基准根的路径（POSIX 分隔符），支持 ``*`` / ``**`` 通配符。
         recursive: 该项是目录且需要递归同步。
         merge: 两端都改过时的合并策略，取 ``MERGE_COPY`` / ``MERGE_JSONL`` /
             ``MERGE_INDEX`` / ``MERGE_MEMORY`` / ``MERGE_TEXT_RICHER``；
@@ -84,15 +84,15 @@ class SyncItem:
 
 #: 学习数据清单。新增学习数据只需往这里补一项，调用方不用改。
 ITEMS: Tuple[SyncItem, ...] = (
-    # 背单词：FSRS 调度进度与手动背诵统计
-    SyncItem("vocab", BASE_PROJECT, "output/user_data/vocab_progress.json"),
+    # 背单词：FSRS 调度进度与手动背诵统计；进度两端都可能推进，按单词并集合并。
+    SyncItem("vocab", BASE_PROJECT, "output/user_data/vocab_progress.json", merge=MERGE_VOCAB),
     SyncItem("vocab", BASE_PROJECT, "output/user_data/vocab_meta.json"),
     # 背单词：每日生词日志、复习队列状态、长期生词本
     SyncItem("vocab", BASE_PROJECT, "data/study_data/English/Words/daily", recursive=True),
-    # 同一个目录里还混着「按天从进度派生」的状态文件（_review*_state.json）：
-    # 两端各写一份、内容必然不同，而 mtime 不可比——一端刚开机就可能拿还没同步
-    # 过来的旧进度生成一份新文件，mtime 反而更晚。改按「派生来源日期」选新的。
-    # 放在递归项之后，用后者覆盖 modes 里的策略。
+    # 每日生词日志是纯追加词表：按单词并集，空占位不会覆盖另一端的记录（放在递归项之后）
+    SyncItem("vocab", BASE_PROJECT, "data/study_data/English/Words/daily/**/*.txt",
+             merge=MERGE_WORD_LIST),
+    # 按天派生的复习状态：mtime 不可比，按「派生来源日期」选新（放在递归项之后）
     SyncItem(
         "vocab",
         BASE_PROJECT,
@@ -105,9 +105,7 @@ ITEMS: Tuple[SyncItem, ...] = (
     SyncItem("daily", BASE_USER_DATA, "daily_records", recursive=True),
     SyncItem("daily", BASE_USER_DATA, "daily_vocab_status.json"),
     SyncItem("daily", BASE_USER_DATA, "daily_word_quiz_status.json"),
-    # daily/ 里混着追加型 JSONL（设备上下文 / 通知 / 健康数据 / 操作流水），
-    # 整文件覆盖会让一边的条目直接消失（2026-10-13 实测丢了 2456 行），
-    # 所以必须按行并集。放在上面递归项之后，用后者覆盖掉 modes 里的策略。
+    # daily/ 里的追加型 JSONL 整文件覆盖会丢条目（2026-10-13 丢过 2456 行），按行并集。
     SyncItem("daily", BASE_USER_DATA, "daily/**/*.jsonl", merge=MERGE_JSONL),
     # 专注会话记录
     SyncItem("focus", BASE_USER_DATA, "focus_sessions", recursive=True),

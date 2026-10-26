@@ -97,7 +97,9 @@ def _async_raise(exc):
 def _patch_loaded(monkeypatch):
     """跳过惰性加载，并把 AudioSegment 换成替身。"""
     monkeypatch.setattr(STTConnector, "_ensure_model_loaded", _noop_async)
-    monkeypatch.setattr(sc, "AudioSegment", SimpleNamespace(from_file=lambda *a, **kw: _FakeAudio()))
+    monkeypatch.setattr(
+        sc, "AudioSegment", SimpleNamespace(from_file=lambda *a, **kw: _FakeAudio())
+    )
 
 
 # --------------------------------------------------------------------------

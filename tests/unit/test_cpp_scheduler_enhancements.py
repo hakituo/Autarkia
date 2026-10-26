@@ -206,7 +206,7 @@ class TestNvidiaSmiMonitor(unittest.TestCase):
             _subprocess_total_used_mb,
         )
 
-        with patch('shutil.which', return_value=None):
+        with patch("shutil.which", return_value=None):
             result = _subprocess_total_used_mb()
             self.assertIsNone(result)
 
@@ -216,8 +216,8 @@ class TestNvidiaSmiMonitor(unittest.TestCase):
             _subprocess_total_used_mb,
         )
 
-        with patch('shutil.which', return_value='/usr/bin/nvidia-smi'):
-            with patch('subprocess.run') as mock_run:
+        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"):
+            with patch("subprocess.run") as mock_run:
                 mock_run.return_value = Mock(returncode=1, stdout="", stderr="Error")
                 result = _subprocess_total_used_mb()
                 self.assertIsNone(result)
@@ -230,13 +230,9 @@ class TestNvidiaSmiMonitor(unittest.TestCase):
 
         mock_output = "1024\n2048\n"
 
-        with patch('shutil.which', return_value='/usr/bin/nvidia-smi'):
-            with patch('subprocess.run') as mock_run:
-                mock_run.return_value = Mock(
-                    returncode=0,
-                    stdout=mock_output,
-                    stderr=""
-                )
+        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"):
+            with patch("subprocess.run") as mock_run:
+                mock_run.return_value = Mock(returncode=0, stdout=mock_output, stderr="")
                 result = _subprocess_total_used_mb()
                 self.assertEqual(result, 3072)  # 1024 + 2048
 
@@ -248,13 +244,9 @@ class TestNvidiaSmiMonitor(unittest.TestCase):
 
         mock_output = "1024\nabc\n512\n"
 
-        with patch('shutil.which', return_value='/usr/bin/nvidia-smi'):
-            with patch('subprocess.run') as mock_run:
-                mock_run.return_value = Mock(
-                    returncode=0,
-                    stdout=mock_output,
-                    stderr=""
-                )
+        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"):
+            with patch("subprocess.run") as mock_run:
+                mock_run.return_value = Mock(returncode=0, stdout=mock_output, stderr="")
                 result = _subprocess_total_used_mb()
                 # 应该只解析数字行，忽略非数字行
                 self.assertEqual(result, 1536)  # 1024 + 512
@@ -468,7 +460,9 @@ class TestCudaBackendErrorDetection(unittest.TestCase):
 
         for msg in cuda_errors:
             with self.subTest(msg=msg):
-                self.assertTrue(is_cuda_backend_error(msg), f"Failed to detect CUDA error in: {msg}")
+                self.assertTrue(
+                    is_cuda_backend_error(msg), f"Failed to detect CUDA error in: {msg}"
+                )
 
     def test_ignores_non_cuda_errors(self):
         """测试忽略非 CUDA 错误"""
@@ -484,7 +478,9 @@ class TestCudaBackendErrorDetection(unittest.TestCase):
 
         for msg in non_cuda_errors:
             with self.subTest(msg=msg):
-                self.assertFalse(is_cuda_backend_error(msg), f"Incorrectly detected CUDA error in: {msg}")
+                self.assertFalse(
+                    is_cuda_backend_error(msg), f"Incorrectly detected CUDA error in: {msg}"
+                )
 
 
 class TestEnvironmentVariableConfiguration(unittest.TestCase):
@@ -493,6 +489,7 @@ class TestEnvironmentVariableConfiguration(unittest.TestCase):
     def test_breaker_threshold_from_env(self):
         """测试从环境变量读取断路器阈值"""
         import os
+
         original_value = os.environ.get("XIAOYOU_CPP_BREAKER_THRESHOLD")
 
         try:
@@ -535,6 +532,7 @@ class TestEnvironmentVariableConfiguration(unittest.TestCase):
     def test_oom_retry_count_from_env(self):
         """测试从环境变量读取 OOM 重试次数"""
         import os
+
         original_value = os.environ.get("XIAOYOU_LLM_OOM_MAX_RETRIES")
 
         try:
@@ -638,6 +636,7 @@ class TestIntegrationScenarios(unittest.TestCase):
         self.assertEqual(engine._saved_llm_state_ts, 0.0)
         self.assertIsNotNone(engine._last_llm_stats)
         self.assertEqual(engine._last_llm_stats["generated_tokens"], 150)
+
 
 if __name__ == "__main__":
     # 运行所有测试

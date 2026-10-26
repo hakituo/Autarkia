@@ -16,7 +16,7 @@ logger = get_logger("minimax_client")
 
 
 MINIMAX_BASE_URL = "https://api.minimax.chat/v1/chat/completions"
-MINIMAX_DEFAULT_MODEL = "MiniMax-M3"
+MINIMAX_DEFAULT_MODEL = "MiniMax-M3.1-Flash"
 
 
 class MiniMaxClient(OpenAIClient):

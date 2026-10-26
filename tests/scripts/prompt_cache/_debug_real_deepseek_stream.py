@@ -8,7 +8,7 @@ import os
 import sys
 
 # 确保项目根目录在路径中
-sys.path.insert(0, r"D:\projects\xiaoyou")
+sys.path.insert(0, r"D:\AI\autarkia")
 
 from core.llm.openai_compat.deepseek_client import DeepSeekClient
 
@@ -121,7 +121,7 @@ async def main():
     print(f"[结果] stream_chat 中是否遇到 usage chunk: {usage_found}")
 
     # 检查日志文件
-    log_path = r"D:\projects\xiaoyou\logs\prompt_cache_stats.log"
+    log_path = r"D:\AI\autarkia\logs\prompt_cache_stats.log"
     if os.path.exists(log_path):
         print("\n" + "=" * 60)
         print("[4] 日志文件最后 5 条 (检查 mode=stream 是否写入)")
@@ -142,5 +142,5 @@ async def main():
 
 if __name__ == "__main__":
     # 切换到项目根目录，方便读取配置
-    os.chdir(r"D:\projects\xiaoyou")
+    os.chdir(r"D:\AI\autarkia")
     asyncio.run(main())

@@ -33,18 +33,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aveline.ai.mobile.domain.models.LifeStatus
 import com.aveline.ai.mobile.presentation.components.SectionCard
-import com.aveline.ai.mobile.presentation.status.StatusUiState
-import com.aveline.ai.mobile.presentation.theme.EmotionColors
-import com.aveline.ai.mobile.presentation.theme.EmotionGreen
-import com.aveline.ai.mobile.presentation.theme.EmotionRed
+import com.aveline.ai.mobile.presentation.status.ui.StatusUiState
+import com.aveline.ai.mobile.presentation.theme.EmotionPalette
+import com.aveline.ai.mobile.presentation.theme.Accent
+import com.aveline.ai.mobile.presentation.theme.Danger
 import com.aveline.ai.mobile.presentation.theme.LifeEnergy
 import com.aveline.ai.mobile.presentation.theme.LifeHappiness
 import com.aveline.ai.mobile.presentation.theme.LifeHealth
@@ -55,7 +57,7 @@ import com.aveline.ai.mobile.presentation.theme.StatusOnline
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
-import com.aveline.ai.mobile.presentation.utils.EmotionResolver
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Companion 状态 Tab。
@@ -63,11 +65,14 @@ import com.aveline.ai.mobile.presentation.utils.EmotionResolver
  * 展示 AI 生命状态(健康/饥饿/幸福/能量)、当前情绪、连接状态。
  *
  * @param uiState 状态页 UI 状态
+ * @param clockFlow 系统时钟流（单独传，不放进 [StatusUiState]；只在卡片内部订阅，
+ *        避免每秒把整棵面板重组一遍）
  * @param onRefresh 刷新回调
  */
 @Composable
 fun CompanionStatusTab(
     uiState: StatusUiState,
+    clockFlow: StateFlow<String>,
     onRefresh: () -> Unit,
     onWake: () -> Unit,
     onInterrupt: () -> Unit,
@@ -121,7 +126,7 @@ fun CompanionStatusTab(
                             .padding(vertical = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = EmotionGreen)
+                        CircularProgressIndicator(color = Accent)
                     }
                 } else {
                     LifeStatusContent(lifeStatus = uiState.lifeStatus)
@@ -153,7 +158,7 @@ fun CompanionStatusTab(
             ) {
                 ConnectionContent(
                     connected = uiState.connected,
-                    clock = uiState.clock
+                    clockFlow = clockFlow
                 )
             }
         }
@@ -170,7 +175,7 @@ private fun ErrorBanner(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = EmotionRed.copy(alpha = 0.1f),
+        color = Danger.copy(alpha = 0.1f),
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
@@ -183,20 +188,20 @@ private fun ErrorBanner(
             Icon(
                 imageVector = Icons.Default.Warning,
                 contentDescription = null,
-                tint = EmotionRed,
+                tint = Danger,
                 modifier = Modifier.size(20.dp)
             )
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodySmall,
-                color = EmotionRed,
+                color = Danger,
                 modifier = Modifier.weight(1f)
             )
             Button(
                 onClick = onRetry,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = EmotionRed.copy(alpha = 0.2f),
-                    contentColor = EmotionRed
+                    containerColor = Danger.copy(alpha = 0.2f),
+                    contentColor = Danger
                 ),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
             ) {
@@ -465,7 +470,7 @@ private fun EmotionContent(
     emotionIntensity: Float,
     emotionMix: Map<String, Float>
 ) {
-    val primaryColor = EmotionResolver.getColorForEmotion(emotionPrimary)
+    val primaryColor = EmotionPalette.of(emotionPrimary)
 
     // 主情绪占比
     Column {
@@ -501,7 +506,7 @@ private fun EmotionContent(
         Spacer(modifier = Modifier.height(12.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             emotionMix.forEach { (name, ratio) ->
-                val mixColor = EmotionColors.getColorForEmotion(name)
+                val mixColor = EmotionPalette.of(name)
                 Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -528,12 +533,15 @@ private fun EmotionContent(
 
 /**
  * 连接内容:WebSocket 连接状态 + 系统时钟。
+ *
+ * 时钟在这里单独订阅：每秒只重组这一小块，而不是整棵伴侣详情面板。
  */
 @Composable
 private fun ConnectionContent(
     connected: Boolean,
-    clock: String
+    clockFlow: StateFlow<String>
 ) {
+    val clock by clockFlow.collectAsStateWithLifecycle()
     val statusColor = if (connected) StatusOnline else StatusOffline
     val statusText = if (connected) "已连接" else "未连接"
 

@@ -23,12 +23,12 @@ from core.llm.openai_compat.dsml_parser import (
 def test_v4_format():
     """测试DeepSeek V4 DSML格式（双全角竖线）"""
     text = (
-        '<\uff5c\uff5cDSML\uff5c\uff5ctool_calls>'
+        "<\uff5c\uff5cDSML\uff5c\uff5ctool_calls>"
         '<\uff5c\uff5cDSML\uff5c\uff5cinvoke name="aveline_daily_data">'
         '<\uff5c\uff5cDSML\uff5c\uff5cparameter name="action" string="true">list</\uff5c\uff5cDSML\uff5c\uff5cparameter>'
         '<\uff5c\uff5cDSML\uff5c\uff5cparameter name="path" string="true">us </\uff5c\uff5cDSML\uff5c\uff5cparameter>'
-        '</\uff5c\uff5cDSML\uff5c\uff5cinvoke>'
-        '</\uff5c\uff5cDSML\uff5c\uff5ctool_calls>'
+        "</\uff5c\uff5cDSML\uff5c\uff5cinvoke>"
+        "</\uff5c\uff5cDSML\uff5c\uff5ctool_calls>"
     )
     fmt = detect_dsml_format(text)
     assert fmt == "v4", f"期望v4，实际{fmt}"
@@ -47,11 +47,11 @@ def test_v4_format_with_prefix_text():
     """测试V4格式前有普通文本"""
     text = (
         "好的，我来帮你查询数据。"
-        '<\uff5c\uff5cDSML\uff5c\uff5ctool_calls>'
+        "<\uff5c\uff5cDSML\uff5c\uff5ctool_calls>"
         '<\uff5c\uff5cDSML\uff5c\uff5cinvoke name="get_weather">'
         '<\uff5c\uff5cDSML\uff5c\uff5cparameter name="city" string="true">北京</\uff5c\uff5cDSML\uff5c\uff5cparameter>'
-        '</\uff5c\uff5cDSML\uff5c\uff5cinvoke>'
-        '</\uff5c\uff5cDSML\uff5c\uff5ctool_calls>'
+        "</\uff5c\uff5cDSML\uff5c\uff5cinvoke>"
+        "</\uff5c\uff5cDSML\uff5c\uff5ctool_calls>"
     )
     cleaned, calls = parse_dsml_tool_calls(text)
     assert len(calls) == 1
@@ -66,12 +66,12 @@ def test_v4_format_with_prefix_text():
 def test_v3_format():
     """测试DeepSeek V3.2 DSML格式（单全角竖线）"""
     text = (
-        '<\uff5cDSML\uff5cfunction_calls>'
+        "<\uff5cDSML\uff5cfunction_calls>"
         '<\uff5cDSML\uff5cinvoke name="get_weather">'
         '<\uff5cDSML\uff5cparameter name="location" string="true">杭州</\uff5cDSML\uff5cparameter>'
         '<\uff5cDSML\uff5cparameter name="date" string="true">2024-01-16</\uff5cDSML\uff5cparameter>'
-        '</\uff5cDSML\uff5cinvoke>'
-        '</\uff5cDSML\uff5cfunction_calls>'
+        "</\uff5cDSML\uff5cinvoke>"
+        "</\uff5cDSML\uff5cfunction_calls>"
     )
     fmt = detect_dsml_format(text)
     assert fmt == "v3", f"期望v3，实际{fmt}"
@@ -88,11 +88,11 @@ def test_v3_format():
 def test_plain_format():
     """测试Plain格式（无DSML前缀）"""
     text = (
-        '<function_calls>'
+        "<function_calls>"
         '<invoke name="search">'
         '<parameter name="query" string="true">test</parameter>'
-        '</invoke>'
-        '</function_calls>'
+        "</invoke>"
+        "</function_calls>"
     )
     fmt = detect_dsml_format(text)
     assert fmt == "plain", f"期望plain，实际{fmt}"
@@ -106,14 +106,14 @@ def test_plain_format():
 def test_multiple_tool_calls():
     """测试多个工具调用"""
     text = (
-        '<\uff5c\uff5cDSML\uff5c\uff5ctool_calls>'
+        "<\uff5c\uff5cDSML\uff5c\uff5ctool_calls>"
         '<\uff5c\uff5cDSML\uff5c\uff5cinvoke name="tool_a">'
         '<\uff5c\uff5cDSML\uff5c\uff5cparameter name="x" string="true">1</\uff5c\uff5cDSML\uff5c\uff5cparameter>'
-        '</\uff5c\uff5cDSML\uff5c\uff5cinvoke>'
+        "</\uff5c\uff5cDSML\uff5c\uff5cinvoke>"
         '<\uff5c\uff5cDSML\uff5c\uff5cinvoke name="tool_b">'
         '<\uff5c\uff5cDSML\uff5c\uff5cparameter name="y" string="true">2</\uff5c\uff5cDSML\uff5c\uff5cparameter>'
-        '</\uff5c\uff5cDSML\uff5c\uff5cinvoke>'
-        '</\uff5c\uff5cDSML\uff5c\uff5ctool_calls>'
+        "</\uff5c\uff5cDSML\uff5c\uff5cinvoke>"
+        "</\uff5c\uff5cDSML\uff5c\uff5ctool_calls>"
     )
     cleaned, calls = parse_dsml_tool_calls(text)
     assert len(calls) == 2, f"期望2个工具调用，实际{len(calls)}"
@@ -135,11 +135,11 @@ def test_no_dsml():
 def test_tool_calls_structure():
     """测试输出的tool_calls结构是否符合OpenAI格式"""
     text = (
-        '<\uff5c\uff5cDSML\uff5c\uff5ctool_calls>'
+        "<\uff5c\uff5cDSML\uff5c\uff5ctool_calls>"
         '<\uff5c\uff5cDSML\uff5c\uff5cinvoke name="aveline_daily_data">'
         '<\uff5c\uff5cDSML\uff5c\uff5cparameter name="action" string="true">list</\uff5c\uff5cDSML\uff5c\uff5cparameter>'
-        '</\uff5c\uff5cDSML\uff5c\uff5cinvoke>'
-        '</\uff5c\uff5cDSML\uff5c\uff5ctool_calls>'
+        "</\uff5c\uff5cDSML\uff5c\uff5cinvoke>"
+        "</\uff5c\uff5cDSML\uff5c\uff5ctool_calls>"
     )
     _, calls = parse_dsml_tool_calls(text)
     tc = calls[0]
@@ -161,12 +161,12 @@ def test_drift_container_alias_and_whitespace():
     识别成真工具调用，否则原始 token 会当正文发给用户。
     """
     text = (
-        '<\uff5c\uff5cDSML\uff5c\uff5c calls>'
+        "<\uff5c\uff5cDSML\uff5c\uff5c calls>"
         '<\uff5c\uff5cDSML\uff5c\uff5c invoke name="search_chat_history">'
         '<\uff5c\uff5cDSML\uff5c\uff5c parameter name="query" string="true">骂 说教 莫名其妙</\uff5c\uff5cDSML\uff5c\uff5c parameter>'
         '<\uff5c\uff5cDSML\uff5c\uff5c parameter name="limit" string="true">30</\uff5c\uff5cDSML\uff5c\uff5c parameter>'
-        '</\uff5c\uff5cDSML\uff5c\uff5c invoke>'
-        '</\uff5c\uff5cDSML\uff5c\uff5c calls>'
+        "</\uff5c\uff5cDSML\uff5c\uff5c invoke>"
+        "</\uff5c\uff5cDSML\uff5c\uff5c calls>"
     )
     assert detect_dsml_format(text) == "v4"
 
@@ -184,11 +184,11 @@ def test_strip_residue_complete_drift_block():
     """通用清洗：完整漂移块应被完全剥掉"""
     text = (
         "我先看看记录。"
-        '<\uff5c\uff5cDSML\uff5c\uff5c calls>'
+        "<\uff5c\uff5cDSML\uff5c\uff5c calls>"
         '<\uff5c\uff5cDSML\uff5c\uff5c invoke name="search_chat_history">'
         '<\uff5c\uff5cDSML\uff5c\uff5c parameter name="query" string="true">念叨 唠叨</\uff5c\uff5cDSML\uff5c\uff5c parameter>'
-        '</\uff5c\uff5cDSML\uff5c\uff5c invoke>'
-        '</\uff5c\uff5cDSML\uff5c\uff5c calls>'
+        "</\uff5c\uff5cDSML\uff5c\uff5c invoke>"
+        "</\uff5c\uff5cDSML\uff5c\uff5c calls>"
     )
     cleaned = strip_tool_mark_residue(text)
     assert "DSML" not in cleaned
@@ -199,7 +199,7 @@ def test_strip_residue_complete_drift_block():
 
 def test_strip_residue_unclosed_block():
     """通用清洗：未闭合（被截断）的块也要能剥掉"""
-    text = "晚安。<\uff5c\uff5cDSML\uff5c\uff5c calls><\uff5c\uff5cDSML\uff5c\uff5c invoke name=\"search\""
+    text = '晚安。<\uff5c\uff5cDSML\uff5c\uff5c calls><\uff5c\uff5cDSML\uff5c\uff5c invoke name="search"'
     cleaned = strip_tool_mark_residue(text)
     assert "DSML" not in cleaned
     assert "\uff5c" not in cleaned

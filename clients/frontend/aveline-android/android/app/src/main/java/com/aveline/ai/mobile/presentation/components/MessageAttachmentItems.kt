@@ -23,7 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.domain.models.ChatAttachment
 import com.aveline.ai.mobile.domain.models.ChatAttachmentKind
-import com.aveline.ai.mobile.presentation.theme.CardBorder
+import com.aveline.ai.mobile.presentation.theme.Line
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 
@@ -52,7 +52,7 @@ fun MessageAttachmentItems(
                     modifier = Modifier.widthIn(max = 260.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                     contentColor = TextPrimary,
-                    border = BorderStroke(1.dp, CardBorder),
+                    border = BorderStroke(1.dp, Line),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Row(

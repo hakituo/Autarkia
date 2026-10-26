@@ -114,6 +114,7 @@ def test_ignores_malformed_entries():
 
 def test_swallows_internal_exception(monkeypatch):
     """内部异常一律降级为「未知」，绝不影响投递链路。"""
+
     class _Boom:
         @property
         def _recent_user_message_cache(self):

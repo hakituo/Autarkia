@@ -1,7 +1,7 @@
 """验证健康起床时间不再被聊天时间覆盖。
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.daily.verify_wakeup_source_priority
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.daily.verify_wakeup_source_priority
 """
 
 import json

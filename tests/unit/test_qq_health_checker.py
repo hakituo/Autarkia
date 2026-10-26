@@ -79,8 +79,8 @@ class TestQQHealthChecker(unittest.IsolatedAsyncioTestCase):
         ok = await checker.preflight_check(
             config_file=os.path.join(_PROJECT_ROOT, "clients", "bots", "config", "config.json"),
             napcat_ws_url="ws://127.0.0.1:3001",
-            xiaoyou_ws_url="ws://127.0.0.1:8000/api/v1/ws",
-            xiaoyou_http_base_url="http://127.0.0.1:8000",
+            autarkia_ws_url="ws://127.0.0.1:8000/api/v1/ws",
+            autarkia_http_base_url="http://127.0.0.1:8000",
         )
 
         self.assertTrue(ok)

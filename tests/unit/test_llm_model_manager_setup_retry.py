@@ -59,6 +59,7 @@ def _mem(percent=10.0, is_pressure=False, threshold=97.0, has_gpu=False):
 
 def _settings(**over):
     from types import SimpleNamespace
+
     base = dict(
         force_cpu_inference=False,
         skip_memory_check_on_llm_load=False,
@@ -116,21 +117,18 @@ def _patch_env(
 ):
     """安装通用 patch：Llama / patch 记录器 / 内存检查 / 设置 / 资源管理器。"""
     patch_calls: list = []
-    monkeypatch.setattr(
-        llmm, "_patch_llama_cpp_internals", lambda: patch_calls.append("patch")
-    )
+    monkeypatch.setattr(llmm, "_patch_llama_cpp_internals", lambda: patch_calls.append("patch"))
     monkeypatch.setattr(llmm, "Llama", llama if llama is not None else _FakeLlama)
     monkeypatch.setattr(llmm, "check_memory_pressure", lambda: mem)
 
     if settings_raises:
+
         def _boom():
             raise RuntimeError("settings unavailable")
 
         monkeypatch.setattr("config.integrated_config.get_settings", _boom)
     elif settings is not None:
-        monkeypatch.setattr(
-            "config.integrated_config.get_settings", lambda: settings
-        )
+        monkeypatch.setattr("config.integrated_config.get_settings", lambda: settings)
 
     rc = rm_calls if rm_calls is not None else []
 
@@ -139,9 +137,12 @@ def _patch_env(
             rc.append((name, loaded))
 
     if rm_boom:
+
         def _rm_factory():
             raise RuntimeError("resource manager unavailable")
+
     else:
+
         def _rm_factory():
             return _RM()
 
@@ -213,8 +214,7 @@ def test_setup_duplicate_candidate_is_skipped(manager, monkeypatch, gguf):
         llama=_make_llama(_handler, llama_calls),
     )
     out = manager.setup_python_llm(
-        {"model_path": gguf, "force_cpu": True, "max_context_size": 1024,
-         "max_batch_size": 128}
+        {"model_path": gguf, "force_cpu": True, "max_context_size": 1024, "max_batch_size": 128}
     )
     assert out is None
     assert len(llama_calls) == 1
@@ -225,9 +225,7 @@ def test_setup_typeerror_retry_removes_keyword(manager, monkeypatch, gguf):
 
     def _handler(index, kwargs):
         if index == 0:
-            raise TypeError(
-                "Llama.__init__() got an unexpected keyword argument 'flash_attn'"
-            )
+            raise TypeError("Llama.__init__() got an unexpected keyword argument 'flash_attn'")
         return _FakeLlama(**kwargs)
 
     llama_calls: list = []

@@ -95,7 +95,7 @@ export default function SettingsView({
     return isDevServer && isLoopbackHost ? `http://${hostname}:8000` : window.location.origin;
   });
   const [accessToken, setAccessToken] = useState(() => {
-    return localStorage.getItem('XIAOYOU_ACCESS_TOKEN') || '';
+    return localStorage.getItem('AUTARKIA_ACCESS_TOKEN') || '';
   });
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
 
@@ -162,7 +162,7 @@ export default function SettingsView({
 
   const handleSaveApiUrl = () => {
     localStorage.setItem('AVELINE_API_URL', apiUrl.replace(/\/$/, ''));
-    localStorage.setItem('XIAOYOU_ACCESS_TOKEN', accessToken);
+    localStorage.setItem('AUTARKIA_ACCESS_TOKEN', accessToken);
     setTestStatus('success');
     setTimeout(() => setTestStatus('idle'), 2000);
     

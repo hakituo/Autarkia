@@ -321,9 +321,7 @@ def test_parse_context_window_error_hit_and_miss():
     gen = StreamGenerator(FakeModule())
     assert gen._parse_context_window_error("nothing here") is None
     assert gen._parse_context_window_error(None) is None
-    parsed = gen._parse_context_window_error(
-        "requested tokens (300) exceed context window of 128"
-    )
+    parsed = gen._parse_context_window_error("requested tokens (300) exceed context window of 128")
     assert parsed == (300, 128)
 
 
@@ -384,9 +382,7 @@ def test_retry_context_window_stream_type_error_retry():
     module = FakeModule(llama_model=model)
     gen = StreamGenerator(module)
     err = "requested tokens (140) exceed context window of 128"
-    out = gen._retry_context_window_stream(
-        [], {"temperature": 0.5, "min_p": 0.1}, 200, err
-    )
+    out = gen._retry_context_window_stream([], {"temperature": 0.5, "min_p": 0.1}, 200, err)
     assert out is not None
     assert len(model.calls) == 2
     assert "min_p" not in model.calls[1][1]
@@ -518,13 +514,9 @@ def test_generate_gguf_end_to_end_with_gpu_gate(monkeypatch, no_gpu_gate):
         ],
         n_ctx=2048,
     )
-    module = FakeModule(
-        is_loaded=True, is_gguf=True, config=_RaisingDict(), llama_model=model
-    )
+    module = FakeModule(is_loaded=True, is_gguf=True, config=_RaisingDict(), llama_model=model)
     gen = StreamGenerator(module)
-    monkeypatch.setattr(
-        "core.resource_manager.get_global_resource_manager", lambda: _fake_rm()
-    )
+    monkeypatch.setattr("core.resource_manager.get_global_resource_manager", lambda: _fake_rm())
     items = _collect(gen.generate("你好"))
     assert items == [{"content": "片段"}]
     assert no_gpu_gate.calls  # need_gpu_gate 兜底为 True
@@ -562,9 +554,7 @@ def test_generate_resets_inconsistent_loaded_flag(monkeypatch, no_gpu_gate):
 
 
 def test_generate_error_when_last_load_error_missing(monkeypatch, no_gpu_gate):
-    module = FakeModule(
-        is_loaded=False, _load_results=[False], _last_load_error=None
-    )
+    module = FakeModule(is_loaded=False, _load_results=[False], _last_load_error=None)
     gen = StreamGenerator(module)
     items = _collect(gen.generate("hi"))
     assert items[0]["error"] == "模型加载失败"
@@ -583,9 +573,7 @@ def _run_scheduler(monkeypatch, module, scheduler):
         lambda: scheduler,
     )
     gen = StreamGenerator(module)
-    return _collect(
-        gen._generate_with_scheduler("hi", None, None, "models/llm/x.gguf", 5.0, None)
-    )
+    return _collect(gen._generate_with_scheduler("hi", None, None, "models/llm/x.gguf", 5.0, None))
 
 
 def test_generate_with_scheduler_token_shapes(monkeypatch):
@@ -667,9 +655,7 @@ def test_generate_with_scheduler_cancelled_without_stop_hook(monkeypatch):
     async def _fake_stop(*args, **kwargs):
         stop_calls["n"] += 1
 
-    monkeypatch.setattr(
-        cse.cpp_scheduler_engine, "request_stop_current_inference", _fake_stop
-    )
+    monkeypatch.setattr(cse.cpp_scheduler_engine, "request_stop_current_inference", _fake_stop)
 
     class _Scheduler:
         _running = True
@@ -694,9 +680,7 @@ def test_generate_with_scheduler_cancelled_without_stop_hook(monkeypatch):
 
 
 def test_prepare_gpu_resources_gguf_layers_from_config(monkeypatch):
-    module = FakeModule(
-        is_gguf=True, config={"n_gpu_layers": 0}, text_model_path="a.gguf"
-    )
+    module = FakeModule(is_gguf=True, config={"n_gpu_layers": 0}, text_model_path="a.gguf")
     gen = StreamGenerator(module)
     rm_calls = []
 
@@ -707,18 +691,14 @@ def test_prepare_gpu_resources_gguf_layers_from_config(monkeypatch):
 
         return _RM()
 
-    monkeypatch.setattr(
-        "core.resource_manager.get_global_resource_manager", lambda: _rm()
-    )
+    monkeypatch.setattr("core.resource_manager.get_global_resource_manager", lambda: _rm())
     asyncio.run(gen._prepare_gpu_resources())
     # n_gpu_layers=0 -> 不准备 GPU
     assert rm_calls == []
 
 
 def test_prepare_gpu_resources_gguf_layers_from_settings(monkeypatch):
-    module = FakeModule(
-        is_gguf=True, config={}, text_model_path="a.gguf", device="cpu"
-    )
+    module = FakeModule(is_gguf=True, config={}, text_model_path="a.gguf", device="cpu")
     module.settings.model = _model_settings(n_gpu_layers=-1)
     gen = StreamGenerator(module)
     rm_calls = []
@@ -730,17 +710,13 @@ def test_prepare_gpu_resources_gguf_layers_from_settings(monkeypatch):
 
         return _RM()
 
-    monkeypatch.setattr(
-        "core.resource_manager.get_global_resource_manager", lambda: _rm()
-    )
+    monkeypatch.setattr("core.resource_manager.get_global_resource_manager", lambda: _rm())
     asyncio.run(gen._prepare_gpu_resources())
     assert rm_calls == ["llm"]
 
 
 def test_prepare_gpu_resources_int_conversion_failure(monkeypatch):
-    module = FakeModule(
-        is_gguf=True, config={"n_gpu_layers": "bad"}, text_model_path="a.gguf"
-    )
+    module = FakeModule(is_gguf=True, config={"n_gpu_layers": "bad"}, text_model_path="a.gguf")
     gen = StreamGenerator(module)
     rm_calls = []
 
@@ -751,9 +727,7 @@ def test_prepare_gpu_resources_int_conversion_failure(monkeypatch):
 
         return _RM()
 
-    monkeypatch.setattr(
-        "core.resource_manager.get_global_resource_manager", lambda: _rm()
-    )
+    monkeypatch.setattr("core.resource_manager.get_global_resource_manager", lambda: _rm())
     asyncio.run(gen._prepare_gpu_resources())
     assert rm_calls == ["llm"]
 
@@ -783,9 +757,7 @@ async def _raising_rm():
 
 
 def test_try_fallback_model_success(monkeypatch):
-    module = FakeModule(
-        is_loaded=True, _load_results=[True], _use_cpp_scheduler_for_llm=True
-    )
+    module = FakeModule(is_loaded=True, _load_results=[True], _use_cpp_scheduler_for_llm=True)
     gen = StreamGenerator(module)
     ok = asyncio.run(gen._try_fallback_model("D:/models/old.gguf"))
     assert ok is True
@@ -824,9 +796,7 @@ def test_clamp_max_tokens_clamps_large_value():
 
 
 def test_clamp_max_tokens_n_ctx_raises_then_config_fallback():
-    module = FakeModule(
-        llama_model=_FakeLlamaModel(n_ctx_raises=True), config={"n_ctx": 1024}
-    )
+    module = FakeModule(llama_model=_FakeLlamaModel(n_ctx_raises=True), config={"n_ctx": 1024})
     gen = StreamGenerator(module)
     assert gen._clamp_max_tokens_for_gguf(5000) == 819
 
@@ -891,7 +861,9 @@ def test_adjust_timeout_gguf_n_ctx_raises_and_bad_layers():
 # --------------------------------------------------------------------------
 
 
-def _iter_stream(gen, stream, start_gen_time, is_gpu_infer=False, layers=0, clock=None, monkeypatch=None):
+def _iter_stream(
+    gen, stream, start_gen_time, is_gpu_infer=False, layers=0, clock=None, monkeypatch=None
+):
     puts = []
     if clock is not None:
         monkeypatch.setattr(sg, "time", SimpleNamespace(time=clock.time))
@@ -989,9 +961,7 @@ def test_iterate_stream_exception_branch():
 
 
 def test_cleanup_and_retry_cpu_success(monkeypatch):
-    module = FakeModule(
-        llama_model=_FakeLlamaModel(), config={"n_gpu_layers": -1, "n_ctx": 4096}
-    )
+    module = FakeModule(llama_model=_FakeLlamaModel(), config={"n_gpu_layers": -1, "n_ctx": 4096})
     gen = StreamGenerator(module)
     fake_torch = _FakeTorch(_FakeCuda(available=True))
     monkeypatch.setattr(sg, "get_torch", lambda: fake_torch)
@@ -1000,9 +970,7 @@ def test_cleanup_and_retry_cpu_success(monkeypatch):
         self.module.llama_model = _FakeLlamaModel()
         return True
 
-    monkeypatch.setattr(
-        "core.modules.llm.model_loader.ModelLoader.load_sync", _load_sync
-    )
+    monkeypatch.setattr("core.modules.llm.model_loader.ModelLoader.load_sync", _load_sync)
     gen._cleanup_and_retry_cpu()
     assert module.config["n_gpu_layers"] == 0
     assert module.config["n_ctx"] == 2048
@@ -1224,9 +1192,7 @@ def test_do_generate_recovers_lock_after_force_release(monkeypatch, no_gpu_gate)
     )
     gen = StreamGenerator(module)
     monkeypatch.setattr(sg, "TextIteratorStreamer", _FakeStreamer)
-    items = _collect(
-        gen._do_generate("hi", 8, 0.5, None, 1.1, 0.9, None, 5.0)
-    )
+    items = _collect(gen._do_generate("hi", 8, 0.5, None, 1.1, 0.9, None, 5.0))
     assert items == [{"content": "你"}, {"content": "好"}]
 
 
@@ -1245,9 +1211,7 @@ def test_do_generate_bad_timeout_value_falls_back(monkeypatch, no_gpu_gate):
     module = FakeModule(is_gguf=False)
     gen = StreamGenerator(module)
     monkeypatch.setattr(sg, "TextIteratorStreamer", _FakeStreamer)
-    items = _collect(
-        gen._do_generate("hi", 8, 0.5, None, 1.1, 0.9, None, object())
-    )
+    items = _collect(gen._do_generate("hi", 8, 0.5, None, 1.1, 0.9, None, object()))
     assert items == [{"content": "你"}, {"content": "好"}]
 
 
@@ -1357,9 +1321,7 @@ def test_generate_gguf_cuda_backend_error_triggers_cpu_retry(monkeypatch):
         self.module.llama_model = _FakeLlamaModel()
         return True
 
-    monkeypatch.setattr(
-        "core.modules.llm.model_loader.ModelLoader.load_sync", _load_sync
-    )
+    monkeypatch.setattr("core.modules.llm.model_loader.ModelLoader.load_sync", _load_sync)
     puts = []
     gen._generate_gguf("hi", 8, 0.5, 0.9, None, 1.1, None, puts.append)
     assert puts == []
@@ -1428,9 +1390,7 @@ def test_generate_gguf_full_flow_with_cancellation(monkeypatch, no_gpu_gate):
 
 def test_generate_gguf_layers_none_falls_back_to_settings(monkeypatch, no_gpu_gate):
     """config 中 n_gpu_layers 显式为 None 时，回退到 settings.model.n_gpu_layers。"""
-    model = _FakeLlamaModel(
-        chunks=[{"choices": [{"delta": {"content": "q"}}]}], n_ctx=2048
-    )
+    model = _FakeLlamaModel(chunks=[{"choices": [{"delta": {"content": "q"}}]}], n_ctx=2048)
     module = FakeModule(
         is_loaded=True,
         is_gguf=True,
@@ -1495,9 +1455,7 @@ def test_do_generate_release_failure_is_swallowed(monkeypatch, no_gpu_gate):
 
 def test_generate_gguf_n_ctx_raises_falls_back_to_zero():
     """llama_model.n_ctx() 抛异常 -> n_ctx 归零并继续。"""
-    model = _FakeLlamaModel(
-        chunks=[{"choices": [{"delta": {"content": "n"}}]}], n_ctx_raises=True
-    )
+    model = _FakeLlamaModel(chunks=[{"choices": [{"delta": {"content": "n"}}]}], n_ctx_raises=True)
     module = FakeModule(is_gguf=True, llama_model=model, config={"n_gpu_layers": 0})
     gen = StreamGenerator(module)
     puts = []
@@ -1516,9 +1474,7 @@ def test_cleanup_and_retry_cpu_del_attribute_failure(monkeypatch):
     module = _NoDelAttrModule(llama_model=_FakeLlamaModel(), config={})
     gen = StreamGenerator(module)
     monkeypatch.setattr(sg, "get_torch", lambda: None)
-    monkeypatch.setattr(
-        "core.modules.llm.model_loader.ModelLoader.load_sync", lambda self: False
-    )
+    monkeypatch.setattr("core.modules.llm.model_loader.ModelLoader.load_sync", lambda self: False)
     with pytest.raises(RuntimeError):
         gen._cleanup_and_retry_cpu()
     assert module.llama_model is None
@@ -1538,9 +1494,7 @@ def test_cleanup_and_retry_cpu_torch_cache_failure(monkeypatch):
         self.module.llama_model = _FakeLlamaModel()
         return True
 
-    monkeypatch.setattr(
-        "core.modules.llm.model_loader.ModelLoader.load_sync", _load_sync
-    )
+    monkeypatch.setattr("core.modules.llm.model_loader.ModelLoader.load_sync", _load_sync)
     gen._cleanup_and_retry_cpu()
     assert module.config["n_gpu_layers"] == 0
 

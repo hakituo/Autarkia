@@ -138,7 +138,9 @@ def test_faster_whisper_uses_cpp_vad_when_available(monkeypatch):
     monkeypatch.setattr(
         sc,
         "audio_processor_py",
-        SimpleNamespace(AudioVAD=lambda **kw: SimpleNamespace(remove_silence=lambda s, frame_ms: [1, 2])),
+        SimpleNamespace(
+            AudioVAD=lambda **kw: SimpleNamespace(remove_silence=lambda s, frame_ms: [1, 2])
+        ),
     )
     monkeypatch.setattr(sc, "AudioSegment", _fake_audiosegment())
     connector = _bare()
@@ -157,7 +159,9 @@ def test_faster_whisper_vad_empty_falls_back(monkeypatch):
     monkeypatch.setattr(
         sc,
         "audio_processor_py",
-        SimpleNamespace(AudioVAD=lambda **kw: SimpleNamespace(remove_silence=lambda s, frame_ms: [])),
+        SimpleNamespace(
+            AudioVAD=lambda **kw: SimpleNamespace(remove_silence=lambda s, frame_ms: [])
+        ),
     )
     monkeypatch.setattr(sc, "AudioSegment", _fake_audiosegment())
     connector = _bare()

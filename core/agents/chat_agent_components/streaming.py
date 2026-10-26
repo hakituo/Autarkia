@@ -39,10 +39,21 @@ from .streaming_pipeline import (
 logger = get_logger("ChatAgent")
 
 
-def _friendly_upstream_error(raw: str) -> str:
+def _friendly_upstream_error(raw: str, details: Optional[Dict[str, Any]] = None) -> str:
     """把上游技术错误转成用户能看懂的一句话（原始信息留在日志与 details）。"""
     text = str(raw or "").strip()
     lowered = text.lower()
+    info = details if isinstance(details, dict) else {}
+    status = info.get("status")
+    body = str(info.get("body") or "").strip()
+    merged = f"{text} {body}".lower()
+
+    # 上游内容审核拒绝：MiniMax 等返回 422 + "input new_sensitive (...)"。
+    # 这不是"服务不可用"，必须说清楚是被拒，否则用户只会反复重发同一句话。
+    if "new_sensitive" in merged or ("sensitive" in merged and (status == 422 or "422" in merged)):
+        return "这次输入被上游模型判定为敏感内容而拒绝（HTTP 422）"
+    if status == 422 or "422" in merged or "unprocessable" in merged:
+        return "上游模型拒绝了这次请求（HTTP 422）"
     if "timeout" in lowered or "timed out" in lowered or "超时" in text:
         return "AI 响应超时了，请稍后重试"
     if any(k in lowered for k in ("rate limit", "too many", "busy", "overload", "503", "429")):
@@ -50,15 +61,38 @@ def _friendly_upstream_error(raw: str) -> str:
     return "AI 服务暂时不可用，请稍后重试"
 
 
-def _build_upstream_error_event(exc: Exception, *, error_code: str, raw: str) -> Dict[str, Any]:
-    """构造统一的上游错误事件（type=error 才会被前端当作报错提示）。"""
+def _build_upstream_error_event(
+    exc: Exception,
+    *,
+    error_code: str,
+    raw: str,
+    upstream_details: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """构造统一的上游错误事件（type=error 才会被前端当作报错提示）。
+
+    ``upstream_details`` 是 provider 客户端给的原始详情（如 ``{"status": 422,
+    "body": "input new_sensitive (1026)"}``）。旧实现只留 ``raw_error``，
+    前端拿不到状态码与上游原话，只能显示一句笼统文案。
+    """
     detail = str(raw or "")[:800]
+    upstream = upstream_details if isinstance(upstream_details, dict) else {}
+    details: Dict[str, Any] = {"error_type": type(exc).__name__, "raw_error": detail}
+    status = upstream.get("status")
+    body = str(upstream.get("body") or "").strip()
+    if status is not None:
+        details["upstream_status"] = status
+    if body:
+        details["upstream_body"] = body[:800]
+    # 其余键（网络异常里的 raw 等）原样带上，且不覆盖上面两个语义键
+    for key, value in upstream.items():
+        if key not in ("status", "body"):
+            details.setdefault(f"upstream_{key}", value)
     return {
         "type": "error",
-        "message": _friendly_upstream_error(detail),
+        "message": _friendly_upstream_error(detail, upstream),
         "error": detail or str(exc),
         "error_code": error_code,
-        "details": {"error_type": type(exc).__name__, "raw_error": detail},
+        "details": details,
         "done": True,
     }
 
@@ -277,7 +311,12 @@ async def stream_chat_impl(
                     logger.info(f"[STREAM][TT] drained {sent} tokens after chunk")
         except LLMStreamError as e:
             logger.error(f"LLM streaming error: {e} | raw={e.raw}")
-            yield _build_upstream_error_event(e, error_code=e.error_code, raw=e.raw)
+            yield _build_upstream_error_event(
+                e,
+                error_code=e.error_code,
+                raw=e.raw,
+                upstream_details=getattr(e, "details", None),
+            )
             return
         except Exception as e:
             logger.error(f"LLM streaming error: {e}")
@@ -437,6 +476,15 @@ async def stream_chat_impl(
                 asyncio.create_task(agent._save_conversation_history(**_pending_save))
             except Exception as e:
                 logger.warning(f"Failed to schedule history save: {e}")
+            # 主人卡实时捕获：零 API 规则提取用户长期事实，fire-and-forget
+            try:
+                from core.character.people.self_view_capture import capture_user_facts_async
+
+                asyncio.create_task(
+                    capture_user_facts_async(user_id, message, profile_filename)
+                )
+            except Exception as e:
+                logger.debug(f"主人卡实时捕获调度失败（不影响本次回复）: {e}")
         # 本请求实际用过的工具交给下一请求延续（同 finally 保证 aclose 也不丢）
         try:
             from core.tools.tool_carryover import record_request_tools

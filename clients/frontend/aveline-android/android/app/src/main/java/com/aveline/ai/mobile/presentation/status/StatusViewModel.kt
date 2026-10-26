@@ -5,10 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aveline.ai.mobile.data.remote.api.WebSocketManager
 import com.aveline.ai.mobile.data.repository.StatusRepositoryImpl
-import com.aveline.ai.mobile.domain.models.Emotion
-import com.aveline.ai.mobile.domain.models.LifeStatus
 import com.aveline.ai.mobile.domain.repository.StatusRepository
 import com.aveline.ai.mobile.domain.repository.ToolsRepository
+import com.aveline.ai.mobile.presentation.status.ui.StatusUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -17,76 +16,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import javax.inject.Inject
 
 /**
- * 状态面板 UI 状态
- * 
- * @property lifeStatus 生命状态
- * @property emotion 当前情绪
- * @property emotionMix 情绪混合比例
- * @property connected WebSocket 连接状态
- * @property clock 系统时钟
- * @property isLoading 是否加载中
- * @property error 错误信息
- */
-data class StatusUiState(
-    val lifeStatus: LifeStatus? = null,
-    val emotion: Emotion = Emotion.NEUTRAL,
-    val emotionMix: Map<String, Float> = emptyMap(),
-    val connected: Boolean = false,
-    val clock: String = "",
-    val systemStats: JsonObject? = null,
-    val isLoading: Boolean = false,
-    val isActionRunning: Boolean = false,
-    val actionMessage: String? = null,
-    val error: String? = null
-) {
-    val hasLowStatus: Boolean
-        get() = lifeStatus?.hasLowStatus() ?: false
-    
-    val lowestStatusValue: Float
-        get() = lifeStatus?.getLowestStatus() ?: 0f
-    
-    val lowestStatusName: String
-        get() {
-            val status = lifeStatus ?: return ""
-            val lowest = minOf(
-                status.health to "健康",
-                status.hunger to "饥饿",
-                status.happiness to "快乐",
-                status.energy to "能量"
-            ) { a, b -> a.first.compareTo(b.first) }
-            return lowest.second
-        }
-    
-    val connectionStatusText: String
-        get() = if (connected) "已连接" else "未连接"
-    
-    val healthPercent: Int
-        get() = ((lifeStatus?.health ?: 0f) * 100).toInt()
-    
-    val hungerPercent: Int
-        get() = ((lifeStatus?.hunger ?: 0f) * 100).toInt()
-    
-    val happinessPercent: Int
-        get() = ((lifeStatus?.happiness ?: 0f) * 100).toInt()
-    
-    val energyPercent: Int
-        get() = ((lifeStatus?.energy ?: 0f) * 100).toInt()
-}
-
-/**
  * 状态面板 ViewModel
- * 
+ *
  * 功能：
  * - 生命状态显示
  * - 情绪状态显示
  * - 连接状态显示
  * - 系统时钟同步
- * 
+ *
  * Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7
  */
 @HiltViewModel
@@ -99,6 +40,16 @@ class StatusViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(StatusUiState())
     val uiState: StateFlow<StatusUiState> = _uiState.asStateFlow()
+
+    /**
+     * 系统时钟单独一个流。
+     *
+     * 以前时钟塞在 [StatusUiState] 里，每秒改一次就把整棵伴侣详情面板重组合一遍；
+     * 而伴侣详情面板常驻在聊天页的组合树里，于是聊天页每秒也跟着重组一次，
+     * 用户滑动时更容易掉帧。拆出来之后，只有真正显示时钟的地方才会重组。
+     */
+    private val _clock = MutableStateFlow("")
+    val clock: StateFlow<String> = _clock.asStateFlow()
 
     private var clockJob: Job? = null
     private var emotionJob: Job? = null
@@ -142,7 +93,7 @@ class StatusViewModel @Inject constructor(
     fun setViewingPersona(filename: String) {
         setControlContext(filename, currentConversationId)
     }
-    
+
     /**
      * 加载生命状态（按当前角色 scope）。
      *
@@ -176,20 +127,36 @@ class StatusViewModel @Inject constructor(
             loadSystemStats()
         }
     }
-    
-    /** 刷新当前控制上下文的状态。 */
+
+    /**
+     * 刷新当前控制上下文的状态（静默刷新）。
+     *
+     * 命中仓库的一分钟缓存时零网络请求。用于"打开伴侣详情""切到日程页"这类
+     * **不该让用户等**的场景：面板先用缓存渲染，再在后台悄悄刷新。
+     */
     fun refreshStatus() {
         refreshStatusForPersona(currentProfileFilename)
     }
 
     /**
-     * 强制刷新指定 persona 的状态。
+     * 强制刷新当前控制上下文的状态（绕过缓存，直接走网络）。
+     *
+     * 只给用户主动点"刷新"的场景用。
+     */
+    fun forceRefreshStatus() {
+        refreshStatusForPersona(currentProfileFilename, force = true)
+    }
+
+    /**
+     * 刷新指定 persona 的状态。
      *
      * 详情面板打开时显式传 [persona]，避免 Compose 可见态更新与 ChatScreen 的
      * control context 更新处在同一帧时误刷上一个角色。相同 persona 已有请求在飞时直接复用；
      * 目标 persona 改变时让旧请求自然结束但丢弃旧结果，防止旧响应晚到覆盖新角色状态。
+     *
+     * @param force true 表示跳过仓库缓存强制走网络（用户主动刷新）；false 表示缓存优先。
      */
-    fun refreshStatusForPersona(persona: String?) {
+    fun refreshStatusForPersona(persona: String?, force: Boolean = false) {
         val targetPersona = persona?.takeIf { it.isNotBlank() } ?: currentProfileFilename
         // 先用仓库里的上次权威状态渲染，再去拉网络：本 ViewModel 随聊天页重建，
         // 不播种就会在每次进详情时留下“空白 + 等一次网络”的空窗。
@@ -203,12 +170,20 @@ class StatusViewModel @Inject constructor(
         statusRefreshRequestId += 1L
         val requestId = statusRefreshRequestId
         statusRefreshJob = viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-            
-            val result = statusRepositoryImpl.forceRefreshLifeStatus(persona = targetPersona)
+            // 已经有数据时不做整块 loading：缓存优先的刷新不该让面板闪成转圈。
+            val showLoading = _uiState.value.lifeStatus == null
+            if (showLoading) {
+                _uiState.update { it.copy(isLoading = true, error = null) }
+            }
+
+            val result = if (force) {
+                statusRepositoryImpl.forceRefreshLifeStatus(persona = targetPersona)
+            } else {
+                statusRepository.getLifeStatus(persona = targetPersona)
+            }
             // 切角色后旧请求即使更晚返回，也不能覆盖最新角色的状态。
             if (requestId != statusRefreshRequestId) return@launch
-            
+
             result.fold(
                 onSuccess = { status ->
                     _uiState.update {
@@ -241,6 +216,10 @@ class StatusViewModel @Inject constructor(
     private fun seedLifeStatusFromCache(persona: String?) {
         val cached = statusRepositoryImpl.cachedLifeStatus.value ?: return
         if (cached.scope != persona) return
+        // 设备跨天后缓存里是更早一天的日程：先渲染会让日程页闪出旧的槽位与「正在进行」，
+        // 直接不播种，让下面这次刷新从接口取今天的计划。判断口径与仓库缓存一致，
+        // 只比设备自然日是否翻页，不拿后端计划日期与设备日期直接比。
+        if (statusRepositoryImpl.isCachedPlanStaleForDeviceDay()) return
         _uiState.update { state ->
             val current = state.lifeStatus
             if (current != null && current.timestamp >= cached.timestamp) state
@@ -301,20 +280,20 @@ class StatusViewModel @Inject constructor(
             }
         }
     }
-    
+
     /**
      * 观察连接状态
      */
     private fun observeConnection() {
         viewModelScope.launch {
             webSocketManager.connectionState.collect { state ->
-                _uiState.update { 
+                _uiState.update {
                     it.copy(connected = state == WebSocketManager.ConnectionState.CONNECTED)
                 }
             }
         }
     }
-    
+
     /**
      * 观察情绪变化
      */
@@ -366,7 +345,7 @@ class StatusViewModel @Inject constructor(
             }
         }
     }
-    
+
     /**
      * 启动时钟
      */
@@ -377,19 +356,19 @@ class StatusViewModel @Inject constructor(
                 val formatted = now.format(
                     java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")
                 )
-                _uiState.update { it.copy(clock = formatted) }
+                _clock.value = formatted
                 delay(1000)
             }
         }
     }
-    
+
     /**
      * 清除错误
      */
     fun clearError() {
         _uiState.update { it.copy(error = null) }
     }
-    
+
     override fun onCleared() {
         super.onCleared()
         clockJob?.cancel()

@@ -12,87 +12,41 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.Fastfood
-import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Extension
-import androidx.compose.material.icons.outlined.Face
-import androidx.compose.material.icons.outlined.Fastfood
 import androidx.compose.material.icons.outlined.MenuBook
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.PushPin
-import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.domain.models.Session
 import com.aveline.ai.mobile.presentation.navigation.Routes
-import com.aveline.ai.mobile.presentation.theme.DividerColor
-import com.aveline.ai.mobile.presentation.theme.InteractivePrimary
-import com.aveline.ai.mobile.presentation.theme.StatusOffline
-import com.aveline.ai.mobile.presentation.theme.StatusOnline
-import com.aveline.ai.mobile.presentation.theme.TextMuted
+import com.aveline.ai.mobile.presentation.theme.Line
+import com.aveline.ai.mobile.presentation.theme.SelectionSurface
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 enum class ConnectionState {
     CONNECTED, CONNECTING, DISCONNECTED
@@ -103,7 +57,9 @@ data class DrawerItem(
     val title: String,
     val icon: ImageVector,
     val selectedIcon: ImageVector,
-    val contentDescription: String
+    val contentDescription: String,
+    /** 平板常驻侧栏用的短标签：抽屉里能写全称，侧栏底部图标行放不下。 */
+    val shortTitle: String = title
 )
 
 val drawerItems = listOf(
@@ -140,7 +96,8 @@ val drawerItems = listOf(
         title = "数字健康",
         icon = Icons.Outlined.Timer,
         selectedIcon = Icons.Filled.Timer,
-        contentDescription = "数字健康(应用使用时长限额)"
+        contentDescription = "数字健康(应用使用时长限额)",
+        shortTitle = "健康"
     ),
     DrawerItem(
         route = Routes.SETTINGS,
@@ -169,20 +126,13 @@ fun DrawerContent(
         modifier = Modifier
             .fillMaxSize()
     ) {
-        // 添加呼吸灯背景作为侧边栏的底色
+        // 背景已经够安静，侧栏直接用呼吸背景，不再叠半透明遮罩
         BreathingBackground(
             modifier = Modifier.fillMaxSize(),
             emotion = currentEmotion,
-            backgroundAlpha = 0.9f
+            backgroundAlpha = 1f
         )
 
-        // 毛玻璃效果遮罩，使用半透明深色覆盖在呼吸灯上面，让背景既有颜色又有深邃感
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0x88101522))
-        )
-        
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -227,9 +177,9 @@ fun DrawerNavigationItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val backgroundColor = if (isSelected) Color(0x1A000000) else Color.Transparent
-    val contentColor = if (isSelected) Color.White else Color(0x66FFFFFF)
-    val borderColor = if (isSelected) Color(0x14000000) else Color.Transparent
+    val backgroundColor = if (isSelected) SelectionSurface else Color.Transparent
+    val contentColor = if (isSelected) TextPrimary else TextSecondary
+    val borderColor = if (isSelected) Line else Color.Transparent
 
     Row(
         modifier = Modifier
@@ -250,11 +200,8 @@ fun DrawerNavigationItem(
         Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = item.title,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 0.5.sp
-            ),
-            color = if (isSelected) contentColor else Color(0xE6FFFFFF)
+            style = MaterialTheme.typography.labelLarge,
+            color = contentColor
         )
     }
 }

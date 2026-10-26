@@ -9,6 +9,7 @@
 - 外部 LLM 合并器用假的协程函数替换，绝不联网；
 - 不做任何耗时 / 随机 / sleep 断言，避免 flaky。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -85,8 +86,10 @@ def _install_fake_embedding(monkeypatch, gen=None, get_raises=False):
     mod = types.ModuleType("memory.embedding_generator")
     mod.EmbeddingGenerator = _FakeEmbeddingGeneratorClass
     if get_raises:
+
         def _boom():
             raise RuntimeError("模型不可用")
+
         mod.get_embedding_generator = _boom
     else:
         mod.get_embedding_generator = lambda: gen
@@ -133,9 +136,7 @@ def _install_fake_journal(
             self.storage = _Storage()
 
     monkeypatch.setattr(journal_mod, "JournalService", _JournalService)
-    monkeypatch.setattr(
-        data_paths_mod, "_resolve_scope_from_active_persona", lambda: scope
-    )
+    monkeypatch.setattr(data_paths_mod, "_resolve_scope_from_active_persona", lambda: scope)
 
 
 # ----------------------------------------------------------------------
@@ -252,6 +253,7 @@ def test_load_and_save_async_roundtrip(cm):
 
 def test_save_sync_swallows_write_error(cm, monkeypatch):
     """落盘失败只记日志，不向上抛异常。"""
+
     def _boom(*args, **kwargs):
         raise OSError("磁盘写满")
 
@@ -357,9 +359,7 @@ def test_find_semantic_duplicate_hits_with_normal_threshold(cm, monkeypatch):
     cm._embedding_checked = True
     _preset(cm, {PREFERENCES: ["条目甲"]})
 
-    assert cm._find_semantic_duplicate(
-        PREFERENCES, "条目乙", _vec_with_sim(0.9)
-    ) == (True, 0)
+    assert cm._find_semantic_duplicate(PREFERENCES, "条目乙", _vec_with_sim(0.9)) == (True, 0)
 
 
 def test_find_semantic_duplicate_misses_below_threshold(cm, monkeypatch):
@@ -370,9 +370,7 @@ def test_find_semantic_duplicate_misses_below_threshold(cm, monkeypatch):
     cm._embedding_checked = True
     _preset(cm, {PREFERENCES: ["条目甲"]})
 
-    assert cm._find_semantic_duplicate(
-        PREFERENCES, "条目乙", _vec_with_sim(0.5)
-    ) == (False, -1)
+    assert cm._find_semantic_duplicate(PREFERENCES, "条目乙", _vec_with_sim(0.5)) == (False, -1)
 
 
 def test_find_semantic_duplicate_same_bucket_uses_loose_threshold(cm, monkeypatch):
@@ -383,24 +381,18 @@ def test_find_semantic_duplicate_same_bucket_uses_loose_threshold(cm, monkeypatc
     cm._embedding_checked = True
     _preset(cm, {PREFERENCES: ["回复要简短"]})
 
-    assert cm._find_semantic_duplicate(
-        PREFERENCES, "回复要精炼", _vec_with_sim(0.7)
-    ) == (True, 0)
+    assert cm._find_semantic_duplicate(PREFERENCES, "回复要精炼", _vec_with_sim(0.7)) == (True, 0)
 
 
 def test_find_semantic_duplicate_hash_fallback_uses_strict_threshold(cm, monkeypatch):
     """hash fallback 模式阈值提高到 0.95，0.9 相似度不再命中。"""
     _install_fake_embedding(monkeypatch, gen=None)
-    gen = _FakeEmbeddingGenerator(
-        vectors={"条目甲": [1.0, 0.0]}, hash_fallback=True
-    )
+    gen = _FakeEmbeddingGenerator(vectors={"条目甲": [1.0, 0.0]}, hash_fallback=True)
     cm._embedding_gen = gen
     cm._embedding_checked = True
     _preset(cm, {PREFERENCES: ["条目甲"]})
 
-    assert cm._find_semantic_duplicate(
-        PREFERENCES, "条目乙", _vec_with_sim(0.9)
-    ) == (False, -1)
+    assert cm._find_semantic_duplicate(PREFERENCES, "条目乙", _vec_with_sim(0.9)) == (False, -1)
 
 
 def test_find_semantic_duplicate_skips_when_cache_rebuild_incomplete(cm, monkeypatch):
@@ -411,9 +403,7 @@ def test_find_semantic_duplicate_skips_when_cache_rebuild_incomplete(cm, monkeyp
     cm._embedding_checked = True
     _preset(cm, {PREFERENCES: ["条目甲"]})
 
-    assert cm._find_semantic_duplicate(
-        PREFERENCES, "条目乙", _vec_with_sim(0.99)
-    ) == (False, -1)
+    assert cm._find_semantic_duplicate(PREFERENCES, "条目乙", _vec_with_sim(0.99)) == (False, -1)
     assert PREFERENCES not in cm._embeddings_cache
 
 
@@ -448,9 +438,7 @@ def test_add_item_exact_duplicate_returns_false(cm):
 def test_add_item_replaces_semantically_duplicate(cm, monkeypatch):
     """语义重复但不全等时，用新表述原地替换并返回 True。"""
     _install_fake_embedding(monkeypatch, gen=None)
-    gen = _FakeEmbeddingGenerator(
-        vectors={"条目甲": [1.0, 0.0], "条目乙": _vec_with_sim(0.9)}
-    )
+    gen = _FakeEmbeddingGenerator(vectors={"条目甲": [1.0, 0.0], "条目乙": _vec_with_sim(0.9)})
     cm._embedding_gen = gen
     cm._embedding_checked = True
     _preset(cm, {PREFERENCES: ["条目甲"]})
@@ -463,9 +451,7 @@ def test_add_item_replaces_semantically_duplicate(cm, monkeypatch):
 def test_add_item_appends_and_extends_embedding_cache(cm, monkeypatch):
     """追加新条目时，若缓存与条目一一对应则直接追加，不整体重建。"""
     _install_fake_embedding(monkeypatch, gen=None)
-    gen = _FakeEmbeddingGenerator(
-        vectors={"条目甲": [1.0, 0.0], "条目乙": [0.0, 1.0]}
-    )
+    gen = _FakeEmbeddingGenerator(vectors={"条目甲": [1.0, 0.0], "条目乙": [0.0, 1.0]})
     cm._embedding_gen = gen
     cm._embedding_checked = True
     _preset(cm, {PREFERENCES: ["条目甲"]})
@@ -479,9 +465,7 @@ def test_add_item_appends_and_extends_embedding_cache(cm, monkeypatch):
 def test_add_item_invalidates_stale_cache_when_embedding_partial(cm, monkeypatch):
     """旧条目 embedding 算不出来时缓存不可用，追加后清掉缓存。"""
     _install_fake_embedding(monkeypatch, gen=None)
-    gen = _FakeEmbeddingGenerator(
-        vectors={"条目乙": [1.0, 0.0]}, fail_texts={"条目甲"}
-    )
+    gen = _FakeEmbeddingGenerator(vectors={"条目乙": [1.0, 0.0]}, fail_texts={"条目甲"})
     cm._embedding_gen = gen
     cm._embedding_checked = True
     _preset(cm, {PREFERENCES: ["条目甲"]})
@@ -652,9 +636,7 @@ def test_auto_slim_returns_empty_when_stat_fails(cm):
 
 def test_auto_slim_removes_stale_and_merges_experience(cm):
     """超限时删除已完成任务 / 已晋升纠正 / 过期摘要，并合并相似经验。"""
-    experience = ["甲乙类经验"] * 2 + [
-        f"{word}类经验" for word in "一二三四五六七八九十甲乙丙丁戊"
-    ]
+    experience = ["甲乙类经验"] * 2 + [f"{word}类经验" for word in "一二三四五六七八九十甲乙丙丁戊"]
     assert len(experience) == 17
     _preset(
         cm,
@@ -947,6 +929,7 @@ def test_archive_items_appends_to_same_file(cm):
 
 def test_archive_items_swallows_errors(cm, monkeypatch):
     """归档过程出错只记日志，不向上抛异常。"""
+
     def _boom():
         raise RuntimeError("boom")
 

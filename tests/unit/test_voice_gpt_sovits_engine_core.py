@@ -110,8 +110,11 @@ def _g0(session):
 class TestInit:
     def test_defaults_and_overrides(self):
         eng = GPTSoVITSEngine()
-        assert (eng.api_url, eng.default_lang, eng.sample_rate) == \
-            ("http://127.0.0.1:9880/tts", "zh", 32000)
+        assert (eng.api_url, eng.default_lang, eng.sample_rate) == (
+            "http://127.0.0.1:9880/tts",
+            "zh",
+            32000,
+        )
         assert (eng._session, eng._session_loop, eng._session_lock) == (None, None, None)
         assert (eng._control_unavailable_until, eng.current_device) == (0.0, "cpu")
         assert (eng._is_generating, eng._last_unavailable_log_ts) == (False, 0.0)
@@ -122,14 +125,23 @@ class TestInit:
 
 
 class TestIsConnectionErrorText:
-    @pytest.mark.parametrize("text,expected", [
-        ("Cannot connect to host", True), ("connection refused", True),
-        ("Connection error", True), ("Operation timed out", True),
-        ("Request timeout", True), ("actively refused", True),
-        ("无法连接服务器", True), ("请求超时", True),
-        ("bad request", False), ("500 internal error", False),
-        ("", False), (None, False),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            ("Cannot connect to host", True),
+            ("connection refused", True),
+            ("Connection error", True),
+            ("Operation timed out", True),
+            ("Request timeout", True),
+            ("actively refused", True),
+            ("无法连接服务器", True),
+            ("请求超时", True),
+            ("bad request", False),
+            ("500 internal error", False),
+            ("", False),
+            (None, False),
+        ],
+    )
     def test_classification(self, engine, text, expected):
         assert engine._is_connection_error_text(text) is expected
 
@@ -179,8 +191,7 @@ class TestInitialize:
         assert calls == [("gpt", "g.ckpt"), ("sovits", "s.pth")]
 
     @pytest.mark.parametrize("rm_available", [True, False])
-    async def test_skips_weights_and_optionally_registers(self, engine, monkeypatch,
-                                                          rm_available):
+    async def test_skips_weights_and_optionally_registers(self, engine, monkeypatch, rm_available):
         _patch_settings(monkeypatch, gpt_model_path="", sovits_model_path=None)
         rm = _RMStub()
         monkeypatch.setattr(mod, "get_resource_manager", (lambda: rm) if rm_available else None)
@@ -214,8 +225,7 @@ class TestHandleResourcePressure:
         await engine.handle_resource_pressure("release")
         assert moved == [1]
 
-    @pytest.mark.parametrize("device,generating", [("cpu", False), (None, False),
-                                                   ("cuda", True)])
+    @pytest.mark.parametrize("device,generating", [("cpu", False), (None, False), ("cuda", True)])
     async def test_release_noop_cases(self, engine, moved, device, generating):
         engine.current_device, engine._is_generating = device, generating
         await engine.handle_resource_pressure("release")
@@ -228,16 +238,21 @@ class TestHandleResourcePressure:
 
 
 class TestBuildControlUrl:
-    @pytest.mark.parametrize("api_url,endpoint,expected", [
-        ("http://127.0.0.1:9880/tts", "set_gpt_weights",
-         "http://127.0.0.1:9880/set_gpt_weights"),
-        ("http://127.0.0.1:9880/tts/", "/set_device",
-         "http://127.0.0.1:9880/set_device"),
-        ("http://host:9999", "ping", "http://host:9999/ping"),
-        ("", "/set_device", "http://127.0.0.1:9880/set_device"),
-        (None, "x", "http://127.0.0.1:9880/x"),
-        ("http://127.0.0.1:9880/tts", "", "http://127.0.0.1:9880/"),
-    ])
+    @pytest.mark.parametrize(
+        "api_url,endpoint,expected",
+        [
+            (
+                "http://127.0.0.1:9880/tts",
+                "set_gpt_weights",
+                "http://127.0.0.1:9880/set_gpt_weights",
+            ),
+            ("http://127.0.0.1:9880/tts/", "/set_device", "http://127.0.0.1:9880/set_device"),
+            ("http://host:9999", "ping", "http://host:9999/ping"),
+            ("", "/set_device", "http://127.0.0.1:9880/set_device"),
+            (None, "x", "http://127.0.0.1:9880/x"),
+            ("http://127.0.0.1:9880/tts", "", "http://127.0.0.1:9880/"),
+        ],
+    )
     def test_urls(self, engine, api_url, endpoint, expected):
         engine.api_url = api_url
         assert engine._build_control_url(endpoint) == expected
@@ -254,7 +269,8 @@ class TestResolveLocalPath:
 
     def test_relative_joined_with_cwd(self, engine):
         assert engine._resolve_local_path("rel/f.wav") == os.path.normpath(
-            os.path.abspath(os.path.join(os.getcwd(), "rel/f.wav")))
+            os.path.abspath(os.path.join(os.getcwd(), "rel/f.wav"))
+        )
 
     def test_tilde_expanded(self, engine):
         result = engine._resolve_local_path("~/probe.wav")
@@ -267,7 +283,8 @@ class TestTrySetWeights:
         session = FakeSession(get_plan=get_plan, post_plan=post_plan)
         _patch_session(monkeypatch, session)
         ok = await engine._try_set_weights(
-            endpoint="/set_gpt_weights", weights_path="w.ckpt", kind="GPT")
+            endpoint="/set_gpt_weights", weights_path="w.ckpt", kind="GPT"
+        )
         return ok, session
 
     async def test_get_success(self, engine, monkeypatch):
@@ -281,13 +298,15 @@ class TestTrySetWeights:
     async def test_get_candidate_scan_succeeds(self, engine, monkeypatch, statuses):
         # 400/404/405/422 属于参数名不对的候选：continue 到下一个候选
         ok, session = await self._run(
-            engine, monkeypatch, get_plan=[FakeResponse(s) for s in statuses])
+            engine, monkeypatch, get_plan=[FakeResponse(s) for s in statuses]
+        )
         assert ok is True
         assert len(session.get_calls) == len(statuses)
 
     async def test_get_connection_error_breaks(self, engine, monkeypatch):
         ok, session = await self._run(
-            engine, monkeypatch, get_plan=[aiohttp.ClientError("Cannot connect to host")])
+            engine, monkeypatch, get_plan=[aiohttp.ClientError("Cannot connect to host")]
+        )
         assert ok is False
         assert len(session.get_calls) == 1  # break，不再试其余候选
         assert session.post_calls == []
@@ -299,25 +318,29 @@ class TestTrySetWeights:
         assert ok is False
         assert session.get_calls == [] and session.post_calls == []
 
-    @pytest.mark.parametrize("get_plan,post_plan,expected,post_calls", [
-        ([ValueError("bad")] * 5, [FakeResponse(200)], True, 1),
-        ([FakeResponse(500, "boom")] * 5, [FakeResponse(200)], True, 1),
-        ([FakeResponse(400)] * 5, [ValueError("bad json")] * 5, False, 5),
-        ([FakeResponse(400)] * 5, [FakeResponse(400)] * 5, False, 5),
-    ])
-    async def test_post_stage(self, engine, monkeypatch, get_plan, post_plan,
-                              expected, post_calls):
+    @pytest.mark.parametrize(
+        "get_plan,post_plan,expected,post_calls",
+        [
+            ([ValueError("bad")] * 5, [FakeResponse(200)], True, 1),
+            ([FakeResponse(500, "boom")] * 5, [FakeResponse(200)], True, 1),
+            ([FakeResponse(400)] * 5, [ValueError("bad json")] * 5, False, 5),
+            ([FakeResponse(400)] * 5, [FakeResponse(400)] * 5, False, 5),
+        ],
+    )
+    async def test_post_stage(self, engine, monkeypatch, get_plan, post_plan, expected, post_calls):
         # GET 全失败后进入 POST：成功 / 非连接错误 continue / 全失败三种走向
-        ok, session = await self._run(engine, monkeypatch, get_plan=get_plan,
-                                      post_plan=post_plan)
+        ok, session = await self._run(engine, monkeypatch, get_plan=get_plan, post_plan=post_plan)
         assert ok is expected
         assert len(session.get_calls) == 5
         assert len(session.post_calls) == post_calls
 
     async def test_post_connection_error_breaks(self, engine, monkeypatch):
         ok, session = await self._run(
-            engine, monkeypatch, get_plan=[FakeResponse(400)] * 5,
-            post_plan=[aiohttp.ClientError("connection refused")])
+            engine,
+            monkeypatch,
+            get_plan=[FakeResponse(400)] * 5,
+            post_plan=[aiohttp.ClientError("connection refused")],
+        )
         assert ok is False
         assert len(session.post_calls) == 1
         assert engine._control_unavailable_until > time.monotonic()
@@ -329,6 +352,7 @@ class TestTrySetWeights:
         ``_control_unavailable_until`` 推到未来；这里在假 session 首次 GET 时置位以
         确定性复现该竞态（覆盖 else 分支）。
         """
+
         class _Inject(FakeSession):
             def get(self, url, **kwargs):
                 engine._control_unavailable_until = time.monotonic() + 15.0
@@ -337,13 +361,16 @@ class TestTrySetWeights:
         session = _Inject(get_plan=[FakeResponse(400, "bad")] * 5)
         _patch_session(monkeypatch, session)
         ok = await engine._try_set_weights(
-            endpoint="/set_gpt_weights", weights_path="w.ckpt", kind="GPT")
+            endpoint="/set_gpt_weights", weights_path="w.ckpt", kind="GPT"
+        )
         assert ok is False
         assert session.post_calls == []  # 冷却中直接返回
 
 
-WEIGHT_CASES = [("set_gpt_weights", "/set_gpt_weights", "GPT"),
-                ("set_sovits_weights", "/set_sovits_weights", "SoVITS")]
+WEIGHT_CASES = [
+    ("set_gpt_weights", "/set_gpt_weights", "GPT"),
+    ("set_sovits_weights", "/set_sovits_weights", "SoVITS"),
+]
 
 
 class TestSetWeights:
@@ -360,8 +387,9 @@ class TestSetWeights:
         assert calls == []
 
     @pytest.mark.parametrize("method,endpoint,kind", WEIGHT_CASES)
-    async def test_existing_and_missing_paths(self, engine, monkeypatch, tmp_path,
-                                              method, endpoint, kind):
+    async def test_existing_and_missing_paths(
+        self, engine, monkeypatch, tmp_path, method, endpoint, kind
+    ):
         calls = []
 
         async def _try(**kwargs):
@@ -377,8 +405,7 @@ class TestSetWeights:
         await getattr(engine, method)(missing)
 
         assert calls == [
-            {"endpoint": endpoint, "weights_path": os.path.normpath(str(existing)),
-             "kind": kind},
+            {"endpoint": endpoint, "weights_path": os.path.normpath(str(existing)), "kind": kind},
             {"endpoint": endpoint, "weights_path": missing, "kind": kind},
         ]
 
@@ -393,10 +420,13 @@ class TestSetWeights:
 
 
 class TestMoveDevice:
-    @pytest.mark.parametrize("method,target,params", [
-        ("move_to_cpu", "cpu", {"device": "cpu", "is_half": "false"}),
-        ("move_to_gpu", "cuda", {"device": "cuda", "is_half": "true"}),
-    ])
+    @pytest.mark.parametrize(
+        "method,target,params",
+        [
+            ("move_to_cpu", "cpu", {"device": "cpu", "is_half": "false"}),
+            ("move_to_gpu", "cuda", {"device": "cuda", "is_half": "true"}),
+        ],
+    )
     async def test_success(self, engine, monkeypatch, method, target, params):
         session = FakeSession(get_plan=[FakeResponse(200)])
         _patch_session(monkeypatch, session)
@@ -406,23 +436,29 @@ class TestMoveDevice:
         assert _g0(session)["params"] == params
 
     @pytest.mark.parametrize("method", ["move_to_cpu", "move_to_gpu"])
-    @pytest.mark.parametrize("plan,cooldown", [
-        ([FakeResponse(500, "no")], False),
-        ([ValueError("x")], False),
-    ])
+    @pytest.mark.parametrize(
+        "plan,cooldown",
+        [
+            ([FakeResponse(500, "no")], False),
+            ([ValueError("x")], False),
+        ],
+    )
     async def test_non_200_and_other_error(self, engine, monkeypatch, method, plan, cooldown):
         _patch_session(monkeypatch, FakeSession(get_plan=plan))
         assert await getattr(engine, method)() is False
         assert (engine._control_unavailable_until > 0.0) is cooldown
 
-    @pytest.mark.parametrize("method,exc", [
-        ("move_to_cpu", asyncio.TimeoutError()),
-        ("move_to_gpu", asyncio.TimeoutError()),
-        ("move_to_cpu", aiohttp.ClientError("Cannot connect to host")),
-        ("move_to_gpu", aiohttp.ClientError("Cannot connect to host")),
-        ("move_to_cpu", aiohttp.ClientError("Connection refused")),
-        ("move_to_gpu", aiohttp.ClientError("Connection refused")),
-    ])
+    @pytest.mark.parametrize(
+        "method,exc",
+        [
+            ("move_to_cpu", asyncio.TimeoutError()),
+            ("move_to_gpu", asyncio.TimeoutError()),
+            ("move_to_cpu", aiohttp.ClientError("Cannot connect to host")),
+            ("move_to_gpu", aiohttp.ClientError("Cannot connect to host")),
+            ("move_to_cpu", aiohttp.ClientError("Connection refused")),
+            ("move_to_gpu", aiohttp.ClientError("Connection refused")),
+        ],
+    )
     async def test_connection_like_error_sets_cooldown(self, engine, monkeypatch, method, exc):
         _patch_session(monkeypatch, FakeSession(get_plan=[exc]))
         assert await getattr(engine, method)() is False
@@ -459,7 +495,8 @@ def _load_probe(monkeypatch, blocked_names):
 
     monkeypatch.setattr(builtins, "__import__", _blocked)
     spec = importlib.util.spec_from_file_location(
-        "_gpt_sovits_engine_import_probe", Path(mod.__file__))
+        "_gpt_sovits_engine_import_probe", Path(mod.__file__)
+    )
     probe = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(probe)
     return probe

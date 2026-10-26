@@ -17,11 +17,13 @@ def test_config():
     print("=" * 60)
 
     from config.integrated_config import get_settings
+
     settings = get_settings()
 
     # 检查调度器配置
     try:
         from core.core_engine.config_manager import ConfigManager
+
         cfg = ConfigManager()
         use_cpp = cfg.get("scheduler.use_cpp", False)
         use_cpp_for_llm = cfg.get("scheduler.use_cpp_for_llm", False)
@@ -77,8 +79,12 @@ def test_cpp_scheduler():
     print("=" * 60)
     try:
         from core.services.scheduler.cpp_scheduler_engine import cpp_scheduler_engine
+
         enabled = getattr(cpp_scheduler_engine, "enabled", "N/A")
-        has_scheduler = hasattr(cpp_scheduler_engine, "scheduler") and cpp_scheduler_engine.scheduler is not None
+        has_scheduler = (
+            hasattr(cpp_scheduler_engine, "scheduler")
+            and cpp_scheduler_engine.scheduler is not None
+        )
         print(f"cpp_scheduler_engine.enabled: {enabled}")
         print(f"cpp_scheduler_engine.scheduler: {'存在' if has_scheduler else '不存在'}")
 
@@ -125,7 +131,9 @@ def test_llm_module_mode():
             print("✗ GGUF 模型但未启用 C++ 调度器，会尝试加载 llama-cpp-python")
         else:
             print()
-            print(f"! 非本地 GGUF 模式，当前配置: provider={getattr(settings.model.llm, 'provider', 'unknown')}")
+            print(
+                f"! 非本地 GGUF 模式，当前配置: provider={getattr(settings.model.llm, 'provider', 'unknown')}"
+            )
 
     except Exception as e:
         print(f"测试失败: {e}")

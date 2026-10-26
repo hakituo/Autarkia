@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -239,12 +240,12 @@ def get_telegram_adapter_settings() -> TelegramAdapterSettings:
             data["enable_vision"] = os.getenv("ENABLE_TELEGRAM_VISION", "").lower() == "true"
         if os.getenv("TELEGRAM_STRIP_MARKDOWN"):
             data["strip_markdown"] = os.getenv("TELEGRAM_STRIP_MARKDOWN", "").lower() == "true"
-        if os.getenv("XIAOYOU_HTTP_BASE_URL"):
-            data["http_base_url"] = os.getenv("XIAOYOU_HTTP_BASE_URL", "")
-        if os.getenv("XIAOYOU_WS_URL"):
-            data["ws_url"] = os.getenv("XIAOYOU_WS_URL", "")
-        if os.getenv("XIAOYOU_ACCESS_TOKEN"):
-            data["access_token"] = os.getenv("XIAOYOU_ACCESS_TOKEN", "")
+        if os.getenv("AUTARKIA_HTTP_BASE_URL"):
+            data["http_base_url"] = os.getenv("AUTARKIA_HTTP_BASE_URL", "")
+        if os.getenv("AUTARKIA_WS_URL"):
+            data["ws_url"] = os.getenv("AUTARKIA_WS_URL", "")
+        if os.getenv("AUTARKIA_ACCESS_TOKEN"):
+            data["access_token"] = os.getenv("AUTARKIA_ACCESS_TOKEN", "")
         if os.getenv("TELEGRAM_MASTER_USER_ID"):
             data["master_user_id"] = os.getenv("TELEGRAM_MASTER_USER_ID", "").strip()
         if os.getenv("TELEGRAM_PROXY_URL"):
@@ -270,13 +271,76 @@ def get_telegram_adapter_settings() -> TelegramAdapterSettings:
 
 # ==================== 多 QQ 适配器配置 ====================
 
+# 改名兼容：multi_qq_config.json / 环境变量里的 xiaoyou_* 旧键自动迁移为 autarkia_*
+_LEGACY_ADAPTER_KEYS = {
+    "xiaoyou_ws_url": "autarkia_ws_url",
+    "xiaoyou_http_base_url": "autarkia_http_base_url",
+    "xiaoyou_access_token": "autarkia_access_token",
+}
+
+
+def _migrate_legacy_adapter_role(role_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """单个角色配置的旧键迁移；新键已有值时仅丢弃旧键。"""
+    migrated = dict(role_cfg)
+    for old_key, new_key in _LEGACY_ADAPTER_KEYS.items():
+        if old_key not in migrated:
+            continue
+        legacy_val = migrated.pop(old_key)
+        if not migrated.get(new_key):
+            migrated[new_key] = legacy_val
+    return migrated
+
+
+def _migrate_legacy_multi_qq_file(raw: Dict[str, Any], json_path: Path) -> Dict[str, Any]:
+    """multi_qq_config.json 内旧版 xiaoyou_* 键迁移为 autarkia_*，发生变化时原子写回。"""
+    migrated = {
+        role_id: _migrate_legacy_adapter_role(rc) if isinstance(rc, dict) else rc
+        for role_id, rc in raw.items()
+    }
+    if migrated == raw:
+        return raw
+    # 临时文件带 pid，避免多进程同时迁移时互相覆盖同一份 .tmp
+    tmp_path = json_path.with_name(f".{json_path.name}.{os.getpid()}.tmp")
+    try:
+        from core.utils.logger import get_logger
+
+        with open(tmp_path, "w", encoding="utf-8") as wf:
+            json.dump(migrated, wf, ensure_ascii=False, indent=2)
+        # Windows 上其它进程/线程可能正以不带 FILE_SHARE_DELETE 的方式读该文件，
+        # 此时 os.replace 会返回 WinError 5；短退避重试几次，仍失败才降级为警告。
+        for attempt in range(5):
+            try:
+                tmp_path.replace(json_path)
+                break
+            except OSError:
+                if attempt == 4:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
+        get_logger("config.multi_qq").info(
+            "multi_qq_config.json 已从 xiaoyou_* 键迁移为 autarkia_*"
+        )
+    except Exception as write_err:
+        from core.utils.logger import get_logger
+
+        get_logger("config.multi_qq").warning(
+            "multi_qq_config.json 键名迁移写回失败（本次会话仍按新键读取）: %s", write_err
+        )
+    finally:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+    return migrated
+
+
 class MultiQQRoleConfig(BaseSettings):
     """单个 QQ 角色的配置。"""
 
     role_id: str = Field(default="", description="角色 ID（aveline/ling 等）")
     role_name: str = Field(default="", description="角色显示名称")
     napcat_ws_url: str = Field(default="", description="NapCat WebSocket 地址")
-    xiaoyou_ws_url: str = Field(
+    autarkia_ws_url: str = Field(
         default="ws://127.0.0.1:8000/api/v1/ws", description="Autarkia WS 地址"
     )
     master_qq_id: str = Field(default="", description="主人 QQ 号")
@@ -328,6 +392,7 @@ def get_multi_qq_config() -> MultiQQConfig:
                 with open(json_path, "r", encoding="utf-8") as f:
                     raw = json.load(f) or {}
                     if isinstance(raw, dict):
+                        raw = _migrate_legacy_multi_qq_file(raw, json_path)
                         for role_id, role_cfg in raw.items():
                             if not isinstance(role_cfg, dict):
                                 continue
@@ -341,13 +406,26 @@ def get_multi_qq_config() -> MultiQQConfig:
                 )
 
         # 环境变量覆盖（保持与 multi_qq_adapter.py 原逻辑一致）
-        master_qq_id = os.getenv("XIAOYOU_QQ_MASTER_ID", "").strip()
-        xiaoyou_access_token = os.getenv("XIAOYOU_ACCESS_TOKEN", "").strip()
+        # 环境变量覆盖（保持与 multi_qq_adapter.py 原逻辑一致；改名前 XIAOYOU_* 旧变量名继续兼容）
+        master_qq_id = (
+            os.getenv("AUTARKIA_QQ_MASTER_ID") or os.getenv("XIAOYOU_QQ_MASTER_ID") or ""
+        ).strip()
+        autarkia_access_token = (
+            os.getenv("AUTARKIA_ACCESS_TOKEN") or os.getenv("XIAOYOU_ACCESS_TOKEN") or ""
+        ).strip()
         napcat_access_token = os.getenv("NAPCAT_ACCESS_TOKEN", "").strip()
-        group_id = os.getenv("XIAOYOU_QQ_GROUP_ID", "").strip()
-        # 向后兼容:aveline/ling 用旧 env var 名
-        aveline_qq = os.getenv("XIAOYOU_QQ_BOT_NUMBER", "").strip()
-        ling_qq = os.getenv("XIAOYOU_QQ_BOT_NUMBER_LING", "").strip()
+        group_id = (
+            os.getenv("AUTARKIA_QQ_GROUP_ID") or os.getenv("XIAOYOU_QQ_GROUP_ID") or ""
+        ).strip()
+        # aveline/ling 用 BOT_NUMBER env
+        aveline_qq = (
+            os.getenv("AUTARKIA_QQ_BOT_NUMBER") or os.getenv("XIAOYOU_QQ_BOT_NUMBER") or ""
+        ).strip()
+        ling_qq = (
+            os.getenv("AUTARKIA_QQ_BOT_NUMBER_LING")
+            or os.getenv("XIAOYOU_QQ_BOT_NUMBER_LING")
+            or ""
+        ).strip()
 
         # N 角色通用:收集所有角色的 QQ 号(从 env var)
         role_qq_from_env = {
@@ -355,10 +433,16 @@ def get_multi_qq_config() -> MultiQQConfig:
             "ling": ling_qq,
         }
         for env_key, env_val in os.environ.items():
-            if env_key.startswith("XIAOYOU_QQ_BOT_NUMBER_"):
-                role_suffix = env_key[len("XIAOYOU_QQ_BOT_NUMBER_"):].lower()
-                if role_suffix and env_val.strip():
-                    role_qq_from_env[role_suffix] = env_val.strip()
+            # 改名兼容：AUTARKIA_QQ_BOT_NUMBER_* 优先，旧 XIAOYOU_QQ_BOT_NUMBER_* 继续生效
+            legacy_match = env_key.startswith("XIAOYOU_QQ_BOT_NUMBER_")
+            if not env_key.startswith("AUTARKIA_QQ_BOT_NUMBER_") and not legacy_match:
+                continue
+            prefix_len = (
+                len("XIAOYOU_QQ_BOT_NUMBER_") if legacy_match else len("AUTARKIA_QQ_BOT_NUMBER_")
+            )
+            role_suffix = env_key[prefix_len:].lower()
+            if role_suffix and env_val.strip():
+                role_qq_from_env[role_suffix] = env_val.strip()
 
         for role_id, role_cfg in roles_data.items():
             if master_qq_id and not role_cfg.get("master_qq_id"):
@@ -367,8 +451,8 @@ def get_multi_qq_config() -> MultiQQConfig:
                 role_cfg["group_id"] = group_id
             # access_token 字段不在 MultiQQRoleConfig 里，但保留在 dict 中
             # 以便向后兼容 QQAdapterConfig.from_dict 的调用方式
-            if xiaoyou_access_token and not role_cfg.get("xiaoyou_access_token"):
-                role_cfg["xiaoyou_access_token"] = xiaoyou_access_token
+            if autarkia_access_token and not role_cfg.get("autarkia_access_token"):
+                role_cfg["autarkia_access_token"] = autarkia_access_token
             if napcat_access_token and not role_cfg.get("napcat_access_token"):
                 role_cfg["napcat_access_token"] = napcat_access_token
             # peer_qq_id 自动填充:取第一个其他角色的 own QQ(向后兼容原双角色逻辑)

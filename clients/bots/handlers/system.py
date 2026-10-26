@@ -62,7 +62,7 @@ class SystemHandler(BaseHandler):
             cfg = getattr(self.adapter, "cfg", None)
             base_url = ""
             if cfg is not None:
-                base_url = getattr(cfg, "xiaoyou_http_base_url", "") or ""
+                base_url = getattr(cfg, "autarkia_http_base_url", "") or ""
             if not base_url:
                 base_url = "http://127.0.0.1:8000"
 

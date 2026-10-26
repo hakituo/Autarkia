@@ -26,7 +26,11 @@ const ACTIVITY_LABEL: Record<string, string> = {
   unknown: '—',
 };
 
-export const FocusMonitorPanel: React.FC = () => {
+export const FocusMonitorPanel: React.FC<{
+  /** 从学习计划「开始专注」带过来的事项名与预计时长。 */
+  prefill?: { subject: string; minutes: number } | null;
+  onPrefillConsumed?: () => void;
+}> = ({ prefill, onPrefillConsumed }) => {
   const fs = useFocusSession();
   const [subject, setSubject] = useState('');
   const [planned, setPlanned] = useState(25);
@@ -37,6 +41,14 @@ export const FocusMonitorPanel: React.FC = () => {
   useEffect(() => {
     fs.refreshCurrent();
   }, [fs.refreshCurrent]);
+
+  // 应用计划带过来的预填值（仅在一次进入时生效）
+  useEffect(() => {
+    if (!prefill) return;
+    setSubject(prefill.subject);
+    setPlanned(Math.max(1, Math.min(180, Math.round(prefill.minutes) || 25)));
+    onPrefillConsumed?.();
+  }, [prefill, onPrefillConsumed]);
 
   // 摄像头监控接入：把端侧观察喂给会话 hook
   const cam = useCameraMonitor({

@@ -197,9 +197,32 @@ class ChatHistoryStore:
         dt: Any,
         label_info: Dict[str, Any],
         storage_scope: str,
+        idempotency_key: str = "",
     ) -> Dict[str, Any]:
-        """构造一条待落盘事件；逐条与批量路径共用，保证两者结构完全一致。"""
-        return {
+        """构造一条待落盘事件；逐条与批量路径共用，保证两者结构完全一致。
+
+        除历史字段外，这里补齐 v3 规范化字段（幂等键、客户端节点、拓扑状态、
+        内容门控）。补齐失败只影响新字段，不影响原 append 语义。
+        """
+        cleaned_metadata = metadata if isinstance(metadata, dict) else {}
+        # 客户端消息树关系在落盘这一层统一继承：只有当前这一轮的 user/assistant
+        # 才拿得到 branch context（判据见 message_branch.request_branch_fields），
+        # 导入器、主动消息等没有上下文来源的写入不受影响。
+        try:
+            from core.agents.chat_agent_components.message_branch import (
+                request_branch_fields,
+            )
+
+            # 思考记录与本轮回复同属一个节点：按 assistant 取树字段（v3 D2）
+            branch_role = str(role or "")
+            if branch_role.lower() == "system" and str(event_type or "") == "chat_thought":
+                branch_role = "assistant"
+            branch_fields = request_branch_fields(branch_role, str(message_id or ""))
+            if branch_fields:
+                cleaned_metadata = {**cleaned_metadata, **branch_fields}
+        except Exception:  # noqa: BLE001 - 分支字段是增强，失败不影响落盘
+            pass
+        payload = {
             "event_id": uuid.uuid4().hex,
             "conversation_id": str(conversation_id or "default"),
             "message_id": str(message_id or ""),
@@ -208,10 +231,26 @@ class ChatHistoryStore:
             "content": str(content or ""),
             "timestamp": float(dt.timestamp()),
             "created_at": dt.strftime("%Y-%m-%d %H:%M:%S"),
-            "metadata": metadata if isinstance(metadata, dict) else {},
+            "metadata": cleaned_metadata,
             "readable_title": str(label_info.get("readable_title") or ""),
             "storage_scope": storage_scope,
         }
+        explicit_key = str(idempotency_key or "").strip()
+        if explicit_key:
+            payload["idempotency_key"] = explicit_key
+        try:
+            from memory.topology.events import enrich_payload
+
+            payload.update(
+                enrich_payload(
+                    payload,
+                    storage_scope=storage_scope,
+                    recorded_at=float(dt.timestamp()),
+                )
+            )
+        except Exception:  # noqa: BLE001 - 拓扑字段是增强，失败不阻断落盘
+            pass
+        return payload
 
     def _day_file_for(
         self,
@@ -231,47 +270,101 @@ class ChatHistoryStore:
             lane_dir = lane_dir / str(segment)
         return day_dir, lane_dir, lane_dir / f"{safe_cid}.jsonl"
 
-    def _write_event_group(self, group: Dict[str, Any]) -> None:
+    def _write_event_group(self, group: Dict[str, Any]) -> list[tuple[int, Dict[str, Any]]]:
         """把一个文件组内的事件一次写完，并只更新一次当天索引与派生索引。
 
         与逐条路径的差别只在「合并次数」：JSONL 仍然追加写、当天 index.json 仍然
         按同一规则重写、派生索引仍然走 append_events，所以落盘结果与逐条完全一致。
+        重投事件按 ``idempotency_key`` 在写前拦下，返回已存在记录的引用。
         """
         lane_dir: Path = group["lane_dir"]
         file_path: Path = group["file_path"]
         base_dir: Path = group["base_dir"]
         payloads: list[Dict[str, Any]] = group["payloads"]
+        indices: list[int] = group["indices"]
 
-        lane_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            size_before = file_path.stat().st_size
-        except OSError:
-            size_before = 0
-        with open(file_path, "a", encoding="utf-8") as f:
-            f.write(
-                "\n".join(
-                    json.dumps(payload, ensure_ascii=False) for payload in payloads
+        from core.services.chat_history_idempotency import get_idempotency_guard
+
+        accepted, duplicates = get_idempotency_guard().reserve(file_path, payloads)
+        # 重投事件不参与线性附着：它们的 head 必须仍是文件里真实存在的节点。
+        duplicate_indices = set(duplicates)
+        accepted_by_index = {
+            offset: payload
+            for offset, payload in enumerate(payloads)
+            if offset not in duplicate_indices
+        }
+        if accepted_by_index:
+            from memory.topology.linear import attach_linear_parent, get_linear_head_tracker
+
+            tracker = get_linear_head_tracker()
+            for offset in sorted(accepted_by_index):
+                payload = accepted_by_index[offset]
+                try:
+                    attach_linear_parent(
+                        payload,
+                        file_path=file_path,
+                        platform=str(payload.get("platform") or ""),
+                        tracker=tracker,
+                    )
+                except Exception:  # noqa: BLE001 - 附着失败退化为 unknown，不阻断落盘
+                    pass
+                node_id = str(payload.get("client_node_id") or "").strip()
+                if node_id:
+                    tracker.advance(file_path, node_id)
+
+        accepted_list = [accepted_by_index[offset] for offset in sorted(accepted_by_index)]
+        if accepted_list:
+            lane_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                size_before = file_path.stat().st_size
+            except OSError:
+                size_before = 0
+            with open(file_path, "a", encoding="utf-8") as f:
+                f.write(
+                    "\n".join(
+                        json.dumps(payload, ensure_ascii=False) for payload in accepted_list
+                    )
+                    + "\n"
                 )
-                + "\n"
+            self._update_day_index_for_file(
+                group["day_dir"],
+                base_dir,
+                file_path,
+                conversation_id=accepted_list[0]["conversation_id"],
+                readable_title=accepted_list[0]["readable_title"],
             )
-        self._update_day_index_for_file(
-            group["day_dir"],
-            base_dir,
-            file_path,
-            conversation_id=payloads[0]["conversation_id"],
-            readable_title=payloads[0]["readable_title"],
-        )
-        try:
-            size_after = file_path.stat().st_size
-        except OSError:
-            size_after = size_before
-        self._sync_index_after_append(
-            base_dir,
-            payloads,
-            group["rel_path"],
-            expected_bytes=size_before,
-            synced_bytes=size_after,
-        )
+            try:
+                size_after = file_path.stat().st_size
+            except OSError:
+                size_after = size_before
+            self._sync_index_after_append(
+                base_dir,
+                accepted_list,
+                group["rel_path"],
+                expected_bytes=size_before,
+                synced_bytes=size_after,
+            )
+            _sync_topology_tree(accepted_list)
+
+        refs: list[tuple[int, Dict[str, Any]]] = []
+        for offset, payload in enumerate(payloads):
+            duplicate_of = duplicates.get(offset)
+            refs.append(
+                (
+                    indices[offset],
+                    {
+                        "event_id": duplicate_of or payload["event_id"],
+                        "relative_path": group["rel_path"],
+                        "mirror_relative_path": group["rel_path"],
+                        "timestamp": payload["timestamp"],
+                        "role": payload["role"],
+                        "conversation_id": payload["conversation_id"],
+                        "storage_scope": payload.get("storage_scope") or "",
+                        "deduplicated": duplicate_of is not None,
+                    },
+                )
+            )
+        return refs
 
     def append_event(
         self,
@@ -283,6 +376,7 @@ class ChatHistoryStore:
         event_type: str = "message",
         metadata: Optional[Dict[str, Any]] = None,
         now_dt=None,
+        idempotency_key: str = "",
     ) -> Dict[str, Any]:
         return self.append_events(
             [
@@ -294,6 +388,7 @@ class ChatHistoryStore:
                     "event_type": event_type,
                     "metadata": metadata,
                     "now_dt": now_dt,
+                    "idempotency_key": idempotency_key,
                 }
             ]
         )[0]
@@ -302,7 +397,9 @@ class ChatHistoryStore:
         """批量追加事件；语义与逐条 append_event 完全一致，但把落盘与索引操作按文件合并。
 
         每项事件接受与 ``append_event`` 相同的键：``conversation_id`` / ``role`` /
-        ``content`` / ``message_id`` / ``event_type`` / ``metadata`` / ``now_dt``。
+        ``content`` / ``message_id`` / ``event_type`` / ``metadata`` / ``now_dt`` /
+        ``idempotency_key``。显式幂等键用于导入器：同秒同文的真实历史消息不能被误去重，
+        重跑时又要按稳定的源记录键拦下重复。
         返回值与入参等长、顺序一致；被 debug/error 过滤掉的条目返回与逐条路径相同的
         ``filtered`` 结构（``relative_path`` 为空串）。
 
@@ -317,12 +414,13 @@ class ChatHistoryStore:
         if not events:
             return []
 
-        refs: list[Dict[str, Any]] = []
+        # 返回值保持与入参等长同序；实际写盘后按 index 回填引用
+        refs: list[Optional[Dict[str, Any]]] = [None] * len(events)
         # 按落盘文件归组；dict 保序，且同一文件内按入参顺序追加，行序与逐条一致
         groups: Dict[Path, Dict[str, Any]] = {}
         contexts: Dict[str, Dict[str, Any]] = {}
 
-        for event in events:
+        for position, event in enumerate(events):
             conversation_id = str(event.get("conversation_id") or "")
             role = event.get("role")
             content = str(event.get("content") or "")
@@ -332,17 +430,15 @@ class ChatHistoryStore:
                 get_logger("ChatHistoryStore").info(
                     f"Filtered out debug/error message from chat history store: {content[:100]}"
                 )
-                refs.append(
-                    {
-                        "event_id": "filtered",
-                        "relative_path": "",
-                        "mirror_relative_path": "",
-                        "timestamp": 0.0,
-                        "role": role,
-                        "conversation_id": event.get("conversation_id"),
-                        "storage_scope": "filtered",
-                    }
-                )
+                refs[position] = {
+                    "event_id": "filtered",
+                    "relative_path": "",
+                    "mirror_relative_path": "",
+                    "timestamp": 0.0,
+                    "role": role,
+                    "conversation_id": event.get("conversation_id"),
+                    "storage_scope": "filtered",
+                }
                 continue
 
             # 标签与 scope 只跟会话有关，同一批里按会话缓存，省掉逐条重复解析
@@ -375,6 +471,7 @@ class ChatHistoryStore:
                 dt=dt,
                 label_info=context["label_info"],
                 storage_scope=context["storage_scope"],
+                idempotency_key=str(event.get("idempotency_key") or ""),
             )
             rel_path = file_path.relative_to(context["base_dir"]).as_posix()
 
@@ -387,26 +484,18 @@ class ChatHistoryStore:
                     "base_dir": context["base_dir"],
                     "rel_path": rel_path,
                     "payloads": [],
+                    "indices": [],
                 }
                 groups[file_path] = group
             group["payloads"].append(payload)
-            refs.append(
-                {
-                    "event_id": payload["event_id"],
-                    "relative_path": rel_path,
-                    "mirror_relative_path": rel_path,
-                    "timestamp": payload["timestamp"],
-                    "role": payload["role"],
-                    "conversation_id": payload["conversation_id"],
-                    "storage_scope": context["storage_scope"],
-                }
-            )
+            group["indices"].append(position)
 
         with _LOCK:
             for group in groups.values():
-                self._write_event_group(group)
+                for index, ref in self._write_event_group(group):
+                    refs[index] = ref
 
-        return refs
+        return [ref for ref in refs if ref is not None]
 
     def rebuild_readable_mirrors(self) -> Dict[str, int]:
         return {"copied": 0, "skipped": 0}
@@ -433,6 +522,14 @@ class ChatHistoryStore:
                         day_dir = base_dir / rel_parts[0] / rel_parts[1] / rel_parts[2]
                         try:
                             file_path.unlink()
+                            from core.services.chat_history_idempotency import (
+                                get_idempotency_guard,
+                            )
+                            from memory.topology.linear import get_linear_head_tracker
+
+                            get_idempotency_guard().forget(file_path)
+                            get_linear_head_tracker().forget(file_path)
+                            _sync_topology_tree([], deleted_conversation=conversation_id)
                             removed += 1
                             matched_days.add(day_dir)
                         except Exception:
@@ -885,6 +982,27 @@ class ChatHistoryStore:
                     items.append(payload)
         except Exception:
             return
+
+
+def _sync_topology_tree(
+    payloads: Sequence[Dict[str, Any]], *, deleted_conversation: str = ""
+) -> None:
+    """落盘后把新事件增量挂到常驻消息树；会话删除时丢弃该树（失败不影响写入）。"""
+    try:
+        from memory.topology.tree_registry import get_tree_registry
+
+        registry = get_tree_registry()
+        if deleted_conversation:
+            registry.forget(deleted_conversation)
+        else:
+            registry.on_append(payloads)
+            from memory.topology.cursors import advance_cursors
+
+            advance_cursors(payloads)  # 分支游标推进到最新节点（E10）
+    except Exception as exc:  # noqa: BLE001
+        from core.utils.logger import get_logger
+
+        get_logger("ChatHistoryStore").debug(f"消息树增量更新失败: {exc}")
 
 
 def get_chat_history_store() -> ChatHistoryStore:

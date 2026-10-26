@@ -147,7 +147,7 @@ def _check_android_static_contract(problems: list[str]) -> None:
         / "presentation"
         / "study"
     )
-    model_text = (study_dir / "StudyViewModel.kt").read_text(encoding="utf-8")
+    model_text = (study_dir / "StudyVocabularyModels.kt").read_text(encoding="utf-8")
     manager_text = (study_dir / "StudyVocabReviewManager.kt").read_text(
         encoding="utf-8"
     )

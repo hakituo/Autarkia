@@ -11,8 +11,8 @@ from clients.bots.handlers.base import BaseHandler
 from clients.bots.qq.settings import (
     STT_TIMEOUT_SECONDS,
     VISION_TIMEOUT_SECONDS,
-    XIAOYOU_ACCESS_TOKEN,
-    XIAOYOU_HTTP_BASE_URL,
+    AUTARKIA_ACCESS_TOKEN,
+    AUTARKIA_HTTP_BASE_URL,
     logger,
 )
 
@@ -322,10 +322,10 @@ class MediaHandler(BaseHandler):
                 t0 = time.time()
                 session = await self.adapter._get_http_session()
                 headers = {}
-                if XIAOYOU_ACCESS_TOKEN:
-                    headers["Authorization"] = f"Bearer {XIAOYOU_ACCESS_TOKEN}"
+                if AUTARKIA_ACCESS_TOKEN:
+                    headers["Authorization"] = f"Bearer {AUTARKIA_ACCESS_TOKEN}"
 
-                url_full = XIAOYOU_HTTP_BASE_URL.rstrip("/") + "/api/v1/stt?model_size=base"
+                url_full = AUTARKIA_HTTP_BASE_URL.rstrip("/") + "/api/v1/stt?model_size=base"
                 req_timeout = aiohttp.ClientTimeout(total=max(1.0, float(STT_TIMEOUT_SECONDS)))
                 async with session.post(url_full, data=form_data, headers=headers, timeout=req_timeout) as stt_resp:
                     status = stt_resp.status

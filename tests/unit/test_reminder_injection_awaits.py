@@ -125,9 +125,7 @@ async def test_handle_due_reminder_awaits_set_pending_reminder(monkeypatch):
         "core.services.active_care.shared.tuning",
         fake_constants,
     )
-    monkeypatch.setattr(
-        handler_module, "get_reminder_injection_store", lambda: fake_store
-    )
+    monkeypatch.setattr(handler_module, "get_reminder_injection_store", lambda: fake_store)
     # 隔离角色睡眠/活动查询：单元测试不依赖真实生命模拟的持久化状态，
     # 否则 aveline 若处于 night_awake 会被主动刷新为 sleeping，导致走推迟路径而非注入路径
     monkeypatch.setattr(
@@ -202,9 +200,7 @@ async def test_stream_chat_impl_awaits_peek_then_clear(monkeypatch):
             "recent_chat_summary": "用户刚刚在聊数学作业",
         }
     )
-    monkeypatch.setattr(
-        reminder_module, "get_reminder_injection_store", lambda: fake_store
-    )
+    monkeypatch.setattr(reminder_module, "get_reminder_injection_store", lambda: fake_store)
 
     async def fake_detect_sensitive_mode(*args, **kwargs):
         return False
@@ -242,12 +238,8 @@ async def test_stream_chat_impl_awaits_peek_then_clear(monkeypatch):
         "infer_soft_reply_limit",
         lambda *args, **kwargs: None,
     )
-    monkeypatch.setattr(
-        context_persona_module, "detect_cloud_mode", lambda *args, **kwargs: False
-    )
-    monkeypatch.setattr(
-        streaming_module.ParallelProcessor, "process_all", fake_process_all
-    )
+    monkeypatch.setattr(context_persona_module, "detect_cloud_mode", lambda *args, **kwargs: False)
+    monkeypatch.setattr(streaming_module.ParallelProcessor, "process_all", fake_process_all)
     monkeypatch.setattr(
         streaming_module.ParallelProcessor,
         "extract_life_stats",

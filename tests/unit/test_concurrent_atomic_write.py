@@ -6,6 +6,7 @@ active_care 服务等）会并发写入同一个 proactive_state.json。旧实�
 固定 .tmp 临时文件名，一个实例替换走 .tmp 后另一个实例 os.replace 报
 WinError 2。修复后使用 _generate_temp_path 生成线程+进程唯一的临时文件名。
 """
+
 import asyncio
 import os
 import sys
@@ -59,8 +60,9 @@ async def test_concurrent_writes_via_multiple_storage_instances(tmp_path):
         # 直接调用底层写入接口，绕过 runtime_scope 解析
         await storage._write_json_file(state_file, {"writer": key, "data": "x" * 100})
 
-    tasks = [_save(storage_a, f"A-{i}") for i in range(10)] + \
-            [_save(storage_b, f"B-{i}") for i in range(10)]
+    tasks = [_save(storage_a, f"A-{i}") for i in range(10)] + [
+        _save(storage_b, f"B-{i}") for i in range(10)
+    ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     failures = [r for r in results if isinstance(r, Exception)]

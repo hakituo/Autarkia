@@ -192,9 +192,7 @@ def test_cache_key_normalizes_text_by_default(monkeypatch, temp_dir):
 def test_cache_key_uses_provider_from_engine_settings(monkeypatch, temp_dir):
     connector = _make(monkeypatch, temp_dir)
     connector.new_engine = type("E", (), {"settings": object()})()
-    monkeypatch.setattr(
-        tm, "get_config", lambda *a, **kw: type("C", (), {"provider": "volcano"})()
-    )
+    monkeypatch.setattr(tm, "get_config", lambda *a, **kw: type("C", (), {"provider": "volcano"})())
 
     with_provider = connector._generate_cache_key("你好")
     monkeypatch.setattr(tm, "get_config", lambda *a, **kw: type("C", (), {"provider": None})())

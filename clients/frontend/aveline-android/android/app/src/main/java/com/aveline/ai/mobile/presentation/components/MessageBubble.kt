@@ -36,11 +36,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
@@ -52,7 +50,10 @@ import android.content.Context
 import com.aveline.ai.mobile.data.local.preferences.AppPreferences
 import com.aveline.ai.mobile.domain.models.ChatAttachment
 import com.aveline.ai.mobile.presentation.study.NotesMarkdownRenderer
-import com.aveline.ai.mobile.presentation.utils.EmotionResolver
+import com.aveline.ai.mobile.presentation.theme.AvelineTextStyles
+import com.aveline.ai.mobile.presentation.theme.EmotionPalette
+import com.aveline.ai.mobile.presentation.theme.Line
+import com.aveline.ai.mobile.presentation.theme.SurfaceHigh
 import com.aveline.ai.mobile.utils.CoilImageModel
 import com.aveline.ai.mobile.utils.ImageUrlResolver
 import com.aveline.ai.mobile.utils.text.ReplySegment
@@ -138,6 +139,8 @@ fun MessageBubble(
     /** 点击气泡时回调，用于切换该条消息的操作栏（复制 / 重新生成 / 更多…）显隐。 */
     onToggleActions: (() -> Unit)? = null,
     onMediaClick: ((MediaPreview) -> Unit)? = null,
+    /** 设置页「动作描写」开关；false 时括号按普通正文显示，不再渲染成居中旁白。 */
+    stageDirectionEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val isUser = message.isUser
@@ -153,7 +156,8 @@ fun MessageBubble(
     } else {
         ReplySegmenter.segment(
             text = cleanedText,
-            forceStageDirection = message.messageType == MessageType.RETRACTION
+            forceStageDirection = message.messageType == MessageType.RETRACTION,
+            stageDirectionEnabled = stageDirectionEnabled
         )
     }
     if (!isUser && segments.size == 1 && segments[0].isStageDirection) {
@@ -164,7 +168,7 @@ fun MessageBubble(
     // 用 message.id 作为 key,避免 LazyColumn 复用 item 时菜单/交互状态跨消息错乱
     val interactionSource = remember(message.id) { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val aiEmotionColor = EmotionResolver.getColorForEmotion(message.emotion ?: "neutral").copy(alpha = 0.15f)
+    val aiEmotionColor = EmotionPalette.of(message.emotion ?: "neutral").copy(alpha = 0.15f)
     
     // 按压缩放动画
     val scale by animateFloatAsState(
@@ -205,14 +209,14 @@ fun MessageBubble(
                     onToggleActions?.invoke()
                 },
             color = when (message.messageType) {
-                MessageType.USER -> Color(0x0CFFFFFF) // bg-white/5
+                MessageType.USER -> SurfaceHigh
                 // AI 正文采用 ChatGPT 式无气泡整行排版，Markdown 块可使用完整宽度。
                 MessageType.AI -> Color.Transparent
-                MessageType.SYSTEM -> Color(0x33000000)
+                MessageType.SYSTEM -> MaterialTheme.colorScheme.surface
                 MessageType.RETRACTION -> aiEmotionColor
             },
-            border = if (isUser || message.messageType == MessageType.SYSTEM) {
-                BorderStroke(1.dp, Color(0x1AFFFFFF))
+            border = if (message.messageType == MessageType.SYSTEM) {
+                BorderStroke(1.dp, Line)
             } else {
                 null
             },
@@ -288,10 +292,7 @@ fun MessageBubble(
                     if (isUser) {
                         Text(
                             text = AnnotatedString(cleanedText),
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                lineHeight = 22.sp,
-                                fontWeight = FontWeight.Normal
-                            ),
+                            style = AvelineTextStyles.message,
                             color = TextPrimary,
                             modifier = Modifier.semantics {
                                 contentDescription = "用户消息: $cleanedText"
@@ -315,7 +316,10 @@ fun MessageBubble(
                                 if (item.isStageDirection) {
                                     StageDirectionRow(text = segment)
                                 } else {
-                                    NotesMarkdownRenderer(text = segment)
+                                    NotesMarkdownRenderer(
+                                        text = segment,
+                                        bodyStyle = AvelineTextStyles.message
+                                    )
                                 }
                             }
                         }

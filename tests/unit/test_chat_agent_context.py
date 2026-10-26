@@ -135,9 +135,7 @@ def test_resolve_project_path_relative_joins_project_root(monkeypatch):
     import core.utils.common as common
 
     monkeypatch.setattr(common, "get_project_root", lambda: "D:/root")
-    assert ctx._resolve_project_path("models/a.gguf") == os.path.join(
-        "D:/root", "models/a.gguf"
-    )
+    assert ctx._resolve_project_path("models/a.gguf") == os.path.join("D:/root", "models/a.gguf")
 
 
 def test_resolve_project_path_falls_back_to_cwd_on_error(monkeypatch):
@@ -197,7 +195,9 @@ def test_score_sentence_numeric_and_date_and_keywords():
 
 
 def test_score_sentence_long_text_bonus_only():
-    assert ctx._score_sentence("这是一句没有任何关键词但足够长的普通描述文本", "assistant") == pytest.approx(0.5)
+    assert ctx._score_sentence(
+        "这是一句没有任何关键词但足够长的普通描述文本", "assistant"
+    ) == pytest.approx(0.5)
 
 
 # --------------------------------------------------------------------------- #
@@ -258,7 +258,9 @@ def test_heuristic_compress_min_max_chars_is_200():
 def test_schedule_compress_llm_returns_early_when_already_loaded(reset_llm_state, monkeypatch):
     monkeypatch.setattr(ctx, "_context_compress_llm", object())
     called = {"n": 0}
-    monkeypatch.setattr(ctx, "_resolve_project_path", lambda p: called.__setitem__("n", called["n"] + 1) or p)
+    monkeypatch.setattr(
+        ctx, "_resolve_project_path", lambda p: called.__setitem__("n", called["n"] + 1) or p
+    )
     asyncio.run(ctx._schedule_context_compress_llm_load("m.gguf"))
     assert called["n"] == 0
 
@@ -266,7 +268,9 @@ def test_schedule_compress_llm_returns_early_when_already_loaded(reset_llm_state
 def test_schedule_compress_llm_returns_early_when_task_pending(reset_llm_state, monkeypatch):
     monkeypatch.setattr(ctx, "_context_compress_llm_task", object())
     called = {"n": 0}
-    monkeypatch.setattr(ctx, "_resolve_project_path", lambda p: called.__setitem__("n", called["n"] + 1) or p)
+    monkeypatch.setattr(
+        ctx, "_resolve_project_path", lambda p: called.__setitem__("n", called["n"] + 1) or p
+    )
     asyncio.run(ctx._schedule_context_compress_llm_load("m.gguf"))
     assert called["n"] == 0
 
@@ -274,7 +278,9 @@ def test_schedule_compress_llm_returns_early_when_task_pending(reset_llm_state, 
 def test_schedule_compress_llm_respects_failed_backoff(reset_llm_state, monkeypatch):
     monkeypatch.setattr(ctx, "_context_compress_load_failed_until", 1e12)
     called = {"n": 0}
-    monkeypatch.setattr(ctx, "_resolve_project_path", lambda p: called.__setitem__("n", called["n"] + 1) or p)
+    monkeypatch.setattr(
+        ctx, "_resolve_project_path", lambda p: called.__setitem__("n", called["n"] + 1) or p
+    )
     asyncio.run(ctx._schedule_context_compress_llm_load("m.gguf"))
     assert called["n"] == 0
 
@@ -326,7 +332,9 @@ def test_schedule_compress_llm_loads_with_threads(reset_llm_state, monkeypatch, 
     assert ctx._context_compress_llm.kwargs["n_ctx"] == 768
 
 
-def test_schedule_compress_llm_type_error_falls_back_to_default(reset_llm_state, monkeypatch, tmp_path):
+def test_schedule_compress_llm_type_error_falls_back_to_default(
+    reset_llm_state, monkeypatch, tmp_path
+):
     model = tmp_path / "m.gguf"
     model.write_text("x")
     monkeypatch.setitem(sys.modules, "llama_cpp", _fake_llama_module("type_error"))
@@ -342,7 +350,9 @@ def test_schedule_compress_llm_type_error_falls_back_to_default(reset_llm_state,
     assert "n_threads" not in ctx._context_compress_llm.kwargs
 
 
-def test_schedule_compress_llm_generic_exception_sets_backoff(reset_llm_state, monkeypatch, tmp_path):
+def test_schedule_compress_llm_generic_exception_sets_backoff(
+    reset_llm_state, monkeypatch, tmp_path
+):
     model = tmp_path / "m.gguf"
     model.write_text("x")
     monkeypatch.setitem(sys.modules, "llama_cpp", _fake_llama_module("boom"))
@@ -421,7 +431,9 @@ def test_schedule_compress_llm_double_check_failed_backoff(reset_llm_state, monk
     assert ctx._context_compress_llm is None
 
 
-def test_schedule_compress_llm_cpu_count_failure_defaults_to_four(reset_llm_state, monkeypatch, tmp_path):
+def test_schedule_compress_llm_cpu_count_failure_defaults_to_four(
+    reset_llm_state, monkeypatch, tmp_path
+):
     model = tmp_path / "m.gguf"
     model.write_text("x")
     monkeypatch.setitem(sys.modules, "llama_cpp", _fake_llama_module("ok"))
@@ -447,9 +459,7 @@ def test_schedule_compress_llm_cpu_count_failure_defaults_to_four(reset_llm_stat
 # _compress_history_block
 # --------------------------------------------------------------------------- #
 def test_compress_history_block_empty_history():
-    out = asyncio.run(
-        ctx._compress_history_block([], 400, "m.gguf", 64, 1.0)
-    )
+    out = asyncio.run(ctx._compress_history_block([], 400, "m.gguf", 64, 1.0))
     assert out == ""
 
 
@@ -473,11 +483,16 @@ def test_compress_history_block_heuristic_when_llm_unavailable(reset_llm_state, 
 
 
 def test_compress_history_block_local_llm_success(reset_llm_state, monkeypatch):
-    payload = _chat_result(json.dumps({
-        "summary": "用户在聊生日",
-        "facts": ["生日 2026-09-23", "", "喜欢美式"],
-        "open_questions": ["要不要订蛋糕", "", "几个人"],
-    }, ensure_ascii=False))
+    payload = _chat_result(
+        json.dumps(
+            {
+                "summary": "用户在聊生日",
+                "facts": ["生日 2026-09-23", "", "喜欢美式"],
+                "open_questions": ["要不要订蛋糕", "", "几个人"],
+            },
+            ensure_ascii=False,
+        )
+    )
     fake = _FakeLocalLLM(payload)
     monkeypatch.setattr(ctx, "_context_compress_llm", fake)
 
@@ -497,7 +512,9 @@ def test_compress_history_block_local_llm_success(reset_llm_state, monkeypatch):
 
 
 def test_compress_history_block_local_llm_empty_out_falls_back(reset_llm_state, monkeypatch):
-    fake = _FakeLocalLLM(_chat_result(json.dumps({"summary": "", "facts": [], "open_questions": []})))
+    fake = _FakeLocalLLM(
+        _chat_result(json.dumps({"summary": "", "facts": [], "open_questions": []}))
+    )
     monkeypatch.setattr(ctx, "_context_compress_llm", fake)
     history = [{"role": "user", "content": "记住我住校。"}]
     out = asyncio.run(ctx._compress_history_block(history, 400, "m.gguf", 64, 1.0))
@@ -520,7 +537,9 @@ def test_compress_history_block_local_llm_raises_falls_back(reset_llm_state, mon
 
 def test_compress_history_block_local_llm_bad_result_shape(reset_llm_state, monkeypatch):
     """choices[0].message 为 None 时内容提取应被吞掉并降级。"""
-    monkeypatch.setattr(ctx, "_context_compress_llm", _FakeLocalLLM({"choices": [{"message": None}]}))
+    monkeypatch.setattr(
+        ctx, "_context_compress_llm", _FakeLocalLLM({"choices": [{"message": None}]})
+    )
     history = [{"role": "user", "content": "记住我过敏花生。"}]
     out = asyncio.run(ctx._compress_history_block(history, 400, "m.gguf", 64, 1.0))
     assert "花生" in out
@@ -538,11 +557,16 @@ def test_compress_history_block_api_model_success(monkeypatch):
     class _LLMModule:
         async def chat(self, **kwargs):
             self.kwargs = kwargs
-            return {"response": json.dumps({
-                "summary": "API 摘要",
-                "facts": ["事实1"],
-                "open_questions": ["问题1"],
-            }, ensure_ascii=False)}
+            return {
+                "response": json.dumps(
+                    {
+                        "summary": "API 摘要",
+                        "facts": ["事实1"],
+                        "open_questions": ["问题1"],
+                    },
+                    ensure_ascii=False,
+                )
+            }
 
     fake_module = _LLMModule()
     monkeypatch.setattr("core.llm.get_llm_module", lambda: fake_module)
@@ -622,7 +646,9 @@ def test_compress_history_block_api_model_non_cloud_prefix_skipped(monkeypatch):
 def test_compress_history_block_prompt_constant_is_used(reset_llm_state, monkeypatch):
     fake = _FakeLocalLLM(_chat_result(json.dumps({"summary": "s"})))
     monkeypatch.setattr(ctx, "_context_compress_llm", fake)
-    asyncio.run(ctx._compress_history_block([{"role": "user", "content": "x"}], 400, "m.gguf", 64, 1.0))
+    asyncio.run(
+        ctx._compress_history_block([{"role": "user", "content": "x"}], 400, "m.gguf", 64, 1.0)
+    )
     assert fake.calls[0]["messages"][0]["content"] == CONTEXT_COMPRESS_SYSTEM_PROMPT
 
 
@@ -632,7 +658,9 @@ def test_compress_history_block_prompt_constant_is_used(reset_llm_state, monkeyp
 def test_schedule_rag_rewrite_returns_early_when_loaded(reset_llm_state, monkeypatch):
     monkeypatch.setattr(ctx, "_rag_rewrite_llm", object())
     called = {"n": 0}
-    monkeypatch.setattr(ctx, "_resolve_project_path", lambda p: called.__setitem__("n", called["n"] + 1) or p)
+    monkeypatch.setattr(
+        ctx, "_resolve_project_path", lambda p: called.__setitem__("n", called["n"] + 1) or p
+    )
     asyncio.run(ctx._schedule_rag_rewrite_llm_load("m.gguf"))
     assert called["n"] == 0
 
@@ -640,7 +668,9 @@ def test_schedule_rag_rewrite_returns_early_when_loaded(reset_llm_state, monkeyp
 def test_schedule_rag_rewrite_returns_early_when_task_pending(reset_llm_state, monkeypatch):
     monkeypatch.setattr(ctx, "_rag_rewrite_llm_task", object())
     called = {"n": 0}
-    monkeypatch.setattr(ctx, "_resolve_project_path", lambda p: called.__setitem__("n", called["n"] + 1) or p)
+    monkeypatch.setattr(
+        ctx, "_resolve_project_path", lambda p: called.__setitem__("n", called["n"] + 1) or p
+    )
     asyncio.run(ctx._schedule_rag_rewrite_llm_load("m.gguf"))
     assert called["n"] == 0
 
@@ -648,7 +678,9 @@ def test_schedule_rag_rewrite_returns_early_when_task_pending(reset_llm_state, m
 def test_schedule_rag_rewrite_respects_backoff(reset_llm_state, monkeypatch):
     monkeypatch.setattr(ctx, "_rag_rewrite_load_failed_until", 1e12)
     called = {"n": 0}
-    monkeypatch.setattr(ctx, "_resolve_project_path", lambda p: called.__setitem__("n", called["n"] + 1) or p)
+    monkeypatch.setattr(
+        ctx, "_resolve_project_path", lambda p: called.__setitem__("n", called["n"] + 1) or p
+    )
     asyncio.run(ctx._schedule_rag_rewrite_llm_load("m.gguf"))
     assert called["n"] == 0
 
@@ -715,7 +747,9 @@ def test_schedule_rag_rewrite_type_error_falls_back(reset_llm_state, monkeypatch
     assert "n_threads" not in ctx._rag_rewrite_llm.kwargs
 
 
-def test_schedule_rag_rewrite_generic_exception_sets_backoff(reset_llm_state, monkeypatch, tmp_path):
+def test_schedule_rag_rewrite_generic_exception_sets_backoff(
+    reset_llm_state, monkeypatch, tmp_path
+):
     model = tmp_path / "r.gguf"
     model.write_text("x")
     monkeypatch.setitem(sys.modules, "llama_cpp", _fake_llama_module("boom"))
@@ -762,7 +796,9 @@ def test_schedule_rag_rewrite_double_check_failed_backoff(reset_llm_state, monke
     assert ctx._rag_rewrite_llm is None
 
 
-def test_schedule_rag_rewrite_cpu_count_failure_defaults_to_four(reset_llm_state, monkeypatch, tmp_path):
+def test_schedule_rag_rewrite_cpu_count_failure_defaults_to_four(
+    reset_llm_state, monkeypatch, tmp_path
+):
     model = tmp_path / "r.gguf"
     model.write_text("x")
     monkeypatch.setitem(sys.modules, "llama_cpp", _fake_llama_module("ok"))
@@ -960,7 +996,9 @@ def test_perform_context_summary_scope_filtering_includes_none_and_matching():
     for i in range(10):
         memories[i] = dict(memories[i], scopes=["local"] if i % 2 == 0 else ["cloud"])
     mm = _FakeMM(memories)
-    asyncio.run(ctx.perform_context_summary(SimpleNamespace(summary_llm=None), "u1", mm, scope="local"))
+    asyncio.run(
+        ctx.perform_context_summary(SimpleNamespace(summary_llm=None), "u1", mm, scope="local")
+    )
     assert len(mm.added) == 1
     assert mm.added[0]["scopes"] == ["local"]
 
@@ -996,7 +1034,9 @@ def deps(monkeypatch):
     async def _inject_thinking(memory_manager, messages):
         messages.append({"content": "thinking"})
 
-    async def _apply_local_budget(history, messages, user_message, active_tools, compress_history_fn):
+    async def _apply_local_budget(
+        history, messages, user_message, active_tools, compress_history_fn
+    ):
         captured["compress_fn"] = compress_history_fn
         messages.append({"content": "budget"})
         return history, user_message
@@ -1099,9 +1139,7 @@ def test_build_history_uses_async_memory_manager(deps):
 
 def test_build_history_active_tools_override_skips_prepare(deps):
     agent = _Agent()
-    asyncio.run(
-        ctx.build_conversation_history(agent, "u1", "你好", active_tools_override=["only"])
-    )
+    asyncio.run(ctx.build_conversation_history(agent, "u1", "你好", active_tools_override=["only"]))
     assert "prepare_tools" not in deps
     assert deps["filter_kwargs"]["tool_names"] if False else True
     assert deps["build_kwargs"]["active_tools"] == ["only"]
@@ -1113,16 +1151,12 @@ def test_build_history_system_prompt_override_skips_persona_resolve(deps):
         ctx.build_conversation_history(agent, "u1", "你好", system_prompt_override="  覆盖人设  ")
     )
     assert "persona_kwargs" not in deps
-    assert deps["scope_kwargs"]["messages"] == [
-        {"role": "system", "content": "覆盖人设"}
-    ]
+    assert deps["scope_kwargs"]["messages"] == [{"role": "system", "content": "覆盖人设"}]
 
 
 def test_build_history_blank_system_prompt_override_falls_through(deps):
     agent = _Agent()
-    asyncio.run(
-        ctx.build_conversation_history(agent, "u1", "你好", system_prompt_override="   ")
-    )
+    asyncio.run(ctx.build_conversation_history(agent, "u1", "你好", system_prompt_override="   "))
     assert deps["persona_kwargs"]["message"] == "你好"
 
 
@@ -1195,9 +1229,7 @@ def test_build_history_study_mode_from_agent(deps):
 
 
 def test_build_history_study_mode_from_classify_category(deps, monkeypatch):
-    monkeypatch.setattr(
-        "memory.core.taxonomy.classify_category", lambda text: "learning"
-    )
+    monkeypatch.setattr("memory.core.taxonomy.classify_category", lambda text: "learning")
     agent = _Agent(study=False)
     asyncio.run(ctx.build_conversation_history(agent, "u1", "背单词"))
     assert deps["fetch_kwargs"]["is_study_mode"] is True
@@ -1320,9 +1352,7 @@ def test_build_history_slow_path_logs_timings(deps, monkeypatch):
 
 def test_build_history_scope_override_passed_through(deps):
     agent = _Agent()
-    asyncio.run(
-        ctx.build_conversation_history(agent, "u1", "你好", scope_override="study")
-    )
+    asyncio.run(ctx.build_conversation_history(agent, "u1", "你好", scope_override="study"))
     assert deps["scope_kwargs"]["scope_override"] == "study"
 
 

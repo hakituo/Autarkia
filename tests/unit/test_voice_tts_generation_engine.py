@@ -107,9 +107,7 @@ class _Mgr:
 def env(monkeypatch, tmp_path):
     root = tmp_path / "root"
     root.mkdir()
-    env = types.SimpleNamespace(
-        root=root, tmp=tmp_path, mgr=_Mgr(), mp=monkeypatch, log=_Logger()
-    )
+    env = types.SimpleNamespace(root=root, tmp=tmp_path, mgr=_Mgr(), mp=monkeypatch, log=_Logger())
     monkeypatch.setattr(tg, "_project_root", lambda: str(root))
     monkeypatch.setattr(tg, "_project_root_path", lambda: root)
     monkeypatch.setattr(tg, "_tts_prompt_text_cache", {})
@@ -131,6 +129,7 @@ def _use_manager(env, mgr, rm=None, rm_exc=None):
 
     env.mp.setattr(cv, "get_tts_manager", _get)
     if rm_exc is not None:
+
         def _boom():
             raise rm_exc
 

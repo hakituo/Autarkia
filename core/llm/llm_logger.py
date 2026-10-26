@@ -5,6 +5,7 @@
 - API 调用统计（消息数量、字符数、模型名）
 - 完整 prompt 日志（受 log_full_prompt 配置控制）
 - API 调用追踪（调用次数、来源、调用栈）
+- 每次调用的 token 用量（输入 / 缓存命中 / 输出）与缓存命中率
 - Active Care prompt 摘要
 
 所有 LLM 客户端（OpenAI兼容、SiliconFlow、本地等）统一调用此模块，
@@ -56,6 +57,25 @@ def _is_api_call_log_enabled() -> bool:
         return is_debug_enabled("api_call_log")
     except Exception:
         return False
+
+
+def _first_int(mapping: Any, keys: Tuple[str, ...]) -> Optional[int]:
+    """按顺序取第一个可转 int 的字段；缺失或非法时返回 None。
+
+    不同 provider 对同一语义的字段名不一致（OpenAI 用 prompt/completion，
+    DashScope 原生格式用 input/output），这里统一兼容。
+    """
+    if not isinstance(mapping, dict):
+        return None
+    for key in keys:
+        value = mapping.get(key)
+        if value is None or value == "":
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            continue
+    return None
 
 
 def log_llm_call_stats(
@@ -347,7 +367,17 @@ def log_prompt_cache_usage(
 
     rate, level, level_name = classify_cache_hit_rate(hit, miss)
     total = hit + miss
-    prompt_tokens = usage.get("prompt_tokens")
+
+    # 输入 / 输出 token：completion 与 reasoning 是 2026-10-22 起才写入的新字段，
+    # 历史记录没有，聚合侧按 None 处理（只统计 prompt 侧）。
+    prompt_tokens = _first_int(usage, ("prompt_tokens", "input_tokens"))
+    completion_tokens = _first_int(usage, ("completion_tokens", "output_tokens"))
+    reasoning_tokens = _first_int(
+        usage.get("completion_tokens_details") or {}, ("reasoning_tokens",)
+    )
+    total_tokens = _first_int(usage, ("total_tokens",))
+    if total_tokens is None and (prompt_tokens is not None or completion_tokens is not None):
+        total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
 
     record = {
         "timestamp": now_iso(),
@@ -360,6 +390,9 @@ def log_prompt_cache_usage(
         "cache_write_tokens": write_tokens,
         "total_cache_tokens": total,
         "prompt_tokens": prompt_tokens if prompt_tokens is not None else total,
+        "completion_tokens": completion_tokens,
+        "reasoning_tokens": reasoning_tokens,
+        "total_tokens": total_tokens,
         "hit_rate": round(rate, 4) if rate is not None else None,
         "level": level,
         "level_name": level_name,
@@ -380,6 +413,10 @@ def log_prompt_cache_usage(
             "[PromptCache] key_id=%s source=%s provider=%s model=%s hit=%d miss=%d rate=%.1f%% level=%s(%s)",
             key_id, source, provider, model, hit, miss, rate * 100, level, level_name,
         )
+
+
+# 语义别名：该函数除缓存命中率外还记录输入/输出 token，新代码建议用这个名字。
+log_llm_usage = log_prompt_cache_usage
 
 
 def log_context_build(

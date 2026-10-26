@@ -1,7 +1,7 @@
 package com.aveline.ai.mobile.presentation.chat
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,7 +25,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -162,15 +161,18 @@ fun ChatScreen(
     val memoryViewModel: MemoryViewModel = hiltViewModel()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
 
-    // 伴侣详情的"正在查看角色"跟随当前聊天会话：进哪个角色的聊天，详情就显示哪个角色。
-    // 纯只读推送，不切对话人设（切人设仍由发消息触发）。
+    // 伴侣详情的"正在查看角色"跟随当前聊天会话（纯只读，不切对话人设）。
+    // 这里同时承担伴侣详情**预加载**：聊天时就把状态 / 记忆拉齐，打开面板直接渲染。
     val viewingPersona by viewModel.viewingProfileFilename.collectAsStateWithLifecycle()
     LaunchedEffect(viewingPersona, uiState.currentSession?.id) {
-        // 记忆面板的「聊天记录树」跟随当前会话；切换会话时 ViewModel 内部会取消旧订阅。
+        // 聊天记录树跟随当前会话；切换会话时 ViewModel 内部会取消旧订阅。
         memoryViewModel.setViewingSession(uiState.currentSession?.id)
-        viewingPersona?.let { fn ->
+        val fn = viewingPersona
+        if (fn != null) {
             memoryViewModel.setViewingPersona(fn)
             statusViewModel.setControlContext(fn, uiState.currentSession?.id)
+        } else {
+            memoryViewModel.ensureLoaded() // 深链无 persona 时兜底首屏
         }
     }
 
@@ -218,9 +220,9 @@ fun ChatScreen(
     )
 
     // 屏幕宽度（px）与手势判定参数：方向锁定后直接驱动面板位移，松手时再按速度吸附。
-    val screenWidthPx = with(density) {
-        LocalConfiguration.current.screenWidthDp.dp.toPx()
-    }
+    // 注意：宽度必须在根容器里按**实际占用宽度**取（见下方 BoxWithConstraints），
+    // 平板双栏时聊天页只占右半边，用整屏宽度会把左侧保留区放大到无法起手。
+    //
     // 和 anchoredDraggable（全局侧边栏）共用系统 touchSlop。
     // 原来写死 16dp，约为侧边栏的两倍，起手要多滑一大段面板才开始动，
     // 主观上就是"侧边栏一碰就走、伴侣详情卡一下才跟手"。
@@ -230,8 +232,8 @@ fun ChatScreen(
     val openCompanionPanel: () -> Unit = {
         companionScope.launch {
             // 面板常驻在屏幕右侧隐藏锚点，点击头像时直接动画到可见位置。
+            // 状态已由上面的 LaunchedEffect 预加载，这里不再补发请求（面板自身会缓存优先刷新）。
             showCompanionPanel = true
-            statusViewModel.refreshStatus()
             companionPanelState.show()
         }
     }
@@ -262,11 +264,13 @@ fun ChatScreen(
     // 键盘弹出时把整个聊天页压到键盘之上（微信/QQ 行为）：
     // 页面可用高度缩小 → 顶部栏留在原位、消息列表缩短、底部输入栏自然贴在键盘上沿。
     // 消息列表内部会监听真实 viewport 高度并根据 followLatest 状态决定是否保持底部锚定。
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .imePadding()
     ) {
+        // 手势阈值用聊天页真实占用的宽度：手机上是整屏宽，平板双栏时是右半栏宽。
+        val screenWidthPx = with(density) { maxWidth.toPx() }
         // ========== 聊天界面（底层）==========
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0f),
@@ -309,6 +313,10 @@ fun ChatScreen(
                             viewModel.stopVoiceRecording()
                         } else {
                             if (viewModel.hasRecordAudioPermission()) {
+                                // 语音态会把输入区整块换掉：先收键盘和更多面板，免得悬空
+                                keyboardController?.hide()
+                                focusManager.clearFocus(force = true)
+                                showMorePanel = false
                                 viewModel.startVoiceRecording()
                             } else {
                                 mediaPickers.requestRecordAudioPermission()
@@ -316,15 +324,10 @@ fun ChatScreen(
                         }
                     },
                     onRemovePendingAttachment = { viewModel.removePendingAttachment(it) },
-                    onStopVoice = { viewModel.stopVoiceRecording() },
-                    onPickImages = {
-                        showMorePanel = false
-                        mediaPickers.pickImages()
-                    },
-                    onPickDocuments = {
-                        showMorePanel = false
-                        mediaPickers.pickDocuments()
-                    }
+                    onVoiceFinish = { viewModel.stopVoiceRecording() },
+                    onVoiceCancel = { viewModel.cancelVoiceRecording() },
+                    onPickImages = { showMorePanel = false; mediaPickers.pickImages() },
+                    onPickDocuments = { showMorePanel = false; mediaPickers.pickDocuments() }
                 )
             }
         ) { paddingValues ->
@@ -333,6 +336,8 @@ fun ChatScreen(
                 uiState = uiState,
                 displayName = activePersonaInfo.displayName,
                 forceFollowLatestRequest = forceFollowLatestRequest,
+                // 键盘可见性在 imePadding 之外读取，与本次键盘动画是同一份值。
+                imeVisible = currentImeHeightPx > 0,
                 horizontalContentGestureState = horizontalContentGestureState,
                 onEditMessage = { id, text ->
                     editingMessageId = id

@@ -413,7 +413,7 @@ class QQConnectionResolver:
         results: List[Dict[str, str]] = []
         try:
             # P2-2: 通过统一入口 get_multi_qq_raw_dict() 读取，避免脆弱的 parents[4] 路径计算
-            # get_multi_qq_config() 内部已应用 env var override（XIAOYOU_QQ_MASTER_ID 等）
+            # get_multi_qq_config() 内部已应用 env var override（AUTARKIA_QQ_MASTER_ID 等）
             # 局部导入：避免 config 包循环导入
             from config.settings_adapters import get_multi_qq_raw_dict
 
@@ -433,7 +433,7 @@ class QQConnectionResolver:
                     continue
                 master_qq = str(role_cfg.get("master_qq_id") or "").strip()
                 if not master_qq:
-                    master_qq = os.getenv("XIAOYOU_QQ_MASTER_ID", "").strip()
+                    master_qq = os.getenv("AUTARKIA_QQ_MASTER_ID", "").strip()
                 # 双QQ模式下 master_qq_id 可能为空（bot互聊场景），
                 # 用 role_id 作为兜底标识，确保连接不被跳过
                 if master_qq:
@@ -545,7 +545,7 @@ class QQConnectionResolver:
                 continue
             master_qq = str(role_cfg.get("master_qq_id") or "").strip()
             if not master_qq:
-                master_qq = os.getenv("XIAOYOU_QQ_MASTER_ID", "").strip()
+                master_qq = os.getenv("AUTARKIA_QQ_MASTER_ID", "").strip()
             if master_qq == qq_number:
                 persona_fn = str(role_cfg.get("profile_filename") or "").strip()
                 return persona_fn, str(role_id)

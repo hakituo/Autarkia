@@ -12,7 +12,7 @@
         "去睡了"过去时态也不触发强指令正则，保留 LLM 原始输出。
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_goodnight_postprocess_e2e
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_goodnight_postprocess_e2e
 """
 
 from __future__ import annotations

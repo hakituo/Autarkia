@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.aveline.ai.mobile.domain.models.ChatAttachment
 import com.aveline.ai.mobile.domain.models.ChatAttachmentKind
-import com.aveline.ai.mobile.presentation.theme.CardBorder
+import com.aveline.ai.mobile.presentation.theme.Line
 import com.aveline.ai.mobile.presentation.theme.Surface as SurfaceColor
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
@@ -54,7 +54,7 @@ fun PendingAttachmentsBar(
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = SurfaceColor,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Line)
                 ) {
                     Row(
                         modifier = Modifier.padding(start = 8.dp, top = 6.dp, bottom = 6.dp),

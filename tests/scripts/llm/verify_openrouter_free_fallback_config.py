@@ -39,7 +39,7 @@ def check() -> int:
         _out(f"[FAIL] {msg}")
 
     free = "cloud:openrouter:openrouter/free"
-    official_m3 = "cloud:minimax:MiniMax-M3"
+    official_m3 = "cloud:minimax:plan:MiniMax-M3"
     legacy_free_m3 = "cloud:openrouter:minimax/minimax-m3:free"
 
     # 1. yaml 里的 fallback_models 配置
@@ -71,6 +71,7 @@ def check() -> int:
             _fail(f"{name} 应返回 {want!r}，实际 {val!r}")
 
     # 3. 后台路由不得直连 :free 端点（各家可用不同正式 provider/key，但不许走免费聚合）
+    #    注意：2026-10-22 起后台主链全部走 cloud:minimax:plan:*，这里只校验不直连免费端点。
     from config.model_config import load_model_config
     from config.settings_model import PROVIDER_DEFAULT_MODELS
 

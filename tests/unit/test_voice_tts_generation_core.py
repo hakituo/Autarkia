@@ -66,8 +66,16 @@ class _Logger:
 class _Mgr:
     """假 TTS manager：可控 synthesize_bytes / synthesize 的返回与异常。"""
 
-    def __init__(self, bytes_result=None, bytes_exc=None, array_result=None,
-                 array_exc=None, last_error=None, engine=None, sample_rate=32000):
+    def __init__(
+        self,
+        bytes_result=None,
+        bytes_exc=None,
+        array_result=None,
+        array_exc=None,
+        last_error=None,
+        engine=None,
+        sample_rate=32000,
+    ):
         self.engine = engine if engine is not None else types.SimpleNamespace()
         self._bytes = _wav_bytes() if bytes_result is None else bytes_result
         self._bytes_exc = bytes_exc
@@ -109,9 +117,7 @@ class _FakeSf:
 def env(monkeypatch, tmp_path):
     root = tmp_path / "root"
     root.mkdir()
-    env = types.SimpleNamespace(
-        root=root, tmp=tmp_path, mgr=_Mgr(), mp=monkeypatch, log=_Logger()
-    )
+    env = types.SimpleNamespace(root=root, tmp=tmp_path, mgr=_Mgr(), mp=monkeypatch, log=_Logger())
     monkeypatch.setattr(tg, "_project_root", lambda: str(root))
     monkeypatch.setattr(tg, "_project_root_path", lambda: root)
     monkeypatch.setattr(tg, "_tts_prompt_text_cache", {})
@@ -201,9 +207,7 @@ async def test_pcm_fallback_converts_array_to_wav(env):
     assert _has(env, "静音") and _has(env, "过短")
 
 
-@pytest.mark.parametrize(
-    "engine_sr,mgr_sr,expected", [(44100, 32000, 44100), (None, 16000, 16000)]
-)
+@pytest.mark.parametrize("engine_sr,mgr_sr,expected", [(44100, 32000, 44100), (None, 16000, 16000)])
 async def test_pcm_fallback_sample_rate_source(env, engine_sr, mgr_sr, expected):
     """引擎自带 sample_rate 时优先用它，否则退回 manager 的。"""
     _use_sf(env)
@@ -251,7 +255,9 @@ async def test_second_synthesize_timeout_raises(env):
 
 async def test_synthesize_bytes_generic_error_falls_back_to_array(env):
     _use_sf(env)
-    _use_manager(env, _Mgr(bytes_exc=ValueError("bad"), array_result=np.full(8000, 0.5, dtype="float32")))
+    _use_manager(
+        env, _Mgr(bytes_exc=ValueError("bad"), array_result=np.full(8000, 0.5, dtype="float32"))
+    )
     got = await tg.generate_tts_with_async("你好", _params(env))
     assert got["sample_rate"] == 32000
     assert env.mgr.synth_calls  # 确实退到了第二次 synthesize

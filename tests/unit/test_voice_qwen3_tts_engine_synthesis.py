@@ -8,6 +8,7 @@
 小数组），``ThreadPoolExecutor`` 换成就地执行的替身；不下载权重、不使用 GPU、不发起
 网络请求，文件 IO 全部落在 ``tmp_path``。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -25,8 +26,9 @@ from core.voice.engines.qwen3_tts_engine import Qwen3TTSEngine
 
 # `soundfile` 属 voice 可选 extra（pyproject.toml），CI 只跑 `uv sync --extra dev` 不装它。
 # 缺依赖时整体跳过而不是失败（与 test_tts_manager_core.py 同口径）。
-sf = pytest.importorskip("soundfile", exc_type=ImportError,
-                         reason="soundfile 属 voice 可选 extra，CI 未安装")
+sf = pytest.importorskip(
+    "soundfile", exc_type=ImportError, reason="soundfile 属 voice 可选 extra，CI 未安装"
+)
 
 
 class _RecordingLogger:
@@ -41,10 +43,10 @@ class _RecordingLogger:
     def _bind(level):
         def _log(self, msg, *args, **kwargs):
             self.records.append((level, msg))
+
         return _log
 
-    debug, info, warning, error = (_bind("debug"), _bind("info"),
-                                   _bind("warning"), _bind("error"))
+    debug, info, warning, error = (_bind("debug"), _bind("info"), _bind("warning"), _bind("error"))
 
 
 class _SettingsStub:
@@ -93,8 +95,15 @@ class _FakeModel:
 class _RMStub:
     """资源管理器替身：可切换是否暴露 ``get_gpu_free_mb`` / ``monitor``。"""
 
-    def __init__(self, *, free_mb=None, monitor_usage=None, raise_exc=None,
-                 has_free_attr=True, has_monitor=True):
+    def __init__(
+        self,
+        *,
+        free_mb=None,
+        monitor_usage=None,
+        raise_exc=None,
+        has_free_attr=True,
+        has_monitor=True,
+    ):
         async def probe(value):
             if raise_exc is not None:
                 raise raise_exc
@@ -104,7 +113,8 @@ class _RMStub:
             self.get_gpu_free_mb = lambda: probe(free_mb)
         if has_monitor:
             self.monitor = types.SimpleNamespace(
-                get_gpu_memory_usage_async=lambda: probe(monitor_usage))
+                get_gpu_memory_usage_async=lambda: probe(monitor_usage)
+            )
 
 
 class _FakeTimer:
@@ -162,8 +172,9 @@ def _patch_do_synthesize(engine, monkeypatch, *, result=b"AUDIO", exc=None):
 
 def _patch_local_settings(monkeypatch, *, threshold=1000):
     """patch ``synthesize_bytes`` 内函数体局部 import 的源模块。"""
-    monkeypatch.setattr(cfg_mod, "get_settings",
-                        lambda: _SettingsStub(tts_vram_threshold_mb=threshold))
+    monkeypatch.setattr(
+        cfg_mod, "get_settings", lambda: _SettingsStub(tts_vram_threshold_mb=threshold)
+    )
 
 
 def _patch_local_rm(monkeypatch, rm):
@@ -172,8 +183,7 @@ def _patch_local_rm(monkeypatch, rm):
 
 def _wav_bytes(samples=240, sample_rate=24000, value=0.5):
     buf = io.BytesIO()
-    sf.write(buf, np.full(samples, value, dtype=np.float32), sample_rate,
-             format="WAV")
+    sf.write(buf, np.full(samples, value, dtype=np.float32), sample_rate, format="WAV")
     return buf.getvalue()
 
 
@@ -181,7 +191,7 @@ class TestSynthesizeBytesVramGuard:
     @pytest.fixture(autouse=True)
     def _env(self, engine, monkeypatch):
         _patch_local_settings(monkeypatch, threshold=1000)
-        engine._model = object()       # 非 None
+        engine._model = object()  # 非 None
         engine.current_device = "cpu"  # 触发预检
         engine._batch_max_size = 1
         return engine
@@ -190,24 +200,30 @@ class TestSynthesizeBytesVramGuard:
         calls = _patch_do_synthesize(engine, monkeypatch, result=b"OK")
         return await engine.synthesize_bytes("hi"), calls
 
-    @pytest.mark.parametrize("rm", [
-        None,                                              # 无资源管理器
-        _RMStub(free_mb=None),                             # 空闲显存探测失败
-        _RMStub(free_mb=2000),                             # 空闲显存充足
-        _RMStub(has_free_attr=False, monitor_usage=None),  # 走 monitor 但无数据
-        _RMStub(has_free_attr=False, monitor_usage=(1000, 8000)),
-    ])
+    @pytest.mark.parametrize(
+        "rm",
+        [
+            None,  # 无资源管理器
+            _RMStub(free_mb=None),  # 空闲显存探测失败
+            _RMStub(free_mb=2000),  # 空闲显存充足
+            _RMStub(has_free_attr=False, monitor_usage=None),  # 走 monitor 但无数据
+            _RMStub(has_free_attr=False, monitor_usage=(1000, 8000)),
+        ],
+    )
     async def test_vram_ok_proceeds(self, engine, monkeypatch, rm):
         _patch_local_rm(monkeypatch, rm)
         out, calls = await self._run(engine, monkeypatch)
         assert out == b"OK"
         assert calls == [("hi", {})]
 
-    @pytest.mark.parametrize("rm,message", [
-        (_RMStub(free_mb=500), "显存不足"),
-        (_RMStub(has_free_attr=False, monitor_usage=(9000, 9500)), "显存不足"),
-        (_RMStub(raise_exc=RuntimeError("probe failed")), "probe failed"),
-    ])
+    @pytest.mark.parametrize(
+        "rm,message",
+        [
+            (_RMStub(free_mb=500), "显存不足"),
+            (_RMStub(has_free_attr=False, monitor_usage=(9000, 9500)), "显存不足"),
+            (_RMStub(raise_exc=RuntimeError("probe failed")), "probe failed"),
+        ],
+    )
     async def test_vram_guard_raises(self, engine, monkeypatch, rm, message):
         _patch_local_rm(monkeypatch, rm)
         with pytest.raises(RuntimeError, match=message):
@@ -297,8 +313,7 @@ class TestProcessBatch:
     async def test_single_item_processed_directly(self, engine, monkeypatch):
         calls = _patch_do_synthesize(engine, monkeypatch, result=b"ONE")
         future = asyncio.get_running_loop().create_future()
-        engine._batch_queue = [
-            {"id": "a", "text": "t", "kwargs": {}, "future": future}]
+        engine._batch_queue = [{"id": "a", "text": "t", "kwargs": {}, "future": future}]
         engine._batch_timer = object()
         await engine._process_batch()
         assert await future == b"ONE"
@@ -332,4 +347,3 @@ class TestProcessBatch:
         bad_future = loop.create_future()
         await engine._process_single({"text": "t", "kwargs": {}, "future": bad_future})
         assert isinstance(bad_future.exception(), ValueError)
-

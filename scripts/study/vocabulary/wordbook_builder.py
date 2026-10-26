@@ -15,6 +15,12 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Iterable
 
+from scripts.study.vocabulary.qwerty_overlay import (
+    DEFAULT_OVERLAY_PATH as DEFAULT_QWERTY_OVERLAY_PATH,
+    filter_covered,
+    load_qwerty_translations,
+    normalize_translation,
+)
 from scripts.study.vocabulary.sense_ranking import (
     DEFAULT_SENSE_RANKINGS_PATH,
     load_sense_rankings,
@@ -105,6 +111,67 @@ def _normalize_pos(value: str) -> str:
     return "adj" if pos == "a" else pos
 
 
+def _explode_translations(
+    items: Iterable[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """把“临时解雇, 操作停止”这类合并行拆成单个义项，避免整行被误判覆盖。"""
+    result: list[dict[str, Any]] = []
+    for item in items:
+        domains = item.get("domains") or []
+        for part in re.split(r"[；;，,]", str(item.get("translation", ""))):
+            translation = part.strip()
+            if not translation:
+                continue
+            exploded: dict[str, Any] = {
+                "type": str(item.get("type", "")).strip(),
+                "translation": translation,
+            }
+            if domains:
+                exploded["domains"] = list(domains)
+            if item.get("primary"):
+                exploded["primary"] = True
+            result.append(exploded)
+    return _deduplicate_translations(result)
+
+
+def _enrich_translation_types(
+    items: Iterable[dict[str, Any]],
+    ecdict_items: Iterable[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """用 ECDICT 同义项的词性补全开源词书缺失的 type 字段。"""
+    type_map: dict[str, set[str]] = {}
+    for item in ecdict_items:
+        pos = str(item.get("type", "")).strip()
+        key = normalize_translation(item.get("translation", ""))
+        if pos and key:
+            type_map.setdefault(key, set()).add(pos)
+
+    result = [dict(item) for item in items]
+    for item in result:
+        if str(item.get("type", "")).strip():
+            continue
+        key = normalize_translation(item.get("translation", ""))
+        if not key:
+            continue
+        candidates = set(type_map.get(key, set()))
+        if not candidates:
+            for existing_key, types in type_map.items():
+                if (
+                    len(key) >= 2
+                    and len(existing_key) >= 2
+                    and (key in existing_key or existing_key in key)
+                ):
+                    candidates.update(types)
+        if not candidates:
+            # 整词只有一种词性时（如 basin 全是 n.），未匹配义项也按该词性展示
+            all_types = {pos for types in type_map.values() for pos in types}
+            if len(all_types) == 1:
+                candidates = all_types
+        if len(candidates) == 1:
+            item["type"] = next(iter(candidates))
+    return result
+
+
 def _deduplicate_translations(items: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     seen: set[tuple[str, str, tuple[str, ...]]] = set()
@@ -175,7 +242,15 @@ def parse_translations(
 
     # 只重排源词典中的普通义；专业义仍留在 extended，人工 override 最后接管。
     general = rank_translations_by_sense(general, sense_ranking)
+    return _apply_override(general, extended, override)
 
+
+def _apply_override(
+    general: list[dict[str, Any]],
+    extended: list[dict[str, Any]],
+    override: dict[str, Any] | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], bool]:
+    """应用人工 override；同一套规则同时服务 ECDICT 与 Qwerty 释义。"""
     override = override or {}
     primary_items = [
         {**item, "primary": True}
@@ -308,10 +383,27 @@ def _build_entry(
     enrichment: dict[str, Any],
     override: dict[str, Any] | None,
     sense_ranking: dict[str, list[dict[str, Any]]] | None = None,
+    qwerty_items: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], bool]:
     translations, extended, domain_only_fallback = parse_translations(
         row.get("translation", ""), override, sense_ranking
     )
+    if qwerty_items:
+        # 开源词书的策划释义作为主释义；ECDICT 义项退到折叠区，人工 override 最后接管。
+        ecdict_general, ecdict_extended, _ = parse_translations(
+            row.get("translation", "")
+        )
+        ecdict_items = _explode_translations(
+            _deduplicate_translations([*ecdict_general, *ecdict_extended])
+        )
+        translations = rank_translations_by_sense(
+            [dict(item) for item in qwerty_items], sense_ranking
+        )
+        translations = _enrich_translation_types(translations, ecdict_items)
+        extended = filter_covered(ecdict_items, translations)
+        translations, extended, domain_only_fallback = _apply_override(
+            translations, extended, override
+        )
     entry: dict[str, Any] = {
         "word": str(row.get("word", "")).strip(),
         "phonetic": str(row.get("phonetic", "")).strip(),
@@ -340,10 +432,12 @@ def build_wordbooks(
     overrides_path: Path = DEFAULT_OVERRIDES_PATH,
     progress_path: Path = DEFAULT_PROGRESS_PATH,
     sense_rankings_path: Path = DEFAULT_SENSE_RANKINGS_PATH,
+    qwerty_overlay_path: Path = DEFAULT_QWERTY_OVERLAY_PATH,
 ) -> tuple[OrderedDict[str, list[dict[str, Any]]], dict[str, Any]]:
     rows = load_ecdict_rows(ecdict_path)
     overrides = load_overrides(overrides_path)
     sense_rankings = load_sense_rankings(sense_rankings_path)
+    qwerty_overlay = load_qwerty_translations(qwerty_overlay_path)
     enrichment = load_enrichment(words_dir, sentence_dir)
     user_words = collect_user_words(words_dir, progress_path)
     row_words = {_clean_word(row.get("word")) for row in rows}
@@ -366,6 +460,7 @@ def build_wordbooks(
             enrichment.get(word, {}),
             overrides.get(word),
             sense_rankings.get(word),
+            qwerty_overlay.get(word),
         )
         entry_by_word[word] = entry
         domain_only_fallback_count += int(fallback)
@@ -389,6 +484,7 @@ def build_wordbooks(
         "extra_words": extra_words,
         "book_counts": {name: len(entries) for name, entries in books.items()},
         "sense_ranking_config_words": len(sense_rankings),
+        "qwerty_overlay_words": sum(1 for word in master_words if word in qwerty_overlay),
         "primary_words": sorted(
             entry["word"]
             for entry in master

@@ -37,7 +37,6 @@ data class MainUiState(
     val currentSessionId: String? = null,
     val connectionState: WebSocketManager.ConnectionState = WebSocketManager.ConnectionState.DISCONNECTED,
     val currentEmotion: String = "calm",
-    val emotionColors: List<String> = emptyList(),
     val manualEmotion: EmotionType? = null,
     val autoEmotion: Boolean = true,
     val isLoading: Boolean = false,
@@ -152,8 +151,7 @@ class MainViewModel @Inject constructor(
                     is WebSocketMessage.EmotionUpdate -> {
                         _uiState.update {
                             it.copy(
-                                currentEmotion = message.primary.ifBlank { it.currentEmotion },
-                                emotionColors = message.colors.filter { color -> color.isNotBlank() }
+                                currentEmotion = message.primary.ifBlank { it.currentEmotion }
                             )
                         }
                     }
@@ -205,11 +203,18 @@ class MainViewModel @Inject constructor(
     }
     
     /**
-     * 重连 WebSocket (如 App 从后台恢复时)
-     * Sends a reconnect message to sync server state.
+     * 回到前台时的连接同步。
+     *
+     * 已连接时只补发一条 reconnect 消息做状态同步，**不重建 socket**：
+     * 重建会让旧连接留在服务端（旧实现 forceReconnect 不关闭旧连接），
+     * 同一用户出现多条并发连接；弱网下还会把一次抖动放大成连续断连。
      */
     fun reconnect() {
-        webSocketManager.connect(forceReconnect = true)
+        if (webSocketManager.connectionState.value == WebSocketManager.ConnectionState.CONNECTED) {
+            webSocketManager.sendReconnect()
+        } else {
+            webSocketManager.connect()
+        }
     }
 
     /**

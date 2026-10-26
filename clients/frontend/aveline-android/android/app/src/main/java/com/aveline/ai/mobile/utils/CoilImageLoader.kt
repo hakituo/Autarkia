@@ -33,7 +33,10 @@ class CoilImageLoader @Inject constructor(
         // 磁盘缓存大小：100MB
         private const val DISK_CACHE_SIZE = 100L * 1024 * 1024
         
-        // 网络超时
+        // 连接超时短一些：后端不可达时快速落到错误占位，而不是让气泡一直转圈
+        private const val CONNECT_TIMEOUT_SECONDS = 8L
+
+        // 读写超时保留较长：表情包 GIF / 大图在后端刚启动时也要能下完
         private const val NETWORK_TIMEOUT_SECONDS = 30L
     }
     
@@ -59,7 +62,7 @@ class CoilImageLoader @Inject constructor(
             // 网络配置
             .okHttpClient {
                 okHttpClient.newBuilder()
-                    .connectTimeout(NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                     .readTimeout(NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                     .writeTimeout(NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                     .build()

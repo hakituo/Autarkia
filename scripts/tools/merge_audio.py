@@ -71,12 +71,12 @@ def merge_wav_files(input_files: List[str], output_file: str):
 if __name__ == "__main__":
     # 用户提供的文件列表
     files_to_merge = [
-        r"D:\projects\xiaoyou\output\voice\tts_qwen3_20260209_000052.wav",
-        r"D:\projects\xiaoyou\output\voice\tts_qwen3_20260209_000117.wav",
-        r"D:\projects\xiaoyou\output\voice\tts_qwen3_20260209_000129.wav",
-        r"D:\projects\xiaoyou\output\voice\tts_qwen3_20260209_000139.wav",
+        r"D:\AI\autarkia\output\voice\tts_qwen3_20260209_000052.wav",
+        r"D:\AI\autarkia\output\voice\tts_qwen3_20260209_000117.wav",
+        r"D:\AI\autarkia\output\voice\tts_qwen3_20260209_000129.wav",
+        r"D:\AI\autarkia\output\voice\tts_qwen3_20260209_000139.wav",
     ]
 
-    output_path = r"D:\projects\xiaoyou\output\voice\merged_qwen3_20260209.wav"
+    output_path = r"d:\AI\autarkia\output\voice\merged_qwen3_20260209.wav"
 
     merge_wav_files(files_to_merge, output_path)

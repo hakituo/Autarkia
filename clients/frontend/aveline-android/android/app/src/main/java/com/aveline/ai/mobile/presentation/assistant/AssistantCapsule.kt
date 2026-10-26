@@ -72,7 +72,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.aveline.ai.mobile.presentation.theme.CardBorder
+import com.aveline.ai.mobile.presentation.theme.Line
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 import kotlin.math.PI
@@ -222,7 +222,7 @@ private fun CapsuleBody(
                     ),
                     shape = shape
                 )
-                .border(width = 1.dp, color = CardBorder, shape = shape)
+                .border(width = 1.dp, color = Line, shape = shape)
                 // 手势必须挂在 padding 之前：放在 padding 之后会把可点-hotspot 缩到内容区，
                 // 胶囊两侧的圆角边缘点不到。
                 .pointerInput(Unit) {

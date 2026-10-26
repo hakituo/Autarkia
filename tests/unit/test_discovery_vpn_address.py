@@ -25,9 +25,7 @@ def _fake_interfaces(*entries: tuple[str, str, int]) -> dict:
     """把 ``(网卡名, 地址, family)`` 列表拼成 psutil.net_if_addrs() 的返回形状。"""
     interfaces: dict = {}
     for name, address, family in entries:
-        interfaces.setdefault(name, []).append(
-            SimpleNamespace(family=family, address=address)
-        )
+        interfaces.setdefault(name, []).append(SimpleNamespace(family=family, address=address))
     return interfaces
 
 
@@ -98,9 +96,7 @@ class TestFindVpnAddress:
         def _boom() -> dict:
             raise OSError("net_if_addrs 不可用")
 
-        monkeypatch.setattr(
-            "core.services.discovery.vpn_address.psutil.net_if_addrs", _boom
-        )
+        monkeypatch.setattr("core.services.discovery.vpn_address.psutil.net_if_addrs", _boom)
         assert find_vpn_address() is None
         assert list(iter_ipv4_addresses()) == []
 

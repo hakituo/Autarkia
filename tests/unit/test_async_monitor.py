@@ -36,6 +36,7 @@ from core.contracts import HealthStatus
 # 桩与代理
 # ============================================================
 
+
 def _capture_logger(monkeypatch, module):
     """替换模块 logger，返回收集到的 (level, text) 列表。"""
     records = []
@@ -162,8 +163,9 @@ class _AsyncioProxy:
         return getattr(asyncio, name)
 
 
-def _fake_torch(cuda_available=True, total_memory=1000, allocated=250,
-                props_exc=None, alloc_exc=None):
+def _fake_torch(
+    cuda_available=True, total_memory=1000, allocated=250, props_exc=None, alloc_exc=None
+):
     """构造假的 torch 模块，供 _collect_metrics 的显存近似分支使用。"""
     module = types.ModuleType("torch")
 
@@ -224,7 +226,9 @@ class _MonitorStub:
 
 def _block_import(monkeypatch, blocked_name):
     """让指定的模块名 import 失败，其余 import 正常。"""
-    real_import = __builtins__["__import__"] if isinstance(__builtins__, dict) else __builtins__.__import__
+    real_import = (
+        __builtins__["__import__"] if isinstance(__builtins__, dict) else __builtins__.__import__
+    )
 
     def _fake_import(name, *args, **kwargs):
         if name == blocked_name:
@@ -250,6 +254,7 @@ def monitor():
 # 构造与配置
 # ============================================================
 
+
 class TestInit:
     def test_defaults(self):
         mon = PerformanceMonitor()
@@ -260,7 +265,11 @@ class TestInit:
         assert mon.monitor_thread is None
         assert mon.app_metrics == {}
         assert set(mon.metrics_history) == {
-            "cpu_usage", "memory_usage", "gpu_usage", "async_tasks", "active_connections",
+            "cpu_usage",
+            "memory_usage",
+            "gpu_usage",
+            "async_tasks",
+            "active_connections",
         }
         assert all(len(v) == 0 for v in mon.metrics_history.values())
         assert mon.current_metrics["cpu_usage"] == 0.0
@@ -289,6 +298,7 @@ class TestInit:
 # ============================================================
 # GPU 惰性探测
 # ============================================================
+
 
 class TestLazyCheckGpu:
     def test_returns_early_when_already_checked(self, monitor, monkeypatch):
@@ -343,6 +353,7 @@ class TestLazyCheckGpu:
 # ============================================================
 # 启停与监控循环
 # ============================================================
+
 
 class TestStartStop:
     def test_start_skipped_when_disabled(self, monkeypatch):
@@ -419,9 +430,12 @@ class TestMonitorLoop:
                 monitor.stop_event.set()
 
         monkeypatch.setattr(monitor, "_collect_metrics", _collect)
-        monkeypatch.setattr(monitor, "_save_history", lambda: calls.__setitem__("save", calls["save"] + 1))
         monkeypatch.setattr(
-            monitor, "_check_health_thresholds",
+            monitor, "_save_history", lambda: calls.__setitem__("save", calls["save"] + 1)
+        )
+        monkeypatch.setattr(
+            monitor,
+            "_check_health_thresholds",
             lambda: calls.__setitem__("threshold", calls["threshold"] + 1),
         )
         records = _capture_logger(monkeypatch, am)
@@ -485,6 +499,7 @@ class TestMonitorLoop:
 # 指标采集
 # ============================================================
 
+
 class TestCollectMetrics:
     def _no_gpu(self, monitor, monkeypatch, **kwargs):
         """把 GPU 探测与事件循环都关掉，只测基础指标。"""
@@ -544,9 +559,7 @@ class TestCollectMetrics:
         """pynvml 不可用时退回 torch 显存占用近似：250 / 1000 * 100 = 25%。"""
         self._no_gpu(monitor, monkeypatch)
         monitor._torch_available = True
-        monkeypatch.setitem(
-            sys.modules, "torch", _fake_torch(total_memory=1000, allocated=250)
-        )
+        monkeypatch.setitem(sys.modules, "torch", _fake_torch(total_memory=1000, allocated=250))
 
         monitor._collect_metrics()
 
@@ -603,7 +616,8 @@ class TestCollectMetrics:
 
     def test_outer_failure_is_logged_not_raised(self, monitor, monkeypatch):
         monkeypatch.setattr(
-            monitor, "_lazy_check_gpu",
+            monitor,
+            "_lazy_check_gpu",
             lambda: (_ for _ in ()).throw(RuntimeError("探测就炸了")),
         )
         records = _capture_logger(monkeypatch, am)
@@ -616,6 +630,7 @@ class TestCollectMetrics:
 # ============================================================
 # 历史与阈值
 # ============================================================
+
 
 class TestSaveHistory:
     def test_appends_timestamped_points(self, monitor):
@@ -706,8 +721,9 @@ class TestCheckHealthThresholds:
         assert len(records) == 3
 
     def test_custom_thresholds_are_honoured(self, monkeypatch):
-        mon = PerformanceMonitor({"thresholds": {"cpu_usage": 5.0, "memory_usage": 5.0,
-                                                 "async_tasks": 1}})
+        mon = PerformanceMonitor(
+            {"thresholds": {"cpu_usage": 5.0, "memory_usage": 5.0, "async_tasks": 1}}
+        )
         mon.current_metrics = {"cpu_usage": 6.0, "memory_usage": 6.0, "async_tasks": 2}
         records = _capture_logger(monkeypatch, am)
 
@@ -771,7 +787,8 @@ class TestAppMetricsAndQuery:
         monkeypatch.setattr(am, "time", _TimeProxy(now=1000.0))
         monitor.current_metrics = {"timestamp": 0.0}
         monkeypatch.setattr(
-            monitor, "_collect_metrics",
+            monitor,
+            "_collect_metrics",
             lambda: (_ for _ in ()).throw(RuntimeError("主动采集失败")),
         )
 
@@ -837,6 +854,7 @@ class TestExportMetrics:
 # ============================================================
 # HealthChecker
 # ============================================================
+
 
 class TestRegisterHealthChecker:
     def test_registers_checker_and_status(self):
@@ -1027,6 +1045,7 @@ class TestHealthSummary:
 # 模块级单例与初始化
 # ============================================================
 
+
 class TestModuleSingletons:
     def test_get_performance_monitor_caches(self):
         first = am.get_performance_monitor()
@@ -1093,9 +1112,7 @@ class TestInitializeMonitoring:
     async def test_non_dict_thresholds_are_ignored(self, monkeypatch):
         monkeypatch.setattr(am, "threading", _ThreadingProxy())
 
-        await am.initialize_monitoring(
-            {"performance_monitor": {"thresholds": "not-a-dict"}}
-        )
+        await am.initialize_monitoring({"performance_monitor": {"thresholds": "not-a-dict"}})
 
         assert am._performance_monitor.config["thresholds"]["async_tasks"] == 1000
 
@@ -1128,9 +1145,7 @@ class TestInitializeMonitoring:
     async def test_settings_thresholds_are_applied(self, monkeypatch):
         monkeypatch.setattr(am, "threading", _ThreadingProxy())
         settings = types.SimpleNamespace(
-            monitor=types.SimpleNamespace(
-                cpu_threshold_high=77.0, memory_threshold_high=88.0
-            )
+            monitor=types.SimpleNamespace(cpu_threshold_high=77.0, memory_threshold_high=88.0)
         )
         fake_config = types.ModuleType("config.integrated_config")
         fake_config.get_settings = lambda: settings
@@ -1155,17 +1170,13 @@ class TestInitializeMonitoring:
     async def test_existing_thresholds_are_not_overwritten(self, monkeypatch):
         monkeypatch.setattr(am, "threading", _ThreadingProxy())
         settings = types.SimpleNamespace(
-            monitor=types.SimpleNamespace(
-                cpu_threshold_high=77.0, memory_threshold_high=88.0
-            )
+            monitor=types.SimpleNamespace(cpu_threshold_high=77.0, memory_threshold_high=88.0)
         )
         fake_config = types.ModuleType("config.integrated_config")
         fake_config.get_settings = lambda: settings
         monkeypatch.setitem(sys.modules, "config.integrated_config", fake_config)
 
-        await am.initialize_monitoring(
-            {"performance_monitor": {"thresholds": {"cpu_usage": 11.0}}}
-        )
+        await am.initialize_monitoring({"performance_monitor": {"thresholds": {"cpu_usage": 11.0}}})
 
         assert am._performance_monitor.config["thresholds"]["cpu_usage"] == 11.0
 
@@ -1209,6 +1220,7 @@ class TestShutdownMonitoring:
 # ============================================================
 # 请求中间件
 # ============================================================
+
 
 class _RequestStub:
     def __init__(self, path="/api/demo"):
@@ -1276,6 +1288,7 @@ class TestRequestPerformanceMiddleware:
 # ============================================================
 # 日志增强装饰器
 # ============================================================
+
 
 class TestEnhancedLogger:
     def test_async_function_uses_async_wrapper(self, monkeypatch):

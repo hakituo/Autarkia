@@ -34,6 +34,7 @@ import core.voice.stt_engine as m
 # 通用替身：日志 / 资源锁 / torch / 配置 / 引擎
 # ============================================================
 
+
 class _AcquireCM:
     """``get_resource_lock().acquire(name)`` 返回的异步上下文管理器替身。"""
 
@@ -78,9 +79,7 @@ def _fake_torch(*, cuda_available=False, cuda_raises=False):
             raise RuntimeError("CUDA 探测失败")
         return cuda_available
 
-    mod.cuda = types.SimpleNamespace(
-        is_available=_is_available, empty_cache=lambda: None
-    )
+    mod.cuda = types.SimpleNamespace(is_available=_is_available, empty_cache=lambda: None)
     return mod
 
 
@@ -105,6 +104,7 @@ def _fresh_exec():
 # ============================================================
 # 抽象基类 / Dummy
 # ============================================================
+
 
 class TestBaseEngine:
     """``STTEngine`` 基类与 ``DummySTTEngine``。"""
@@ -136,6 +136,7 @@ class TestBaseEngine:
 # ============================================================
 # import 期的可选依赖探测分支
 # ============================================================
+
 
 class TestImportTimeBranches:
     """模块顶部两组可选依赖探测的「命中 / 缺失」两种状态。"""
@@ -181,6 +182,7 @@ class TestImportTimeBranches:
 # HuggingFaceSTTEngine
 # ============================================================
 
+
 class _HFProcessorStub:
     """WhisperProcessor 替身：可调用、可解码、可生成 decoder prompt。"""
 
@@ -196,9 +198,7 @@ class _HFProcessorStub:
         return inst
 
     def __call__(self, y, sampling_rate=16000, return_tensors="pt"):
-        features = types.SimpleNamespace(
-            to=lambda device: types.SimpleNamespace(device=device)
-        )
+        features = types.SimpleNamespace(to=lambda device: types.SimpleNamespace(device=device))
         return types.SimpleNamespace(input_features=features)
 
     def get_decoder_prompt_ids(self, language=None, task=None):
@@ -239,8 +239,7 @@ class _HFModelStub:
         return [[11, 12, 13]]
 
 
-def _install_transformers(monkeypatch, *, processor=None, model=None,
-                          raise_load=False):
+def _install_transformers(monkeypatch, *, processor=None, model=None, raise_load=False):
     """注入假 transformers 模块。"""
     mod = types.ModuleType("transformers")
 
@@ -430,6 +429,7 @@ class TestHuggingFaceEngine:
 # FasterWhisperSTTEngine
 # ============================================================
 
+
 class _FWWhisperModelStub:
     """faster_whisper.WhisperModel 替身，同时支持加载与转写。"""
 
@@ -437,8 +437,7 @@ class _FWWhisperModelStub:
         self.ctor_args = args
         self.ctor_kwargs = kwargs
 
-    def transcribe(self, audio, beam_size=5, language="zh", vad_filter=True,
-                   vad_parameters=None):
+    def transcribe(self, audio, beam_size=5, language="zh", vad_filter=True, vad_parameters=None):
         segments = [types.SimpleNamespace(text=" 你好"), types.SimpleNamespace(text="世界 ")]
         return iter(segments), types.SimpleNamespace(language="zh")
 
@@ -449,6 +448,7 @@ def _install_faster_whisper(monkeypatch, *, raise_load=False, model_cls=None):
     if model_cls is not None:
         mod.WhisperModel = model_cls
     else:
+
         class _WhisperModel(_FWWhisperModelStub):
             def __init__(self, *args, **kwargs):
                 if raise_load:
@@ -465,9 +465,7 @@ def _install_missing_faster_whisper(monkeypatch):
     mod = types.ModuleType("faster_whisper")
 
     def _getattr(name):
-        raise ModuleNotFoundError(
-            "No module named 'faster_whisper'", name="faster_whisper"
-        )
+        raise ModuleNotFoundError("No module named 'faster_whisper'", name="faster_whisper")
 
     mod.__getattr__ = _getattr
     _install(monkeypatch, "faster_whisper", mod)
@@ -536,6 +534,7 @@ class TestFasterWhisperLoad:
         _install_faster_whisper(monkeypatch)
         _install(monkeypatch, "torch", _fake_torch(cuda_available=False))
         import core.utils.common as common_mod
+
         monkeypatch.setattr(common_mod, "get_project_root", lambda: tmp_path)
 
         engine = m.FasterWhisperSTTEngine(model_size="small", device="cpu")
@@ -554,6 +553,7 @@ class TestFasterWhisperLoad:
         target.mkdir(parents=True)
         (target / "model.bin").write_bytes(b"x")
         import core.utils.common as common_mod
+
         monkeypatch.setattr(common_mod, "get_project_root", lambda: tmp_path)
 
         engine = m.FasterWhisperSTTEngine(model_size="small", device="cpu")
@@ -565,6 +565,7 @@ class TestFasterWhisperLoad:
         _install_faster_whisper(monkeypatch)
         _install(monkeypatch, "torch", _fake_torch(cuda_available=True))
         import core.utils.common as common_mod
+
         monkeypatch.setattr(common_mod, "get_project_root", lambda: tmp_path)
 
         engine = m.FasterWhisperSTTEngine(model_size="small", device="cpu")
@@ -573,13 +574,12 @@ class TestFasterWhisperLoad:
 
         assert isinstance(engine.model, _FWWhisperModelStub)
 
-    def test_load_model_swallows_error_while_clearing_previous_model(
-        self, monkeypatch, tmp_path
-    ):
+    def test_load_model_swallows_error_while_clearing_previous_model(self, monkeypatch, tmp_path):
         _install_faster_whisper(monkeypatch)
         # torch 探测抛错 -> 清理旧模型时的内层 except 命中并 pass
         _install(monkeypatch, "torch", _fake_torch(cuda_raises=True))
         import core.utils.common as common_mod
+
         monkeypatch.setattr(common_mod, "get_project_root", lambda: tmp_path)
 
         engine = m.FasterWhisperSTTEngine(model_size="small", device="cpu")
@@ -592,11 +592,10 @@ class TestFasterWhisperLoad:
         _install_faster_whisper(monkeypatch)
         _install(monkeypatch, "torch", _fake_torch(cuda_available=False))
         import core.utils.common as common_mod
+
         monkeypatch.setattr(common_mod, "get_project_root", lambda: tmp_path)
 
-        engine = m.FasterWhisperSTTEngine(
-            model_size="small", device="cuda", compute_type="float16"
-        )
+        engine = m.FasterWhisperSTTEngine(model_size="small", device="cuda", compute_type="float16")
         asyncio.run(engine.initialize())
 
         assert engine.device == "cpu"
@@ -616,6 +615,7 @@ class TestFasterWhisperLoad:
         _install_faster_whisper(monkeypatch, raise_load=True)
         _install(monkeypatch, "torch", _fake_torch())
         import core.utils.common as common_mod
+
         monkeypatch.setattr(common_mod, "get_project_root", lambda: tmp_path)
 
         engine = m.FasterWhisperSTTEngine(model_size="small", device="cpu")
@@ -713,6 +713,7 @@ class TestFasterWhisperTranscribe:
         _install_faster_whisper(monkeypatch)
         _install(monkeypatch, "torch", _fake_torch(cuda_available=False))
         import core.utils.common as common_mod
+
         monkeypatch.setattr(common_mod, "get_project_root", lambda: tmp_path)
 
         class _Monitor:
@@ -789,6 +790,7 @@ class TestFasterWhisperLifecycle:
         _install_faster_whisper(monkeypatch)
         _install(monkeypatch, "torch", _fake_torch(cuda_available=False))
         import core.utils.common as common_mod
+
         monkeypatch.setattr(common_mod, "get_project_root", lambda: tmp_path)
 
         engine = m.FasterWhisperSTTEngine(device="cuda", compute_type="float16")
@@ -820,6 +822,7 @@ class TestFasterWhisperLifecycle:
         _install_faster_whisper(monkeypatch)
         _install(monkeypatch, "torch", _fake_torch(cuda_available=True))
         import core.utils.common as common_mod
+
         monkeypatch.setattr(common_mod, "get_project_root", lambda: tmp_path)
 
         engine = m.FasterWhisperSTTEngine(device="cpu")
@@ -832,6 +835,7 @@ class TestFasterWhisperLifecycle:
         _install_faster_whisper(monkeypatch, raise_load=True)
         _install(monkeypatch, "torch", _fake_torch(cuda_available=True))
         import core.utils.common as common_mod
+
         monkeypatch.setattr(common_mod, "get_project_root", lambda: tmp_path)
 
         engine = m.FasterWhisperSTTEngine(device="cpu")
@@ -845,8 +849,10 @@ class TestFasterWhisperLifecycle:
 # CloudSTTEngine
 # ============================================================
 
-def _make_aiohttp(*, status=200, json_payload=None, text_payload="",
-                  raise_post=False, raise_session=False):
+
+def _make_aiohttp(
+    *, status=200, json_payload=None, text_payload="", raise_post=False, raise_session=False
+):
     """构造替身 aiohttp 模块，返回 (模块, 会话列表)。"""
     sessions = []
     mod = types.ModuleType("aiohttp")
@@ -960,9 +966,7 @@ class TestCloudEngine:
         mod, sessions = _make_aiohttp(status=200, json_payload={"text": "hi"})
         _install(monkeypatch, "aiohttp", mod)
 
-        engine = m.CloudSTTEngine(
-            api_key="k", base_url="https://x/v1/audio/transcriptions"
-        )
+        engine = m.CloudSTTEngine(api_key="k", base_url="https://x/v1/audio/transcriptions")
         result = asyncio.run(engine.transcribe(b"audio"))
 
         assert result["language"] == "auto"
@@ -974,9 +978,7 @@ class TestCloudEngine:
         mod, _ = _make_aiohttp(status=429, text_payload="rate limited")
         _install(monkeypatch, "aiohttp", mod)
 
-        engine = m.CloudSTTEngine(
-            api_key="k", base_url="https://x/v1/audio/transcriptions"
-        )
+        engine = m.CloudSTTEngine(api_key="k", base_url="https://x/v1/audio/transcriptions")
         result = asyncio.run(engine.transcribe(b"audio"))
 
         assert result == {"text": "", "error": "API Error: 429"}
@@ -985,9 +987,7 @@ class TestCloudEngine:
         mod, _ = _make_aiohttp(raise_post=True)
         _install(monkeypatch, "aiohttp", mod)
 
-        engine = m.CloudSTTEngine(
-            api_key="k", base_url="https://x/v1/audio/transcriptions"
-        )
+        engine = m.CloudSTTEngine(api_key="k", base_url="https://x/v1/audio/transcriptions")
         result = asyncio.run(engine.transcribe(b"audio"))
 
         assert result["text"] == ""
@@ -997,9 +997,7 @@ class TestCloudEngine:
         mod, _ = _make_aiohttp(raise_session=True)
         _install(monkeypatch, "aiohttp", mod)
 
-        engine = m.CloudSTTEngine(
-            api_key="k", base_url="https://x/v1/audio/transcriptions"
-        )
+        engine = m.CloudSTTEngine(api_key="k", base_url="https://x/v1/audio/transcriptions")
         result = asyncio.run(engine.transcribe(b"audio"))
 
         assert result["text"] == ""
@@ -1009,6 +1007,7 @@ class TestCloudEngine:
 # ============================================================
 # STTManager
 # ============================================================
+
 
 class _STTConfigStub:
     def __init__(self, provider="local", model=None, base_url=None, api_key=None):
@@ -1074,14 +1073,19 @@ class _RMStub:
             raise RuntimeError("注册处理器失败")
 
 
-def _make_manager(monkeypatch, *, provider="local", model=None, base_url=None,
-                  api_key=None, stt_engine="faster_whisper"):
+def _make_manager(
+    monkeypatch,
+    *,
+    provider="local",
+    model=None,
+    base_url=None,
+    api_key=None,
+    stt_engine="faster_whisper",
+):
     monkeypatch.setattr(
         m,
         "get_settings",
-        lambda: _SettingsStub(
-            _STTConfigStub(provider, model, base_url, api_key), stt_engine
-        ),
+        lambda: _SettingsStub(_STTConfigStub(provider, model, base_url, api_key), stt_engine),
     )
     return m.STTManager()
 
@@ -1191,9 +1195,7 @@ class TestSTTManagerInitialize:
         record = []
         _patch_engines(monkeypatch, cloud=_engine_cls(record, "Cloud"))
 
-        manager = _make_manager(
-            monkeypatch, provider="local", stt_engine="siliconflow"
-        )
+        manager = _make_manager(monkeypatch, provider="local", stt_engine="siliconflow")
         asyncio.run(manager.initialize())
 
         assert type(manager.engine).__name__ == "Cloud"

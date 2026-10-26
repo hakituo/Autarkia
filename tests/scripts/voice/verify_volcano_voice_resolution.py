@@ -14,7 +14,7 @@
 
 本脚本校验修复后的行为，防止回归。
 
-运行：d:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe tests/scripts/voice/verify_volcano_voice_resolution.py
+运行：d:\\AI\\autarkia\\venv_core\\Scripts\\python.exe tests/scripts/voice/verify_volcano_voice_resolution.py
 """
 
 import os

@@ -48,9 +48,7 @@ def _write(path: Path, value) -> Path:
 
 
 def test_union_memory_merges_short_term_arrays_by_id():
-    mine = _dump(
-        [{"id": "a", "timestamp": 2, "content": "本地"}, {"id": "c", "timestamp": 5}]
-    )
+    mine = _dump([{"id": "a", "timestamp": 2, "content": "本地"}, {"id": "c", "timestamp": 5}])
     theirs = _dump(
         [
             {"id": "b", "timestamp": 1, "content": "对端"},

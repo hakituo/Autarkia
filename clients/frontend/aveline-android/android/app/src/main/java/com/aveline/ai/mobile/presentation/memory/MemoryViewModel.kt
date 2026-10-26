@@ -58,14 +58,30 @@ class MemoryViewModel @Inject constructor(
 
     private var conversationJob: Job? = null
 
-    init {
-        // 初始先用 null 加载一次（后端默认），随后由 ChatScreen 通过 setViewingPersona 注入
-        // 当前聊天对应的角色文件名，再按角色重新加载。
+    /** 首轮记忆列表 / 统计 / 标签是否已经拉过（避免按 null persona 白拉一轮）。 */
+    private var initialLoadStarted = false
+
+    /**
+     * 首次加载（幂等）。
+     *
+     * 以前在 init 里先按 null persona 拉一轮，等 ChatScreen 注入 persona 后再整轮重拉，
+     * 6 个请求里有一半是白发的。现在改成"谁先确定上下文谁触发"：
+     * - 聊天页进页时 [setViewingPersona] 直接带 persona 拉一次；
+     * - 深链只给 role 没给 persona 时，详情面板打开会调 [ensureLoaded] 兜底。
+     */
+    private fun loadAllForCurrentContext() {
+        initialLoadStarted = true
         viewModelScope.launch(Dispatchers.IO) {
             loadMemories()
             loadStats()
             loadTags()
         }
+    }
+
+    /** 兜底首轮加载：已经拉过就什么都不做。 */
+    fun ensureLoaded() {
+        if (initialLoadStarted) return
+        loadAllForCurrentContext()
     }
 
     /**
@@ -78,11 +94,7 @@ class MemoryViewModel @Inject constructor(
         Log.d(TAG, "查看角色 persona 文件名: $filename")
         // 地标与关系都是按角色算的，换角色必须作废旧结果
         graphCoordinator.reset()
-        viewModelScope.launch(Dispatchers.IO) {
-            loadMemories()
-            loadStats()
-            loadTags()
-        }
+        loadAllForCurrentContext()
     }
 
     /**

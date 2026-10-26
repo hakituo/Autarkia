@@ -4,7 +4,7 @@
 可选打开图片查看实际效果。
 
 用法：
-    d:\\AI\\xiaoyou-core\\venv_cpu\\Scripts\\python.exe tests\\scripts\\meme\\search_meme_interactive.py
+    d:\\AI\\autarkia\\venv_cpu\\Scripts\\python.exe tests\\scripts\\meme\\search_meme_interactive.py
 
 命令：
     直接输入文字 → 搜索

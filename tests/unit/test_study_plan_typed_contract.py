@@ -178,9 +178,7 @@ class TestIdFirstCrud(_RouteTestCase):
         )
         remove_resp = await self._call(
             journal,
-            lambda: remove_plan_item(
-                PlanItemRefRequest(date="2026-09-13", item_id="plan_b")
-            ),
+            lambda: remove_plan_item(PlanItemRefRequest(date="2026-09-13", item_id="plan_b")),
         )
         self.assertEqual(status_resp["status"], "success")
         self.assertEqual(remove_resp["status"], "success")

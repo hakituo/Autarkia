@@ -28,7 +28,8 @@ interface LocalMediaEntryPoint {
  * 1. 先同步查本地磁盘，命中直接返回 File —— 换后端后历史图片/视频仍能显示；
  * 2. 未命中时在后台把 [resolvedUrl] 下载到本地，同时组件先用远端地址正常加载，
  *    下载完成后自动切到本地文件（下次进入不再依赖网络）；
- * 3. data URI / content URI 不参与落盘，直接返回 null 让调用方走原逻辑。
+ * 3. data URI（后端表情包）key 对内容哈希，未命中时解码落盘、完成后自动切本地文件；
+ *    content URI / file URI 不参与落盘，直接返回 null 让调用方走原逻辑。
  *
  * @param rawUrl 后端下发的原始地址（相对路径），用于计算与后端无关的稳定 key
  * @param resolvedUrl 已按当前生效后端补全的绝对地址

@@ -1,5 +1,5 @@
-class XiaoyouError(Exception):
-    """Base exception for Xiaoyou Core"""
+class AutarkiaError(Exception):
+    """Base exception for Autarkia"""
 
     def __init__(
         self, message: str, code: str = "INTERNAL_ERROR", details: dict = None
@@ -9,28 +9,28 @@ class XiaoyouError(Exception):
         self.details = details or {}
 
 
-class ResourceError(XiaoyouError):
+class ResourceError(AutarkiaError):
     """Resource availability error (GPU, Memory)"""
 
     def __init__(self, message: str, details: dict = None):
         super().__init__(message, code="RESOURCE_ERROR", details=details)
 
 
-class ModelError(XiaoyouError):
+class ModelError(AutarkiaError):
     """Model execution error"""
 
     def __init__(self, message: str, details: dict = None):
         super().__init__(message, code="MODEL_ERROR", details=details)
 
 
-class ConfigError(XiaoyouError):
+class ConfigError(AutarkiaError):
     """Configuration error"""
 
     def __init__(self, message: str, details: dict = None):
         super().__init__(message, code="CONFIG_ERROR", details=details)
 
 
-class ServiceError(XiaoyouError):
+class ServiceError(AutarkiaError):
     """External service error"""
 
     def __init__(self, message: str, details: dict = None):

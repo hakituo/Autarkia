@@ -38,6 +38,7 @@ from multimodal.tts_manager import (
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def temp_dir():
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -53,16 +54,13 @@ def tts_cache_config(temp_dir):
         entry_ttl_sec=2,
         synthesis_timeout_sec=5,
         min_free_disk_mb=1,
-        normalize_text=True
+        normalize_text=True,
     )
 
 
 @pytest.fixture
 def manager(tts_cache_config, temp_dir, monkeypatch):
-    monkeypatch.setattr(
-        "multimodal.tts_manager.TTSCacheManager.TEMP_DIR",
-        temp_dir
-    )
+    monkeypatch.setattr("multimodal.tts_manager.TTSCacheManager.TEMP_DIR", temp_dir)
 
     mgr = TTSCacheManager(tts_cache_config)
     yield mgr
@@ -84,6 +82,7 @@ def _make_mock_engine(**overrides):
 # ============================================================================
 # 线程安全测试
 # ============================================================================
+
 
 def test_background_loop_thread_safety(manager):
     results = []
@@ -134,6 +133,7 @@ def test_cache_concurrent_access(manager):
 # Future 超时测试
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_future_timeout_mechanism(manager):
     cache_key = "timeout_test"
@@ -162,15 +162,13 @@ async def test_synthesis_timeout(manager):
     manager._initialized = True
 
     with pytest.raises((TTSTimeoutError, asyncio.TimeoutError)):
-        await asyncio.wait_for(
-            manager.async_text_to_speech("test", speed=1.0),
-            timeout=1.0
-        )
+        await asyncio.wait_for(manager.async_text_to_speech("test", speed=1.0), timeout=1.0)
 
 
 # ============================================================================
 # 缓存管理测试
 # ============================================================================
+
 
 def test_cache_key_generation(manager):
     key1 = manager._generate_cache_key("Hello  World")
@@ -225,6 +223,7 @@ def test_cache_expiration(manager):
 # 磁盘空间管理测试
 # ============================================================================
 
+
 def test_disk_space_check_insufficient(manager):
     with patch("multimodal.tts_manager._get_disk_usage") as mock_disk:
         mock_disk.return_value = (1000, 0)
@@ -260,6 +259,7 @@ def test_disk_quota_eviction(manager):
 # ============================================================================
 # 错误处理测试
 # ============================================================================
+
 
 def test_empty_text_validation(manager):
     with pytest.raises(ValueError) as exc_info:
@@ -306,6 +306,7 @@ async def test_synthesis_error_propagation(manager):
 # 关闭测试
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_graceful_shutdown_with_inflight(manager):
     loop = asyncio.get_running_loop()
@@ -338,6 +339,7 @@ async def test_shutdown_prevents_new_requests(manager):
 # 健康检查测试
 # ============================================================================
 
+
 def test_health_check_metrics(manager):
     manager._cache_hits = 80
     manager._cache_misses = 20
@@ -357,6 +359,7 @@ def test_health_check_metrics(manager):
 # ============================================================================
 # 集成测试
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_concurrent_deduplication(manager):
@@ -405,12 +408,10 @@ async def test_cache_hit_performance(manager):
 # 配置测试
 # ============================================================================
 
+
 def test_custom_configuration():
     config = TTSCacheConfig(
-        max_entries=100,
-        max_disk_mb=500,
-        synthesis_timeout_sec=30,
-        normalize_text=False
+        max_entries=100, max_disk_mb=500, synthesis_timeout_sec=30, normalize_text=False
     )
 
     mgr = TTSCacheManager(config)
@@ -424,6 +425,7 @@ def test_custom_configuration():
 # ============================================================================
 # 单例测试
 # ============================================================================
+
 
 def test_singleton_pattern():
     mgr1 = get_tts_manager()

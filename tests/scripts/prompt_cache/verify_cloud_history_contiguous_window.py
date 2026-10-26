@@ -421,8 +421,8 @@ def test_settings_have_no_relevance_fields() -> None:
         "cloud_relevance_candidate_window",
     ):
         assert not hasattr(settings, field), f"配置项 {field} 仍存在"
-    assert settings.cloud_max_history_messages == 60
-    assert settings.cloud_max_history_chars == 12000
+    assert settings.cloud_max_history_messages == 120
+    assert settings.cloud_max_history_chars == 24000
     assert settings.cloud_history_quantize_messages == 20
     assert settings.cloud_history_quantum_seconds == 300
 

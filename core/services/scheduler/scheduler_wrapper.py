@@ -8,6 +8,51 @@ import importlib.machinery
 logger = get_logger(__name__)
 
 _DLL_DIR_HANDLES = []
+_POSIX_LIB_HANDLES = []
+
+
+def _has_scheduler_binary(directory: str) -> bool:
+    """目录内是否存在 scheduler_py 编译产物（用于区分「目录还在」与「真有该版本产物」）。"""
+    try:
+        return any(
+            name.startswith("scheduler_py") and (name.endswith(".pyd") or name.endswith(".so"))
+            for name in os.listdir(directory)
+        )
+    except OSError:
+        return False
+
+
+def _preload_posix_shared_libs(directory: str) -> None:
+    """Linux/macOS 下预加载扩展依赖的共享库（等价 Windows 的 add_dll_directory）。
+
+    CMake 会把编译时的绝对路径写进 RUNPATH，项目目录搬迁后 RUNPATH 失效，
+    scheduler_py 的 DT_NEEDED（如 libllama.so.0）就找不到。glibc 解析 DT_NEEDED
+    时会复用已加载的同 soname 库，因此导入前先用 RTLD_GLOBAL 把扩展同级
+    bin/ 目录下的共享库加载进来即可，不必重新编译。
+    """
+    import ctypes
+
+    lib_dirs = [os.path.join(directory, "bin"), directory]
+    loaded: set[str] = set()
+    for _ in range(2):  # 第一遍可能因库间依赖顺序失败，第二遍补齐
+        for lib_dir in lib_dirs:
+            try:
+                names = sorted(os.listdir(lib_dir))
+            except OSError:
+                continue
+            for name in names:
+                if ".so" not in name or name.startswith("scheduler_py"):
+                    continue
+                real_path = os.path.realpath(os.path.join(lib_dir, name))
+                if real_path in loaded or not os.path.isfile(real_path):
+                    continue
+                try:
+                    _POSIX_LIB_HANDLES.append(
+                        ctypes.CDLL(real_path, mode=ctypes.RTLD_GLOBAL)
+                    )
+                    loaded.add(real_path)
+                except OSError as exc:
+                    logger.debug("预加载共享库失败 %s: %s", real_path, exc)
 
 
 # Find and import the C++ scheduler extension
@@ -82,9 +127,8 @@ def _import_scheduler_py():
         except (Exception, AttributeError):
             pass
     elif os.name == "posix":
-        # On Linux, shared libraries are typically found via LD_LIBRARY_PATH or standard paths.
-        # We can add paths to sys.path, but for shared libraries (.so),
-        # the OS loader needs to know where they are if they are not in standard paths.
+        # Linux 下 .so 的 RUNPATH 是编译时写死的绝对路径，项目目录搬迁后即失效；
+        # 统一在找到扩展目录后预加载同级 bin/ 下的共享库（见下面的循环）。
         pass
 
     # core/services/scheduler -> services -> core -> root
@@ -112,7 +156,7 @@ def _import_scheduler_py():
     elif backend == "cpu":
         pass
     else:  # auto
-        if os.path.isdir(cuda_dir):
+        if _has_scheduler_binary(cuda_dir):
             logger.info("XIAOYOU_CPP_BACKEND=auto：检测到 CUDA 版产物，优先加载 %s", cuda_dir)
             search_paths.append(cuda_dir)
 
@@ -178,6 +222,10 @@ def _import_scheduler_py():
                         candidates,
                     )
                     continue
+
+                # 把 Windows 侧的 add_dll_directory 换成 Linux 侧预加载配套 .so
+                if os.name == "posix":
+                    _preload_posix_shared_libs(path)
 
                 try:
                     importlib.invalidate_caches()

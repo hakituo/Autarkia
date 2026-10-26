@@ -34,9 +34,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.presentation.components.MetricRow
 import com.aveline.ai.mobile.presentation.components.SectionCard
-import com.aveline.ai.mobile.presentation.health.DailyDataUiState
-import com.aveline.ai.mobile.presentation.health.DailyStudySession
-import com.aveline.ai.mobile.presentation.theme.OverlayLight
+import com.aveline.ai.mobile.presentation.health.daily.DailyDataUiState
+import com.aveline.ai.mobile.presentation.health.daily.DailyStudySession
+import com.aveline.ai.mobile.presentation.theme.SurfaceHigh
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
@@ -230,7 +230,7 @@ private fun SessionItem(session: DailyStudySession) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(OverlayLight)
+            .background(SurfaceHigh)
             .padding(14.dp)
     ) {
         Text(

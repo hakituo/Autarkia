@@ -79,6 +79,8 @@ class SherpaNcnnAsrEngine @Inject constructor(
     private var recognizer: SherpaNcnn? = null
     private var audioRecord: AudioRecord? = null
     private var recordJob: Job? = null
+    /** 收尾解码协程（inputFinished + 余量 decode），与录音协程分开，避免它占住主线程。 */
+    private var flushJob: Job? = null
 
     private var isInitialized = false
     private var loadError: String? = null
@@ -132,12 +134,16 @@ class SherpaNcnnAsrEngine @Inject constructor(
         }
     }
 
+    /** 模型是否已经加载好（[VoiceInputManager] 用它决定要不要先预热）。 */
+    fun isModelLoaded(): Boolean = isInitialized
+
     /**
      * 初始化模型 (从 assets 加载)
      *
      * 应在 app 启动后或首次使用 ASR 前调用。
      * 耗时约 1-3s (取决于设备), 建议在 IO 线程。
      */
+    @Synchronized
     fun initialize(): Boolean {
         if (isInitialized) return true
         if (!isAvailable()) {
@@ -225,6 +231,14 @@ class SherpaNcnnAsrEngine @Inject constructor(
             return
         }
 
+        // 收尾解码还没跑完时不要重开：recognizer 正被 flush 协程占着，
+        // 这时 reset / acceptSamples 会跟 decode 并发进 native。
+        // 除了 Processing，还要挡住 cancel() 之后状态已归 Idle、但 flush 仍在跑的那一小段。
+        if (_state.value == AsrState.Processing || flushJob?.isActive == true) {
+            Log.w(TAG, "上一轮收尾解码未结束, 忽略本次开录")
+            return
+        }
+
         if (!isInitialized && !initialize()) {
             _state.value = AsrState.Error(loadError ?: "sherpa-ncnn 初始化失败")
             return
@@ -271,36 +285,60 @@ class SherpaNcnnAsrEngine @Inject constructor(
     }
 
     /**
-     * 停止录音, 返回最终识别结果
+     * 停止录音。
+     *
+     * 音频立刻停下，收尾解码（inputFinished + 余量 decode）丢到 IO 协程里做：
+     * 这段是 native 计算，放在主线程会直接卡住 UI —— 用户看到的就是"点完停止要愣几秒"。
+     * 状态先切 [AsrState.Processing]，结果在解码完成后通过 [state] 发出。
+     *
+     * 输入栏那边不会等这个结果：点「完成」时已经实时上屏的文本已经落进输入框了。
      */
-    fun stopListening(): String {
+    fun stopListening() {
+        if (_state.value != AsrState.Recording) {
+            Log.w(TAG, "当前不在录音状态(${_state.value}), 忽略 stopListening")
+            return
+        }
+
         _state.value = AsrState.Processing
 
-        recordJob?.cancel()
+        val pendingRecord = recordJob
         recordJob = null
+        pendingRecord?.cancel()
 
         try {
             audioRecord?.stop()
         } catch (e: Exception) {
             Log.w(TAG, "AudioRecord.stop 异常: ${e.message}")
         }
-
-        // 通知 recognizer 输入结束, flush 最后的解码
-        try {
-            recognizer?.inputFinished()
-            while (recognizer?.isReady() == true) {
-                recognizer?.decode()
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "flush decode 异常: ${e.message}")
-        }
-
-        // 结果 = 已断句确认的文本 + recognizer 里还留着的最后一句
-        val result = combineText(recognizer?.text ?: "").ifBlank { _partialText.value }
-
-        _state.value = if (result.isNotBlank()) AsrState.Result(result) else AsrState.Error("未识别到语音")
         _amplitude.value = 0f
-        return result
+
+        flushJob?.cancel()
+        flushJob = engineScope.launch {
+            // 等录音循环真正退出再碰 recognizer，否则可能和 acceptSamples 并发进 native
+            pendingRecord?.join()
+
+            val result = try {
+                // 通知 recognizer 输入结束, flush 最后的解码
+                recognizer?.inputFinished()
+                while (recognizer?.isReady() == true) {
+                    recognizer?.decode()
+                }
+                // 结果 = 已断句确认的文本 + recognizer 里还留着的最后一句
+                combineText(recognizer?.text ?: "").ifBlank { _partialText.value }
+            } catch (e: Exception) {
+                Log.w(TAG, "flush decode 异常: ${e.message}")
+                _partialText.value
+            }
+
+            // 期间可能被 cancel() 置回 Idle，那就不要再把结果抛回去
+            if (_state.value != AsrState.Processing) return@launch
+
+            _state.value = if (result.isNotBlank()) {
+                AsrState.Result(result)
+            } else {
+                AsrState.Error("未识别到语音")
+            }
+        }
     }
 
     /**
@@ -314,11 +352,24 @@ class SherpaNcnnAsrEngine @Inject constructor(
         } catch (e: Exception) {
             // 忽略
         }
-        recognizer?.reset(recreate = false)
+
         _state.value = AsrState.Idle
         committedText = ""
         _partialText.value = ""
         _amplitude.value = 0f
+
+        // 收尾解码可能正在 native 里跑：等它退出再 reset，避免和 decode 并发。
+        // flushJob 保留引用不清空，startListening 靠它挡住这段窗口里的重开。
+        val pendingFlush = flushJob
+        pendingFlush?.cancel()
+        engineScope.launch {
+            pendingFlush?.join()
+            if (flushJob == pendingFlush) flushJob = null
+            // 等待期间可能已经开了新一轮录音，那时 recognizer 归新会话管，不能 reset
+            if (_state.value == AsrState.Idle) {
+                recognizer?.reset(recreate = false)
+            }
+        }
     }
 
     /**

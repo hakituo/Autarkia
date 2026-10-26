@@ -7,6 +7,7 @@ __eq__ / __repr__ 协议方法。
 
 全部用例均为纯内存对象操作，不依赖时钟、随机数与外部资源。
 """
+
 from __future__ import annotations
 
 import re
@@ -16,9 +17,7 @@ from dataclasses import asdict
 from core.models.message import MessageResource, MessageType, UnifiedMessage
 
 # uuid4 的规范文本形态（第 3 组以 4 开头、第 4 组以 8/9/a/b 开头）
-_UUID4_RE = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-)
+_UUID4_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 
 
 # --------------------------------------------------------------------------- #

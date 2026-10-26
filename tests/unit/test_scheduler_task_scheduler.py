@@ -241,9 +241,7 @@ class TestResolveGpuLayers:
         assert GlobalTaskScheduler._resolve_gpu_layers(settings, "cpp") == -1
 
     def test_python_backend_without_cuda_forces_zero(self, monkeypatch):
-        fake_torch = types.SimpleNamespace(
-            cuda=types.SimpleNamespace(is_available=lambda: False)
-        )
+        fake_torch = types.SimpleNamespace(cuda=types.SimpleNamespace(is_available=lambda: False))
         monkeypatch.setitem(sys.modules, "torch", fake_torch)
         settings = types.SimpleNamespace(model=types.SimpleNamespace(n_gpu_layers=-1))
         assert GlobalTaskScheduler._resolve_gpu_layers(settings, "python") == 0
@@ -255,9 +253,7 @@ class TestResolveGpuLayers:
         assert GlobalTaskScheduler._resolve_gpu_layers(settings, "python") == 0
 
     def test_zero_layers_with_cuda_available_restores_auto(self, monkeypatch):
-        fake_torch = types.SimpleNamespace(
-            cuda=types.SimpleNamespace(is_available=lambda: True)
-        )
+        fake_torch = types.SimpleNamespace(cuda=types.SimpleNamespace(is_available=lambda: True))
         monkeypatch.setitem(sys.modules, "torch", fake_torch)
         settings = types.SimpleNamespace(model=types.SimpleNamespace(n_gpu_layers=0))
         assert GlobalTaskScheduler._resolve_gpu_layers(settings, "python") == -1
@@ -454,9 +450,7 @@ class TestEnsureCppLlmReady:
         monkeypatch.setattr(ts, "_get_cpp_engine", lambda: cpp)
         monkeypatch.setattr(ts, "get_config", lambda *a, **k: True)
         monkeypatch.setattr(ts, "get_settings", lambda: _make_settings())
-        monkeypatch.setattr(
-            scheduler, "_build_llm_gpu_config", lambda s, p: {"model_path": "x"}
-        )
+        monkeypatch.setattr(scheduler, "_build_llm_gpu_config", lambda s, p: {"model_path": "x"})
         asyncio.run(scheduler._ensure_cpp_llm_ready(None))
         assert cpp.applied == ({"model_path": "x"}, scheduler._worker_count, False)
 
@@ -492,15 +486,9 @@ class TestLifecycle:
     def test_start_with_cpp_enabled_and_stops_engine(self, scheduler, monkeypatch):
         cpp = _FakeCpp(enabled=True)
         monkeypatch.setattr(ts, "_get_cpp_engine", lambda: cpp)
-        monkeypatch.setattr(
-            "config.integrated_config.get_settings", lambda: _make_settings()
-        )
-        monkeypatch.setattr(
-            "core.utils.config_accessor.get_config", lambda *a, **k: True
-        )
-        monkeypatch.setattr(
-            scheduler, "_build_llm_gpu_config", lambda s, p: {"model_path": "x"}
-        )
+        monkeypatch.setattr("config.integrated_config.get_settings", lambda: _make_settings())
+        monkeypatch.setattr("core.utils.config_accessor.get_config", lambda *a, **k: True)
+        monkeypatch.setattr(scheduler, "_build_llm_gpu_config", lambda s, p: {"model_path": "x"})
 
         async def scenario():
             await scheduler.start(worker_count=1, llm_model_path="D:/m.gguf")
@@ -514,12 +502,8 @@ class TestLifecycle:
     def test_start_swallows_cpp_errors(self, scheduler, monkeypatch):
         cpp = _FakeCpp(enabled=True)
         monkeypatch.setattr(ts, "_get_cpp_engine", lambda: cpp)
-        monkeypatch.setattr(
-            "config.integrated_config.get_settings", lambda: _make_settings()
-        )
-        monkeypatch.setattr(
-            "core.utils.config_accessor.get_config", lambda *a, **k: True
-        )
+        monkeypatch.setattr("config.integrated_config.get_settings", lambda: _make_settings())
+        monkeypatch.setattr("core.utils.config_accessor.get_config", lambda *a, **k: True)
 
         def boom(settings, path):
             raise RuntimeError("boom")
@@ -762,9 +746,7 @@ class TestExecuteTask:
         assert lock.calls == [("TaskScheduler_GPU", True)]
 
     def test_cpu_bound_uses_thread_pool(self, scheduler):
-        result = asyncio.run(
-            scheduler._execute_task(lambda x: x * 3, TaskType.CPU_BOUND, 4)
-        )
+        result = asyncio.run(scheduler._execute_task(lambda x: x * 3, TaskType.CPU_BOUND, 4))
         assert result == 12
 
     def test_default_async_function_is_awaited(self, scheduler):
@@ -774,10 +756,7 @@ class TestExecuteTask:
         assert asyncio.run(scheduler._execute_task(coro, TaskType.DEFAULT, 1)) == 2
 
     def test_default_sync_function_runs_in_thread(self, scheduler):
-        assert (
-            asyncio.run(scheduler._execute_task(lambda: "sync", TaskType.DEFAULT))
-            == "sync"
-        )
+        assert asyncio.run(scheduler._execute_task(lambda: "sync", TaskType.DEFAULT)) == "sync"
 
     def test_default_sync_function_returning_coroutine_is_awaited(self, scheduler):
         async def inner():
@@ -786,9 +765,7 @@ class TestExecuteTask:
         def outer():
             return inner()
 
-        assert (
-            asyncio.run(scheduler._execute_task(outer, TaskType.DEFAULT)) == "awaited"
-        )
+        assert asyncio.run(scheduler._execute_task(outer, TaskType.DEFAULT)) == "awaited"
 
 
 # ============================================================
@@ -828,9 +805,7 @@ class TestScheduleTask:
     def test_int_priority_is_converted(self, scheduler):
         async def scenario():
             scheduler._running = True
-            return await scheduler.schedule_task(
-                lambda: 1, priority=3, args=(1,), kwargs={"a": 2}
-            )
+            return await scheduler.schedule_task(lambda: 1, priority=3, args=(1,), kwargs={"a": 2})
 
         task_id = asyncio.run(scenario())
         stored = scheduler._tasks[task_id]
@@ -992,9 +967,7 @@ class TestQueries:
 
 
 class TestSchedulePeriodicTask:
-    def test_periodic_wrapper_submits_then_reports_failure(
-        self, scheduler, monkeypatch
-    ):
+    def test_periodic_wrapper_submits_then_reports_failure(self, scheduler, monkeypatch):
         captured = {}
         sleep_calls = {"n": 0}
 
@@ -1161,9 +1134,7 @@ class TestSubmitLlmTask:
 
         monkeypatch.setattr(scheduler, "_ensure_cpp_llm_ready", fake_ensure)
 
-        chunks = self._collect(
-            scheduler, "hi", model_hint="IGNORED", model_path="D:/m.bin"
-        )
+        chunks = self._collect(scheduler, "hi", model_hint="IGNORED", model_path="D:/m.bin")
 
         assert chunks == ["tok1", "tok2"]
         # .bin 不是 gguf，desired_model_path 被归一化为 None

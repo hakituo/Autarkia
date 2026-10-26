@@ -31,9 +31,6 @@ from core.utils import demo_utils
 
 import routers.demo as demo_mod
 
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(demo_mod.__file__)))
-DEMO_INDEX = os.path.join(_PROJECT_ROOT, "static", "demo", "index.html")
-
 
 # ==================== 通用替身 ====================
 
@@ -223,15 +220,6 @@ def _patch_ws_deps(monkeypatch, *, rm, token="tok", scheduler=None, lock=None, m
 
 
 # ==================== HTTP: GET /demo ====================
-
-
-def test_demo_page_serves_static_html(client):
-    """静态页面存在时，应原样返回 static/demo/index.html 的内容。"""
-    resp = client.get("/demo")
-    assert resp.status_code == 200
-    with open(DEMO_INDEX, "r", encoding="utf-8") as f:
-        expected = f.read()
-    assert resp.text == expected
 
 
 def test_demo_page_fallback_when_html_missing(monkeypatch, client):
@@ -675,9 +663,7 @@ def test_ws_streams_over_real_testclient(monkeypatch, fast_asyncio):
         monitor=_FakeMonitor(gpu_info=(512, 8192)),
     )
     monkeypatch.setattr(resource_manager_mod, "get_resource_manager", lambda: rm)
-    monkeypatch.setattr(
-        integrated_config, "get_settings", lambda: _make_settings(token="secret")
-    )
+    monkeypatch.setattr(integrated_config, "get_settings", lambda: _make_settings(token="secret"))
     monkeypatch.setattr(cpp_scheduler_engine, "get_scheduler_status", lambda: {"ok": True})
     monkeypatch.setattr(
         resource_lock_mod,

@@ -41,7 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.domain.models.MemorySortOrder
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
@@ -90,7 +90,7 @@ internal fun MemoryFilterBar(
                 unfocusedContainerColor = Color(0x1A000000),
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = Primary,
+                cursorColor = Accent,
                 focusedTextColor = TextPrimary,
                 unfocusedTextColor = TextPrimary
             ),
@@ -162,7 +162,7 @@ internal fun MemoryFilterBar(
                             text = {
                                 Text(
                                     text = getSortOrderLabel(order),
-                                    color = if (sortOrder == order) Primary else TextPrimary
+                                    color = if (sortOrder == order) Accent else TextPrimary
                                 )
                             },
                             onClick = {

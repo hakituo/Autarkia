@@ -25,15 +25,17 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 MAIN_REF = "refs/heads/main"
-SYNC_REMOTE = "xiaoyou-sync"
+SYNC_REMOTE = "autarkia-sync"
 SYNC_REF = f"refs/remotes/{SYNC_REMOTE}/main"
 
-ENV_HUB = "XIAOYOU_CODE_HUB"
-ENV_PEER = "XIAOYOU_CODE_PEER"
+#: 环境变量新名优先、旧名兼容（Linux /etc/environment 可能仍是旧写法）
+ENV_HUB, ENV_HUB_LEGACY = "AUTARKIA_CODE_HUB", "XIAOYOU_CODE_HUB"
+ENV_PEER, ENV_PEER_LEGACY = "AUTARKIA_CODE_PEER", "XIAOYOU_CODE_PEER"
+ENV_SYNC, ENV_SYNC_LEGACY = "AUTARKIA_SYNC_CODE", "XIAOYOU_SYNC_CODE"
 
-DEFAULT_WIN_HUB = Path(r"D:\AI\xiaoyou-hub.git")
-DEFAULT_LINUX_HUB = Path("/mnt/win_p4/AI/xiaoyou-hub.git")
-DEFAULT_LINUX_PEER = Path("/mnt/win_p4/AI/xiaoyou-core")
+DEFAULT_WIN_HUB = Path(r"D:\projects\autarkia-hub.git")
+DEFAULT_LINUX_HUB = Path("/mnt/win_p4/AI/Autarkia-hub.git")
+DEFAULT_LINUX_PEER = Path("/mnt/win_p4/AI/Autarkia")
 
 RC_OK = 0
 RC_ERROR = 1
@@ -52,7 +54,7 @@ def project_root() -> Path:
 
 def default_hub() -> Path:
     """同盘裸仓库默认路径：Windows 用盘符，Linux 用挂载点。"""
-    env = os.environ.get(ENV_HUB, "").strip()
+    env = (os.environ.get(ENV_HUB) or os.environ.get(ENV_HUB_LEGACY) or "").strip()
     if env:
         return Path(env).expanduser()
     return DEFAULT_WIN_HUB if is_windows() else DEFAULT_LINUX_HUB
@@ -60,7 +62,7 @@ def default_hub() -> Path:
 
 def default_peer() -> Optional[Path]:
     """对端工作副本：只有 Linux 读得到 Windows，反方向返回 None。"""
-    env = os.environ.get(ENV_PEER, "").strip()
+    env = (os.environ.get(ENV_PEER) or os.environ.get(ENV_PEER_LEGACY) or "").strip()
     if env:
         return Path(env).expanduser()
     return None if is_windows() else DEFAULT_LINUX_PEER
@@ -111,7 +113,7 @@ def current_branch(repo: Path) -> str:
 
 
 def fetch_from(repo: Path, source: Path) -> bool:
-    """从本地路径 fetch 对方的 main，落到 ``refs/remotes/xiaoyou-sync/main``。"""
+    """从本地路径 fetch 对方的 main，落到 ``refs/remotes/autarkia-sync/main``。"""
     proc = run_git(
         repo,
         "fetch",
@@ -208,7 +210,7 @@ def do_push(repo: Path, hub: Path) -> int:
     # hub 被指到本仓库自身时直接退出：git 不允许往自己身上回收推送，
     # 报错信息也看不出根因，不如自己拦掉。
     if hub.resolve() == repo.resolve():
-        print("[WARN] hub 指向本仓库自身（XIAOYOU_CODE_HUB 配置有误），跳过代码回写")
+        print(f"[WARN] hub 指向本仓库自身（{ENV_HUB} 配置有误），跳过代码回写")
         return RC_OK
 
     if not hub.exists():
@@ -256,8 +258,8 @@ def do_status(repo: Path, hub: Path, peer: Optional[Path]) -> int:
 def main(argv: list[str] | None = None) -> int:
     # 关闭开关统一在这里判断：start.bat 只留一行调用，判断全交给这里
     # （批处理里不能写中文，多字节内容会让 cmd 在 chcp 65001 之后错位）。
-    if os.environ.get("XIAOYOU_SYNC_CODE", "1").strip() == "0":
-        print("[INFO] XIAOYOU_SYNC_CODE=0，跳过代码同步")
+    if (os.environ.get(ENV_SYNC) or os.environ.get(ENV_SYNC_LEGACY) or "").strip() == "0":
+        print(f"[INFO] {ENV_SYNC}=0，跳过代码同步")
         return RC_OK
 
     parser = argparse.ArgumentParser(
@@ -266,12 +268,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("action", choices=["pull", "push", "status"], help="要执行的动作")
     parser.add_argument("--repo", help="仓库路径，默认本项目根")
-    parser.add_argument(
-        "--hub", help="同盘裸仓库路径，默认按系统取 D:\\AI\\xiaoyou-hub.git 或 /mnt/win_p4/AI/xiaoyou-hub.git"
-    )
-    parser.add_argument(
-        "--peer", help="对端工作副本路径；传空串表示禁用（Windows 侧天然禁用）"
-    )
+    parser.add_argument("--hub", help="同盘裸仓库路径（默认按系统取 Autarkia-hub.git）")
+    parser.add_argument("--peer", help="对端工作副本路径；传空串表示禁用（Windows 侧天然禁用）")
     args = parser.parse_args(argv)
 
     repo = Path(args.repo).expanduser().resolve() if args.repo else project_root()

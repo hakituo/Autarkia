@@ -109,9 +109,7 @@ def test_openai_compatible_config():
 def test_endpoint_returns_success(monkeypatch):
     fake_settings = SimpleNamespace(
         voice=SimpleNamespace(
-            tts=_tts(
-                model_extra={"appid": "app-1", "voice_map": {"Aveline": "S_HbG6m9272"}}
-            )
+            tts=_tts(model_extra={"appid": "app-1", "voice_map": {"Aveline": "S_HbG6m9272"}})
         )
     )
 

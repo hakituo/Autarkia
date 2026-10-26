@@ -1,7 +1,7 @@
 """验证「写日记的角色 = 注册角色」：日记链路不再硬编码 aveline / ling。
 
 运行：
-    d:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe ^
+    d:\\AI\\autarkia\\venv_core\\Scripts\\python.exe ^
         tests\\scripts\\journal\\verify_diary_personas_from_registry.py
 """
 from __future__ import annotations
@@ -198,19 +198,25 @@ def _verify_storage_scopes() -> None:
 
 
 def _verify_model_route_avoids_moderation() -> None:
-    """日记 / 蒸馏模型不能是会审核拒绝题材的 Minimax，否则日记直接写不出来。"""
+    """日记路由不能走 MiniMax：长上下文会被内容审核 422。
+
+    实测记录（2026-10-23）：每日总结的 20K 字符长上下文在 M3 与 M3.1 Flash 上
+    都稳定 422；同夜的单条短记忆蒸馏在 M3 上 50 条全部成功。所以政策是：
+    - journal_model（长上下文汇总）→ DeepSeek qqbot1
+    - memory_models.distillation（单条短文本）→ 可留在 MiniMax
+    """
     from config.model_config import load_model_config, get_journal_model
 
     journal_model = get_journal_model()
     distill_model = (load_model_config().get("memory_models") or {}).get("distillation")
     _check(
-        "日记模型已切到 deepseek（不再被 MiniMax 422 拒绝）",
+        "日记模型必须避开 MiniMax（长上下文会被 422）",
         "deepseek" in journal_model and "minimax" not in journal_model.lower(),
         f"journal_model={journal_model}",
     )
     _check(
-        "记忆蒸馏 / 人物档案提取同样走 deepseek",
-        distill_model and "deepseek" in distill_model,
+        "记忆蒸馏不直连免费端点（:free），模型不限",
+        distill_model and ":free" not in distill_model,
         f"distillation={distill_model}",
     )
 

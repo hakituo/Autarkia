@@ -16,9 +16,10 @@ Llama = llama_cpp.Llama
 
 torch = pytest.importorskip("torch")
 
+
 def test_llm_gpu():
     print("Testing llama-cpp-python GPU support...")
-    
+
     if torch.cuda.is_available():
         print(f"CUDA is available: {torch.cuda.get_device_name(0)}")
     else:
@@ -42,23 +43,18 @@ def test_llm_gpu():
         except Exception:
             n_gpu_layers = 0
 
-        llm = Llama(
-            model_path=model_path,
-            n_gpu_layers=n_gpu_layers,
-            verbose=True,
-            n_ctx=2048
-        )
+        llm = Llama(model_path=model_path, n_gpu_layers=n_gpu_layers, verbose=True, n_ctx=2048)
         print("Model loaded successfully.")
-        
+
         # Simple generation
         output = llm.create_chat_completion(
-            messages=[{"role": "user", "content": "Hello, are you running on GPU?"}],
-            max_tokens=50
+            messages=[{"role": "user", "content": "Hello, are you running on GPU?"}], max_tokens=50
         )
         print(f"Generation output: {output}")
-        
+
     except Exception as e:
         pytest.fail(f"Error loading/running model: {e}")
+
 
 if __name__ == "__main__":
     test_llm_gpu()

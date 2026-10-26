@@ -10,9 +10,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
 sys.path.append(PROJECT_ROOT)
 
-XIAOYOU_HTTP_BASE_URL = "http://127.0.0.1:8000"
-XIAOYOU_WS_URL = "ws://127.0.0.1:8000/api/v1/ws"
-XIAOYOU_ACCESS_TOKEN = "" # 如果有 Token 请填写
+AUTARKIA_HTTP_BASE_URL = "http://127.0.0.1:8000"
+AUTARKIA_WS_URL = "ws://127.0.0.1:8000/api/v1/ws"
+AUTARKIA_ACCESS_TOKEN = "" # 如果有 Token 请填写
 
 async def test_intent_latency(text: str):
     # 直接模拟逻辑：如果文本太短，adapter 层会跳过。
@@ -21,7 +21,7 @@ async def test_intent_latency(text: str):
         print(f"\n[模拟 Adapter 逻辑] 输入: '{text}' -> 长度 <= 2, 自动跳过识别 (耗时: 0.000s)")
         return
 
-    url = f"{XIAOYOU_HTTP_BASE_URL}/api/v1/intent/classify"
+    url = f"{AUTARKIA_HTTP_BASE_URL}/api/v1/intent/classify"
     payload = {
         "text": text,
         "candidates": ["CLEAR_MEMORY", "SHOW_STATUS", "NONE"],
@@ -29,8 +29,8 @@ async def test_intent_latency(text: str):
         "temperature": 0.0
     }
     headers = {}
-    if XIAOYOU_ACCESS_TOKEN:
-        headers["Authorization"] = f"Bearer {XIAOYOU_ACCESS_TOKEN}"
+    if AUTARKIA_ACCESS_TOKEN:
+        headers["Authorization"] = f"Bearer {AUTARKIA_ACCESS_TOKEN}"
     
     print(f"\n[测试意图识别] 输入: '{text}'")
     start = time.time()
@@ -48,7 +48,7 @@ async def test_intent_latency(text: str):
 
 async def test_chat_latency(text: str):
     # 模拟 WebSocket 握手耗时
-    ws_url = f"{XIAOYOU_WS_URL}?client_id=test_script&user_id=test_user&platform=qq"
+    ws_url = f"{AUTARKIA_WS_URL}?client_id=test_script&user_id=test_user&platform=qq"
     print(f"\n[测试聊天响应] 输入: '{text}'")
     start = time.time()
     try:

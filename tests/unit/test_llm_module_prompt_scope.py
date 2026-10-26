@@ -35,4 +35,3 @@ def test_stream_chat_prompt_scope_regression():
 
     result = asyncio.run(_runner())
     assert result == "OK"
-

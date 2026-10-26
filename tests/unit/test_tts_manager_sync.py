@@ -55,8 +55,9 @@ class _AsyncioProxy:
 
 
 class _Engine:
-    def __init__(self, *, bytes_payload=None, array_payload=None, last_error=None,
-                 thread_error=None):
+    def __init__(
+        self, *, bytes_payload=None, array_payload=None, last_error=None, thread_error=None
+    ):
         self.settings = object()
         self.bytes_payload = bytes_payload
         self.array_payload = array_payload
@@ -163,8 +164,12 @@ def test_sync_non_owner_returns_existing_future_result(monkeypatch, tmp_path):
 
 def test_sync_non_owner_timeout_raises(monkeypatch, tmp_path):
     """等待 inflight 超时 → TTSTimeoutError，并清掉条目。"""
-    mgr = _ready(monkeypatch, tmp_path, _Engine(), TTSCacheConfig(min_free_disk_mb=0,
-                                                                 synthesis_timeout_sec=0))
+    mgr = _ready(
+        monkeypatch,
+        tmp_path,
+        _Engine(),
+        TTSCacheConfig(min_free_disk_mb=0, synthesis_timeout_sec=0),
+    )
     key = mgr._generate_cache_key("你好")
     mgr._inflight_sync[key] = concurrent.futures.Future()  # 永不完成
 
@@ -212,7 +217,9 @@ def test_sync_array_path_writes_via_soundfile(monkeypatch, tmp_path):
     engine = _Engine(bytes_payload=None, array_payload=b"\x00\x01")
     mgr = _ready(monkeypatch, tmp_path, engine)
     _patch_threadsafe(monkeypatch, engine)
-    sf = pytest.importorskip("soundfile", exc_type=ImportError, reason="只有 sf.write 分支需要 voice extra")
+    sf = pytest.importorskip(
+        "soundfile", exc_type=ImportError, reason="只有 sf.write 分支需要 voice extra"
+    )
     seen = []
     monkeypatch.setattr(sf, "write", lambda path, data, rate: seen.append((data, rate)))
 

@@ -11,7 +11,7 @@ errors_20260815.json / errors_20260816.json 修复验证脚本
    包含最后一次异常与上游错误信息（errors_20260816.json traceback 为空、无法定位根因）
 3. memory.nightly_processor / core.utils.singleton 导入正常（errors_20260813.json 的 singleton 污染问题）
 运行：
-    D:\projects\xiaoyou\venv_core\Scripts\python.exe tests\scripts\websocket_errors\verify_debug_20260815_20260816.py
+    D:\AI\autarkia\venv_core\Scripts\python.exe tests\scripts\websocket_errors\verify_debug_20260815_20260816.py
 """
 
 import inspect

@@ -35,6 +35,13 @@ data class ChatUiState(
     val playingMessageId: String? = null,
     /** 正在合成语音的消息 id（UI 用它显示转圈；与"正在播放"区分开）。 */
     val ttsLoadingMessageId: String? = null,
+    /**
+     * 括号里的动作 / 场景描写是否渲染成居中旁白。
+     *
+     * 来自设置页开关（[com.aveline.ai.mobile.data.local.preferences.AppPreferences.stageDirectionEnabled]），
+     * 关闭后消息里的括号按普通正文显示，流式分段也不再产出 retraction 气泡。
+     */
+    val stageDirectionEnabled: Boolean = true,
     val voiceInputState: VoiceInputState = VoiceInputState.Idle,
     val voiceAmplitude: Float = 0f,
     val voicePartialText: String = "",

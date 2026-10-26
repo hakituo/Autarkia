@@ -14,7 +14,7 @@ class SessionStateManager:
     """会话状态管理器，处理打字延迟、仿生画像、智能睡眠等。"""
 
     def __init__(self, session):
-        # 持有外层 XiaoyouSession 实例，用于访问 cfg/session_id 等属性
+        # 持有外层 AutarkiaSession 实例，用于访问 cfg/session_id 等属性
         self.session = session
 
     async def load_bionic_profile(self):

@@ -96,13 +96,12 @@ def main() -> int:
     )
 
     reload_model_config()
-    # 主对话路由：Ye按用户要求用 flash（config/yaml/sections/model_routing.yaml
-    # 的 chat_models.ye）。这里锁定当前路由意图，配置被静默改动时该断言会失败。
-    assert get_chat_model("Ye") == "cloud:deepseek:rushuang:deepseek-v4-flash"
-    # 主动关怀/peer chat 统一走 ACTIVECARE 专用 key 的 DeepSeek flash
+    # 主对话路由：三个角色统一走 M Plan 的 M3.1 Flash（model_routing.chat_models.ye）。
+    assert get_chat_model("Ye") == "cloud:minimax:plan:MiniMax-M3.1-Flash"
+    # 主动关怀/peer chat 与主对话同模型
     assert (
         get_active_care_content_model("Ye")
-        == "cloud:deepseek:activecare:deepseek-v4-flash"
+        == "cloud:minimax:plan:MiniMax-M3.1-Flash"
     )
 
     aveline = _build("core_aveline.json", "Aveline")

@@ -88,9 +88,7 @@ def test_split_health_entries_skips_blank_symptom():
 
 
 def test_split_health_entries_missing_time_is_fresh():
-    fresh, earlier = split_health_entries(
-        [{"symptom": "感冒"}], now=datetime(2026, 4, 7, 12, 0)
-    )
+    fresh, earlier = split_health_entries([{"symptom": "感冒"}], now=datetime(2026, 4, 7, 12, 0))
     assert fresh == ["感冒"]
     assert earlier == []
 
@@ -429,7 +427,9 @@ def test_upsert_meal_appends_when_absent(manager):
 def test_upsert_meal_handles_non_list_meals(manager, monkeypatch):
     # _load_record 被规范化保证 meals 为 list，故直接打桩喂坏结构
     saved = []
-    monkeypatch.setattr(manager, "_load_record", lambda *a, **k: {"date": "2026-04-07", "meals": "bad"})
+    monkeypatch.setattr(
+        manager, "_load_record", lambda *a, **k: {"date": "2026-04-07", "meals": "bad"}
+    )
     monkeypatch.setattr(manager, "_save_record", lambda data, *a, **k: saved.append(data))
     manager.upsert_meal("dinner", "饭")
     assert saved[0]["meals"] == [{"type": "dinner", "content": "饭", "time": "12:00"}]
@@ -439,7 +439,9 @@ def test_upsert_meal_skips_non_dict_items(manager):
     # 非 dict 项排在匹配项之后，才会真正走到 continue 分支
     path = manager._get_file_path("2026-04-07")
     with open(path, "w", encoding="utf-8") as f:
-        json.dump({"date": "2026-04-07", "meals": [{"type": "breakfast", "content": "旧"}, "junk"]}, f)
+        json.dump(
+            {"date": "2026-04-07", "meals": [{"type": "breakfast", "content": "旧"}, "junk"]}, f
+        )
     manager.upsert_meal("breakfast", "新")
     meals = manager.get_record("2026-04-07")["meals"]
     assert meals[0] == {"type": "breakfast", "content": "新", "time": "12:00"}

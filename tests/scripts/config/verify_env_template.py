@@ -51,7 +51,7 @@ TEMPLATE_LINE = re.compile(r"^\s*#?\s*([A-Za-z_][A-Za-z0-9_]*)\s*=")
 # 别名后缀允许大小写混写：DEEPSEEK_API_KEY_Yeye → 别名 yeye（统一转小写）。
 DYNAMIC_KEY_PATTERNS = (
     re.compile(r"^[A-Z][A-Z0-9_]*_API_KEY_[A-Za-z0-9_]+$"),  # <PROVIDER>_API_KEY_<别名>
-    re.compile(r"^XIAOYOU_QQ_BOT_NUMBER(_[A-Z]+)?$"),  # 多 QQ 号按角色拼
+    re.compile(r"^AUTARKIA_QQ_BOT_NUMBER(_[A-Z]+)?$"),  # 多 QQ 号按角色拼
 )
 
 # env 名写在配置里、由代码按配置值去读的间接引用（getenv 的字面量是变量）
@@ -73,7 +73,7 @@ REQUIRED_KEYS = (
     "QWEATHER_CREDENTIAL_ID",
     "QWEATHER_PROJECT_ID",
     "QWEATHER_PRIVATE_KEY_PATH",
-    "XIAOYOU_QQ_MASTER_ID",
+    "AUTARKIA_QQ_MASTER_ID",
 )
 
 

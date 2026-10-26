@@ -15,6 +15,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from scripts.study.vocabulary.qwerty_overlay import (  # noqa: E402
+    DEFAULT_OVERLAY_PATH as DEFAULT_QWERTY_OVERLAY_PATH,
+)
 from scripts.study.vocabulary.wordbook_builder import (  # noqa: E402
     DEFAULT_ECDICT_PATH,
     DEFAULT_OVERRIDES_PATH,
@@ -38,6 +41,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_SENSE_RANKINGS_PATH,
         help="构建期 learner sense priority 配置；不在运行时联网或调用 LLM",
+    )
+    parser.add_argument(
+        "--qwerty-overlay",
+        type=Path,
+        default=DEFAULT_QWERTY_OVERLAY_PATH,
+        help="开源词书释义覆盖层；文件不存在时退回纯 ECDICT",
     )
     parser.add_argument("--progress", type=Path, default=DEFAULT_PROGRESS_PATH)
     parser.add_argument(
@@ -69,6 +78,7 @@ def main() -> int:
         overrides_path=args.overrides,
         progress_path=args.progress,
         sense_rankings_path=args.sense_rankings,
+        qwerty_overlay_path=args.qwerty_overlay,
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))
     if not args.write:

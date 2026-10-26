@@ -10,7 +10,7 @@ onRefresh 参数。
 1. 按钮被重新加回来；
 2. 按钮删了，但自动加载链路（init -> refresh）也被误删，列表变成空白。
 
-运行：d:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe tests/scripts/android_frontend/verify_conversation_list_autoload.py
+运行：d:\\AI\\autarkia\\venv_core\\Scripts\\python.exe tests/scripts/android_frontend/verify_conversation_list_autoload.py
 """
 
 import re
@@ -24,7 +24,9 @@ PRESENTATION = (
 )
 CONVERSATION_SCREEN = PRESENTATION / "conversations/ConversationListScreen.kt"
 CONVERSATION_VIEW_MODEL = PRESENTATION / "conversations/ConversationListViewModel.kt"
-NAV_GRAPH = PRESENTATION / "navigation/NavGraph.kt"
+# 会话列表的注册与 onReload 接线在 2026-10-23 前已从 NavGraph.kt 拆到 graph/ConversationsGraph.kt，
+# 这里跟着真实调用方走；列表在平板常驻侧栏里也复用同一个 ConversationListScreen。
+NAV_GRAPH = PRESENTATION / "navigation/graph/ConversationsGraph.kt"
 
 IMPORT_RE = re.compile(r"^import\s+([\w.]+)(?:\s+as\s+(\w+))?\s*$")
 DELEGATE_IMPORTS = (

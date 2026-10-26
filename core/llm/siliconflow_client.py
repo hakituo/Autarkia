@@ -19,7 +19,8 @@ from core.utils.debug_markers import ensure_debug_error_prefix
 from core.utils.async_locks import LazyAsyncLock
 from . import LLMModule
 from core.llm.openai_compat.client import LLMSessionMixin
-from core.llm.llm_logger import log_llm_call_stats, log_api_call
+from core.llm.llm_logger import log_llm_call_stats, log_api_call, log_llm_usage
+from core.llm.openai_compat.caller_source import caller_source
 from core.llm.model_capabilities import (
     is_vision_model,
     has_image_content,
@@ -201,10 +202,19 @@ class SiliconFlowClient(LLMSessionMixin, LLMModule):
                             if not content.strip() and reasoning.strip():
                                 content = reasoning
                             logger.info(f"VL模型直接回复: {content[:200]}...")
+                            usage = data.get("usage") or {}
+                            if usage:
+                                log_llm_usage(
+                                    "siliconflow",
+                                    self.VISION_MODEL,
+                                    usage,
+                                    extra={"mode": "sync", "stage": "vision"},
+                                    source=caller_source(),
+                                )
                             return {
                                 "status": "success",
                                 "text": content,
-                                "usage": data.get("usage", {}),
+                                "usage": usage,
                             }
                         return {
                             "status": "error",
@@ -428,6 +438,16 @@ class SiliconFlowClient(LLMSessionMixin, LLMModule):
                             if line.startswith("data: "):
                                 try:
                                     data = json.loads(line[6:])
+                                    # 部分 OpenAI 兼容服务在末尾单独回一个 usage 块
+                                    usage = data.get("usage") or {}
+                                    if usage:
+                                        log_llm_usage(
+                                            "siliconflow",
+                                            model,
+                                            usage,
+                                            extra={"mode": "stream"},
+                                            source=caller_source(),
+                                        )
                                     if "choices" in data and len(data["choices"]) > 0:
                                         delta = data["choices"][0].get("delta", {})
 
@@ -508,10 +528,19 @@ class SiliconFlowClient(LLMSessionMixin, LLMModule):
                             if not content.strip() and reasoning.strip():
                                 content = reasoning
                             finish_reason = (data["choices"][0] or {}).get("finish_reason")
+                            usage = data.get("usage") or {}
+                            if usage:
+                                log_llm_usage(
+                                    "siliconflow",
+                                    model,
+                                    usage,
+                                    extra={"mode": "sync"},
+                                    source=caller_source(),
+                                )
                             return {
                                 "status": "success",
                                 "text": content,
-                                "usage": data.get("usage", {}),
+                                "usage": usage,
                                 "finish_reason": finish_reason,
                             }
                         return {

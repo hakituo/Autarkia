@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.domain.models.Memory
 import com.aveline.ai.mobile.presentation.components.SectionCard
 import com.aveline.ai.mobile.presentation.memory.MemoryGraphUiState
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 
 private const val GRAPH_HEIGHT_DP = 340
@@ -111,7 +111,7 @@ internal fun MemoryGraphSection(
                     style = MaterialTheme.typography.labelSmall,
                     color = TextTertiary
                 )
-                TextButton(onClick = onBack) { Text("返回地标", color = Primary) }
+                TextButton(onClick = onBack) { Text("返回地标", color = Accent) }
             }
         }
 
@@ -123,7 +123,7 @@ internal fun MemoryGraphSection(
                         .height((GRAPH_HEIGHT_DP / 2).dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = Primary)
+                    CircularProgressIndicator(color = Accent)
                 }
             }
 

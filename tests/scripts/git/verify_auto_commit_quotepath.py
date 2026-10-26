@@ -9,7 +9,7 @@ git 默认 `core.quotepath=true`，会把非 ASCII 路径转义成
 本脚本验证：扫描与重复保护都关掉了 quotepath，且中文路径能被正确匹配。
 
 运行：
-    D:\projects\xiaoyou\venv_core\Scripts\python.exe -m tests.scripts.git.verify_auto_commit_quotepath
+    D:\AI\autarkia\venv_core\Scripts\python.exe -m tests.scripts.git.verify_auto_commit_quotepath
 """
 
 from __future__ import annotations

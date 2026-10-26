@@ -58,7 +58,7 @@ def main() -> int:
         assert "important.log" in index
         assert "sections/01_active_care.log" in index
         assert "sections/07_other.log" in index
-        assert "xiaoyou_main.log" in index
+        assert "autarkia_main.log" in index
 
         config = {
             "log_dir": str(daily_dir),

@@ -123,6 +123,41 @@ def run_check() -> int:
             print("FAIL: 重复执行改动了当天文件")
             return 7
 
+        # 3.5 updates 条目原位修订时，后面的条目不能被截断（next_marker 回归）
+        apply_payload(
+            {
+                "updates": [
+                    {
+                        "date": "2026-06-30",
+                        "weekday": "二",
+                        "title": "后续记录",
+                        "background": "用于验证原位修订不会截断后续条目",
+                    }
+                ]
+            },
+            temp_root,
+        )
+        apply_payload(
+            {
+                "updates": [
+                    {
+                        "date": "2026-06-30",
+                        "weekday": "二",
+                        "title": "文档记录脚本接入",
+                        "background": "修订后的背景",
+                    }
+                ]
+            },
+            temp_root,
+        )
+        revised_text = same_day_path.read_text(encoding="utf-8")
+        if "修订后的背景" not in revised_text:
+            print("FAIL: updates 条目内容变化后没有原位修订")
+            return 26
+        if "后续记录" not in revised_text:
+            print("FAIL: 原位修订把后面的 updates 条目截断了")
+            return 27
+
         # 4. 非本次日期的文件不被改动
         if prev_day_path.read_text(encoding="utf-8") != PREV_DAY_BLOCK:
             print("FAIL: 非本次日期的文件被改动")

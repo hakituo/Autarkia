@@ -13,8 +13,12 @@ from core.utils import data_paths
 
 def write_event(root: Path, cid: str, eid: str, ts: float, **fields) -> dict:
     event = {
-        "event_id": eid, "conversation_id": cid, "timestamp": ts,
-        "role": "user", "event_type": "chat_message", "content": "归档线索",
+        "event_id": eid,
+        "conversation_id": cid,
+        "timestamp": ts,
+        "role": "user",
+        "event_type": "chat_message",
+        "content": "归档线索",
         "metadata": {"platform": "qq"},
         **fields,
     }
@@ -38,11 +42,18 @@ def archive(tmp_path, monkeypatch):
 
 
 def search(**kwargs):
-    return SearchChatHistoryTool()._search_in_store(**{
-        "conversation_id": "web_role_aveline", "query": "归档线索", "limit": 20,
-        "roles": None, "before_ts": None, "after_ts": None, "scope": "local",
-        **kwargs,
-    })
+    return SearchChatHistoryTool()._search_in_store(
+        **{
+            "conversation_id": "web_role_aveline",
+            "query": "归档线索",
+            "limit": 20,
+            "roles": None,
+            "before_ts": None,
+            "after_ts": None,
+            "scope": "local",
+            **kwargs,
+        }
+    )
 
 
 def test_current_hit_does_not_hide_legacy_conversations(archive):
@@ -63,7 +74,13 @@ def test_filter_before_limit_and_keep_archive_dates(archive, monkeypatch):
     write_event(root, "web_role_aveline", "wrong-platform", 20, metadata={"platform": "obsidian"})
     write_event(root, "web_role_aveline", "thought", 30, event_type="chat_thought")
     write_event(root, "web_role_aveline", "wrong-role", 40, role="assistant")
-    write_event(root, "web_role_aveline", "excluded", 45, metadata={"topics": ["sensitive"], "platform": "qq"})
+    write_event(
+        root,
+        "web_role_aveline",
+        "excluded",
+        45,
+        metadata={"topics": ["sensitive"], "platform": "qq"},
+    )
     monkeypatch.setattr(search_chat_history_tool, "should_exclude_sensitive", lambda **_kw: True)
     events = search(limit=1, roles=["user"], after_ts=5, before_ts=50, source="qq", scope="sfw")
     assert [e["event_id"] for e in events] == ["wanted"]

@@ -43,8 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.domain.models.PlanItem
 import com.aveline.ai.mobile.presentation.components.SectionCard
-import com.aveline.ai.mobile.presentation.theme.EmotionGreen
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
@@ -184,7 +183,7 @@ fun StudyPlanTab(
                         Text(
                             text = "$completedCount / $totalCount",
                             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                            color = if (completedCount == totalCount && totalCount > 0) EmotionGreen else TextPrimary
+                            color = if (completedCount == totalCount && totalCount > 0) Accent else TextPrimary
                         )
                         Text(
                             text = "已完成计划项",
@@ -201,7 +200,7 @@ fun StudyPlanTab(
                                 .padding(start = 16.dp)
                                 .height(8.dp)
                                 .clip(RoundedCornerShape(4.dp)),
-                            color = if (progress >= 1f) EmotionGreen else Primary,
+                            color = Accent,
                             trackColor = Color(0x1AFFFFFF)
                         )
                     }
@@ -390,7 +389,7 @@ private fun PlanItemRow(
         Icon(
             imageVector = if (isChecked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
             contentDescription = if (isChecked) "已完成" else "未完成",
-            tint = if (isChecked) EmotionGreen else TextTertiary,
+            tint = if (isChecked) Accent else TextTertiary,
             modifier = Modifier.size(22.dp)
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -398,7 +397,7 @@ private fun PlanItemRow(
             // 无固定时间的计划项在 plan.md 里写作"灵活"
             text = item.time.ifBlank { "灵活" },
             style = MaterialTheme.typography.labelMedium,
-            color = if (isChecked) TextTertiary else Primary,
+            color = if (isChecked) TextTertiary else Accent,
             modifier = Modifier.width(56.dp)
         )
         Column(modifier = Modifier.weight(1f)) {
@@ -424,7 +423,7 @@ private fun PlanItemRow(
             Icon(
                 imageVector = Icons.Default.PlayArrow,
                 contentDescription = "开始计时",
-                tint = Primary,
+                tint = Accent,
                 modifier = Modifier.size(18.dp)
             )
         }

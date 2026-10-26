@@ -100,7 +100,9 @@ async def test_replace_daily_plan_replaces_generated_pending_tasks_only(monkeypa
         return {"path": path, "content": content, "append": append}
 
     async def _schedule_message(message: str, trigger_ts: float, metadata=None, type="text"):
-        scheduled.append({"message": message, "trigger_ts": trigger_ts, "metadata": metadata, "type": type})
+        scheduled.append(
+            {"message": message, "trigger_ts": trigger_ts, "metadata": metadata, "type": type}
+        )
         return f"msg-{len(scheduled)}"
 
     async def _delete_message(msg_id: str):

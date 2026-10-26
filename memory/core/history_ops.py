@@ -1,8 +1,32 @@
+import asyncio
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.services.chat_history_store import get_chat_history_store
+from core.utils.logger import get_logger
 from memory.core.lock_utils import get_read_lock
+
+logger = get_logger("MemoryHistoryOps")
+
+
+def _apply_read_guards(
+    items: List[Dict[str, Any]], conversation_id: str
+) -> List[Dict[str, Any]]:
+    """所有原始事件读路径共用的分支边界 + 世界线闸门（v3 E2）。"""
+    try:
+        from core.agents.chat_agent_components.message_branch import (
+            filter_events_by_branch_scope,
+        )
+        from memory.topology.read_gate import filter_raw_events
+
+        items = filter_events_by_branch_scope(
+            items, conversation_id=conversation_id
+        )
+        # 不传 tree_reader：走按会话常驻、随写入增量更新的消息树
+        return filter_raw_events(items, conversation_id=conversation_id).events
+    except Exception as exc:  # noqa: BLE001 - 过滤故障不得清空历史
+        logger.warning(f"事件历史可见性过滤失败，按原样返回: {exc}")
+        return items
 
 
 async def get_recent_history(
@@ -98,6 +122,9 @@ async def get_event_history(
         query=query,
         roles=roles,
     )
+    items = await asyncio.to_thread(
+        _apply_read_guards, items, target_conversation_id
+    )
     result: List[Dict[str, Any]] = []
     for item in items:
         metadata = item.get("metadata") if isinstance(item, dict) else {}
@@ -177,6 +204,9 @@ async def get_conversation_records(
         target_conversation_id,
         limit=record_limit * _EVENTS_PER_TURN,
         before=before,
+    )
+    items = await asyncio.to_thread(
+        _apply_read_guards, items, target_conversation_id
     )
 
     thoughts_by_message_id: Dict[str, str] = {}

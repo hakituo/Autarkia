@@ -189,9 +189,7 @@ class FakeHandlers:
 
     def __init__(self, *, text_result=_UNSET, errors=None):
         self.calls = []
-        self.text_result = (
-            {"type": "text"} if text_result is _UNSET else text_result
-        )
+        self.text_result = {"type": "text"} if text_result is _UNSET else text_result
         self.errors = dict(errors or {})
 
     async def _invoke(self, name):
@@ -327,9 +325,7 @@ def _asyncio_shim(monkeypatch, **overrides):
 def _patch_security(monkeypatch, *, bypass=True, loopback=True):
     import core.middleware.security as security
 
-    monkeypatch.setattr(
-        security, "is_loopback_auth_bypass_enabled", lambda: bypass
-    )
+    monkeypatch.setattr(security, "is_loopback_auth_bypass_enabled", lambda: bypass)
     monkeypatch.setattr(security, "is_loopback_address", lambda host: loopback)
 
 
@@ -681,9 +677,7 @@ class TestInitialize:
 
         import core.interfaces.websocket.websocket_manager as wsm_mod
 
-        monkeypatch.setattr(
-            wsm_mod, "get_websocket_manager", lambda: called.append(1)
-        )
+        monkeypatch.setattr(wsm_mod, "get_websocket_manager", lambda: called.append(1))
 
         asyncio.run(adapter.initialize())
         assert called == []
@@ -1296,9 +1290,7 @@ class TestProcessMessage:
 
         monkeypatch.setattr(adapter, "_handle_device_command_result", _fake_device)
 
-        asyncio.run(
-            adapter._process_message(FakeWebSocket(), {"type": "device_command_result"})
-        )
+        asyncio.run(adapter._process_message(FakeWebSocket(), {"type": "device_command_result"}))
         assert seen == [{"type": "device_command_result"}]
 
     def test_unknown_type_is_forwarded_to_manager(self):
@@ -1317,9 +1309,7 @@ class TestProcessMessage:
     def test_handler_close_race_error_is_debug_only(self):
         handlers = FakeHandlers(
             errors={
-                "handle_ping": RuntimeError(
-                    "Cannot call send once a close message has been sent"
-                )
+                "handle_ping": RuntimeError("Cannot call send once a close message has been sent")
             }
         )
         adapter = _make_adapter(manager=None, handlers=handlers)
@@ -1328,9 +1318,7 @@ class TestProcessMessage:
         assert handlers.calls == ["handle_ping"]
 
     def test_handler_not_connected_error_is_debug_only(self):
-        handlers = FakeHandlers(
-            errors={"handle_ping": RuntimeError("WebSocket is not connected")}
-        )
+        handlers = FakeHandlers(errors={"handle_ping": RuntimeError("WebSocket is not connected")})
         adapter = _make_adapter(manager=None, handlers=handlers)
 
         asyncio.run(adapter._process_message(FakeWebSocket(), {"type": "ping"}))
@@ -1533,9 +1521,7 @@ class TestHandleDemoMessage:
         assert demo.pipelines[0]["request_id"] == generated_id
 
     def test_life_simulation_failure_is_swallowed(self, monkeypatch):
-        adapter, demo = self._setup(
-            monkeypatch, life_error=RuntimeError("life sim down")
-        )
+        adapter, demo = self._setup(monkeypatch, life_error=RuntimeError("life sim down"))
         ws = FakeWebSocket()
 
         self._run(
@@ -1564,9 +1550,7 @@ class TestGenerateImageAndSend:
             seen_results.append(result)
             return {"success": True, "prompt": result.get("prompt")}
 
-        monkeypatch.setattr(
-            adapter, "_prepare_image_payload", prepare or _default_prepare
-        )
+        monkeypatch.setattr(adapter, "_prepare_image_payload", prepare or _default_prepare)
         return adapter, seen_results
 
     def test_empty_prompt_returns_early(self, monkeypatch):
@@ -1592,18 +1576,14 @@ class TestGenerateImageAndSend:
         adapter, _ = self._prepare(monkeypatch, manager=manager)
         ws = FakeWebSocket()
 
-        asyncio.run(
-            adapter._generate_image_and_send(ws, "cat|dog", "m1", "cv1")
-        )
+        asyncio.run(adapter._generate_image_and_send(ws, "cat|dog", "m1", "cv1"))
 
         assert ws.sent[0]["data"]["status"] == "started"
         assert ws.sent[0]["data"]["prompt"] == "cat"
         assert manager.calls[0]["prompt"] == "cat"
 
     def test_queued_status_when_gate_busy(self, monkeypatch):
-        lock = FakeResourceLock(
-            status={"enabled": True, "active": 1, "waiting": 1}
-        )
+        lock = FakeResourceLock(status={"enabled": True, "active": 1, "waiting": 1})
         adapter, _ = self._prepare(monkeypatch, lock=lock)
         ws = FakeWebSocket()
 
@@ -1722,9 +1702,7 @@ class TestGenerateImageAndSend:
         ws = FakeWebSocket()
 
         async def _run():
-            task = asyncio.create_task(
-                adapter._generate_image_and_send(ws, "cat", "m1", "cv1")
-            )
+            task = asyncio.create_task(adapter._generate_image_and_send(ws, "cat", "m1", "cv1"))
             adapter._image_generation_tasks["m1"] = task
             await task
 
@@ -1752,9 +1730,7 @@ class TestPrepareImagePayload:
     def _patch_image_url(monkeypatch):
         import core.image.image_utils as img_utils
 
-        monkeypatch.setattr(
-            img_utils, "get_image_url", lambda path: f"url::{path}"
-        )
+        monkeypatch.setattr(img_utils, "get_image_url", lambda path: f"url::{path}")
 
     def test_thumbnail_generated_for_existing_file(self, monkeypatch, tmp_path):
         from PIL import Image
@@ -1783,9 +1759,7 @@ class TestPrepareImagePayload:
 
         missing = tmp_path / "nope.png"
         payload = asyncio.run(
-            adapter._prepare_image_payload(
-                {"success": True, "image_path": str(missing)}
-            )
+            adapter._prepare_image_payload({"success": True, "image_path": str(missing)})
         )
 
         assert "thumbnail_base64" not in payload
@@ -1806,9 +1780,7 @@ class TestPrepareImagePayload:
         monkeypatch.setattr(pil_image, "open", _boom)
 
         payload = asyncio.run(
-            adapter._prepare_image_payload(
-                {"success": True, "image_path": str(image_path)}
-            )
+            adapter._prepare_image_payload({"success": True, "image_path": str(image_path)})
         )
 
         assert "thumbnail_base64" not in payload
@@ -1863,9 +1835,7 @@ class TestPrepareImagePayload:
         )
 
         assert payload["image_url"] == "url::main.png"
-        assert payload["images"] == [
-            {"image_path": "extra.png", "url": "url::extra.png"}
-        ]
+        assert payload["images"] == [{"image_path": "extra.png", "url": "url::extra.png"}]
 
 
 # ============================================================
@@ -1911,6 +1881,7 @@ class TestHandleResourceUpdate:
         monkeypatch.setattr(rm_mod, "get_resource_manager", lambda: rm)
 
         if settings_error:
+
             def _boom_settings():
                 raise RuntimeError("settings boom")
 
@@ -1940,6 +1911,7 @@ class TestHandleResourceUpdate:
         import core.services.scheduler.cpp_scheduler_engine as sched_mod
 
         if scheduler_error:
+
             def _boom_sched(*args, **kwargs):
                 raise RuntimeError("scheduler boom")
 

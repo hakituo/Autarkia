@@ -5,6 +5,7 @@
 
 所有 IO 落 tmp_path，绝不触碰真实 companion_data。
 """
+
 from __future__ import annotations
 
 import json
@@ -128,24 +129,28 @@ def test_move_path_merge_rmdir_failure_logs(tmp_path, debug_on):
 def test_scope_to_chat_history_root_builtin(tmp_path, scope, dir_name):
     """各内置 scope 映射到对应角色目录（dual_role 归 aveline）。"""
     base = tmp_path / "companion_data"
-    assert dp._scope_to_chat_history_root(base, scope) == (base / dir_name / "chat_history").resolve()
+    assert (
+        dp._scope_to_chat_history_root(base, scope) == (base / dir_name / "chat_history").resolve()
+    )
 
 
 def test_scope_to_chat_history_root_invalid_falls_back(tmp_path):
     """非法 scope 归 aveline。"""
     base = tmp_path / "companion_data"
-    assert dp._scope_to_chat_history_root(base, "not_a_scope") == (
-        base / dp._AVELINE_DIR / "chat_history"
-    ).resolve()
+    assert (
+        dp._scope_to_chat_history_root(base, "not_a_scope")
+        == (base / dp._AVELINE_DIR / "chat_history").resolve()
+    )
 
 
 def test_scope_to_chat_history_root_dynamic(tmp_path, monkeypatch):
     """动态 scope 使用其 {scope}_data 目录名。"""
     monkeypatch.setattr(dp, "_get_role_scopes", lambda: {"aveline", "custom_role"})
     base = tmp_path / "companion_data"
-    assert dp._scope_to_chat_history_root(base, "custom_role") == (
-        base / "custom_role_data" / "chat_history"
-    ).resolve()
+    assert (
+        dp._scope_to_chat_history_root(base, "custom_role")
+        == (base / "custom_role_data" / "chat_history").resolve()
+    )
 
 
 # ────────────────────────── _migrate_active_care_layout ──────────────────────────
@@ -267,5 +272,3 @@ def test_migrate_daily_diary_relative_to_failure(tmp_path, monkeypatch, debug_on
     _patch_rglob_to_yield(monkeypatch, "daily", "diary/*.json", outside)
     dp._migrate_daily_diary_layout(base)
     assert outside.exists()
-
-

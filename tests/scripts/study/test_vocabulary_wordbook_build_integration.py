@@ -47,6 +47,24 @@ def _write_fixture(path: Path) -> None:
             "bnc": "0",
             "frq": "0",
         },
+        {
+            "word": "basin",
+            "phonetic": "'beisn",
+            "translation": "n. 盆, 盆地",
+            "pos": "n:100",
+            "tag": "cet4",
+            "bnc": "4000",
+            "frq": "6000",
+        },
+        {
+            "word": "layoff",
+            "phonetic": "'leiɒf",
+            "translation": "n. 临时解雇, 操作停止",
+            "pos": "n:100",
+            "tag": "cet6",
+            "bnc": "40000",
+            "frq": "7000",
+        },
     ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=ECDICT_FIELDS)
@@ -73,6 +91,7 @@ def test_wordbook_build_is_deterministic_and_applies_ranking(tmp_path: Path) -> 
         "sentence_dir": sentence_dir,
         "overrides_path": overrides,
         "progress_path": progress,
+        "qwerty_overlay_path": tmp_path / "missing_qwerty_overlay.json",
     }
     first_books, first_report = build_wordbooks(**kwargs)
     second_books, second_report = build_wordbooks(**kwargs)
@@ -96,4 +115,84 @@ def test_wordbook_build_is_deterministic_and_applies_ranking(tmp_path: Path) -> 
     assert [item["translation"] for item in unranked["translations"]] == [
         "原始第一义",
         "原始第二义",
+    ]
+
+
+def test_qwerty_overlay_is_primary_and_keeps_ecdict_extended(tmp_path: Path) -> None:
+    ecdict = tmp_path / "ecdict.csv"
+    words_dir = tmp_path / "Words"
+    sentence_dir = tmp_path / "Sentence"
+    overlay = tmp_path / "qwerty_overlay.json"
+    overrides = tmp_path / "overrides.json"
+    _write_fixture(ecdict)
+    overlay.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "words": {
+                    "basin": [
+                        {"type": "n", "translation": "盆地"},
+                        {"type": "n", "translation": "流域"},
+                    ],
+                    "layoff": [
+                        {"type": "n", "translation": "解雇"},
+                        {"type": "n", "translation": "裁员"},
+                    ],
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    books, _ = build_wordbooks(
+        ecdict_path=ecdict,
+        words_dir=words_dir,
+        sentence_dir=sentence_dir,
+        overrides_path=tmp_path / "missing_overrides.json",
+        progress_path=tmp_path / "missing_progress.json",
+        qwerty_overlay_path=overlay,
+    )
+    master = books["CET-全量.json"]
+
+    basin = _find(master, "basin")
+    assert [item["translation"] for item in basin["translations"]] == ["盆地", "流域"]
+    assert "盆" in [
+        item["translation"] for item in basin.get("extended_translations") or []
+    ]
+
+    layoff = _find(master, "layoff")
+    assert [item["translation"] for item in layoff["translations"]] == ["解雇", "裁员"]
+    assert "操作停止" in [
+        item["translation"] for item in layoff.get("extended_translations") or []
+    ]
+
+    # 人工 override 仍然高于开源词书覆盖层。
+    overrides.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "words": {
+                    "basin": {
+                        "collapse_source_translations": True,
+                        "primary_translations": [{"type": "n", "translation": "水域"}],
+                    }
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    override_books, _ = build_wordbooks(
+        ecdict_path=ecdict,
+        words_dir=words_dir,
+        sentence_dir=sentence_dir,
+        overrides_path=overrides,
+        progress_path=tmp_path / "missing_progress.json",
+        qwerty_overlay_path=overlay,
+    )
+    override_basin = _find(override_books["CET-全量.json"], "basin")
+    assert [item["translation"] for item in override_basin["translations"]] == ["水域"]
+    assert "流域" in [
+        item["translation"] for item in override_basin.get("extended_translations") or []
     ]

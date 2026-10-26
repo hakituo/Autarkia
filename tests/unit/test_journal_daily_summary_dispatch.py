@@ -5,6 +5,7 @@
 2. 补写窗口（凌晨 + 用户睡着）与去重只在这里判断
 3. 单个角色失败不拖垮其余角色，且失败可重试
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -80,9 +81,7 @@ async def test_unregistered_role_never_receives_diary(monkeypatch, registered_ro
     calls: list[tuple[str, bool, object]] = []
     _patch_journal(monkeypatch, calls)
 
-    await dispatch.generate_registered_summaries(
-        "2026-09-25", force=False, reason="sleep_backfill"
-    )
+    await dispatch.generate_registered_summaries("2026-09-25", force=False, reason="sleep_backfill")
 
     assert "ling" not in [call[0] for call in calls]
 
@@ -91,9 +90,7 @@ async def test_distinct_from_carries_previous_text(monkeypatch, registered_roles
     calls: list[tuple[str, bool, object]] = []
     _patch_journal(monkeypatch, calls)
 
-    await dispatch.generate_registered_summaries(
-        "2026-09-25", force=True, reason="nightly"
-    )
+    await dispatch.generate_registered_summaries("2026-09-25", force=True, reason="nightly")
 
     assert calls[0][2] is None
     assert "aveline 的日记正文" in str(calls[1][2] or "")
@@ -120,9 +117,10 @@ async def test_no_registered_role_returns_empty(monkeypatch):
     calls: list[tuple[str, bool, object]] = []
     _patch_journal(monkeypatch, calls)
 
-    assert await dispatch.generate_registered_summaries(
-        "2026-09-25", force=True, reason="nightly"
-    ) == {}
+    assert (
+        await dispatch.generate_registered_summaries("2026-09-25", force=True, reason="nightly")
+        == {}
+    )
     assert calls == []
 
 
@@ -131,12 +129,7 @@ async def test_backfill_skipped_when_user_not_sleeping(monkeypatch, registered_r
     _patch_journal(monkeypatch, calls)
     monkeypatch.setattr(dispatch, "get_diary_target_date_str", lambda _dt: "2026-09-25")
 
-    assert (
-        await dispatch.backfill_after_sleep(
-            _at(0, 10), is_sleeping=False
-        )
-        == {}
-    )
+    assert await dispatch.backfill_after_sleep(_at(0, 10), is_sleeping=False) == {}
     assert calls == []
 
 
@@ -146,12 +139,7 @@ async def test_backfill_skipped_after_noon(monkeypatch, registered_roles):
     _patch_journal(monkeypatch, calls)
     monkeypatch.setattr(dispatch, "get_diary_target_date_str", lambda _dt: "2026-09-26")
 
-    assert (
-        await dispatch.backfill_after_sleep(
-            _at(13, 0), is_sleeping=True
-        )
-        == {}
-    )
+    assert await dispatch.backfill_after_sleep(_at(13, 0), is_sleeping=True) == {}
     assert calls == []
 
 
@@ -160,12 +148,8 @@ async def test_backfill_runs_once_per_date(monkeypatch, registered_roles):
     _patch_journal(monkeypatch, calls)
     monkeypatch.setattr(dispatch, "get_diary_target_date_str", lambda _dt: "2026-09-25")
 
-    first = await dispatch.backfill_after_sleep(
-        _at(0, 10), is_sleeping=True
-    )
-    second = await dispatch.backfill_after_sleep(
-        _at(0, 20), is_sleeping=True
-    )
+    first = await dispatch.backfill_after_sleep(_at(0, 10), is_sleeping=True)
+    second = await dispatch.backfill_after_sleep(_at(0, 20), is_sleeping=True)
 
     assert len(first) == 2
     assert second == {}
@@ -191,9 +175,7 @@ async def test_backfill_retries_after_failure(monkeypatch, registered_roles):
         "core.services.journal.service.get_journal_service",
         lambda: _OkJournal(),
     )
-    retry = await dispatch.backfill_after_sleep(
-        _at(0, 20), is_sleeping=True
-    )
+    retry = await dispatch.backfill_after_sleep(_at(0, 20), is_sleeping=True)
     assert len(retry) == 2
 
 
@@ -202,16 +184,9 @@ async def test_schedule_backfill_is_fire_and_forget(monkeypatch, registered_role
     _patch_journal(monkeypatch, calls)
     monkeypatch.setattr(dispatch, "get_diary_target_date_str", lambda _dt: "2026-09-25")
 
-    task = dispatch.schedule_backfill_after_sleep(
-        _at(0, 10), is_sleeping=True
-    )
+    task = dispatch.schedule_backfill_after_sleep(_at(0, 10), is_sleeping=True)
     assert task is not None
     await task
     assert len(calls) == 2
 
-    assert (
-        dispatch.schedule_backfill_after_sleep(
-            _at(0, 30), is_sleeping=True
-        )
-        is None
-    )
+    assert dispatch.schedule_backfill_after_sleep(_at(0, 30), is_sleeping=True) is None

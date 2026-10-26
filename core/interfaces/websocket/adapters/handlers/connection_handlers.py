@@ -5,11 +5,13 @@
 处理 ping、pong、reconnect 等连接管理消息
 """
 
-from core.utils.logger import get_logger
-
 import time
+
 from fastapi import WebSocket
 from starlette.websockets import WebSocketState
+
+from core.utils.logger import get_logger
+from core.utils.websocket_logging import is_websocket_disconnect_error
 
 logger = get_logger(__name__)
 
@@ -89,9 +91,16 @@ class ConnectionHandlers:
             logger.debug("收到 ping，但连接已关闭，跳过 pong 响应")
             return
         await self._refresh_connection_metadata(websocket, message)
-        await websocket.send_json(
-            {"type": "pong", "timestamp": message.get("timestamp", time.time())}
-        )
+        try:
+            await websocket.send_json(
+                {"type": "pong", "timestamp": message.get("timestamp", time.time())}
+            )
+        except Exception as exc:
+            # 心跳发送与客户端断开天然存在竞态：send 时连接刚断会抛
+            # WebSocketDisconnect / ClientDisconnected，属于正常现象
+            if not is_websocket_disconnect_error(exc):
+                raise
+            logger.debug("发送 pong 时连接已断开，跳过响应：%s", type(exc).__name__)
 
     async def handle_pong(self, websocket: WebSocket, message: dict):
         """处理 pong 消息"""

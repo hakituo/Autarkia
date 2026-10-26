@@ -86,14 +86,14 @@ import javax.inject.Singleton
 @Singleton
 class EndpointResolver @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val appPreferences: AppPreferences
+    internal val appPreferences: AppPreferences
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val inspector = NetworkTransportInspector(context)
 
-    private val prober = EndpointProber { appPreferences.accessToken }
+    internal val prober = EndpointProber { appPreferences.accessToken }
 
     /** 网络监听交给 [NetworkWatcher]；它只在「有更优候选」时才让门面真的发探测请求。 */
     private val watcher = NetworkWatcher(
@@ -121,7 +121,7 @@ class EndpointResolver @Inject constructor(
     val changes: SharedFlow<String> = _changes.asSharedFlow()
 
     /** 串行化探测：并发探测会互相覆盖 activeUrl，也会把网络堆满。 */
-    private val resolveMutex = Mutex()
+    internal val resolveMutex = Mutex()
 
     /** 上次「失败降级」探测的时间戳，用于节流。 */
     private val lastFailureProbeAt = AtomicLong(0L)
@@ -360,8 +360,8 @@ class EndpointResolver @Inject constructor(
          * 局域网探测超时。**必须短**：出门在外时局域网候选是必然连不上的，
          * 超时多长，用户就要多等多久才能降到公网。局域网正常应在 100ms 内返回。
          */
-        private const val LAN_CONNECT_TIMEOUT_MS = 800
-        private const val LAN_READ_TIMEOUT_MS = 800
+        internal const val LAN_CONNECT_TIMEOUT_MS = 800
+        internal const val LAN_READ_TIMEOUT_MS = 800
 
         /**
          * 组网通道探测超时：Tailscale 打洞成功时是几十毫秒的直连，走 DERP 中继多一跳
@@ -370,12 +370,12 @@ class EndpointResolver @Inject constructor(
          * 比公网（3s）短是刻意的：手机端没开 Tailscale 时，100.x 地址在蜂窝网络下不可达，
          * 连接会一直挂到超时才转公网候选。这段等待是用户能感知的「切换卡顿」，能短就短。
          */
-        private const val VPN_CONNECT_TIMEOUT_MS = 1500
-        private const val VPN_READ_TIMEOUT_MS = 1500
+        internal const val VPN_CONNECT_TIMEOUT_MS = 1500
+        internal const val VPN_READ_TIMEOUT_MS = 1500
 
         /** 公网探测超时：TLS 握手 + Cloudflare 边缘回源，需要给宽一些。 */
-        private const val WAN_CONNECT_TIMEOUT_MS = 3000
-        private const val WAN_READ_TIMEOUT_MS = 3000
+        internal const val WAN_CONNECT_TIMEOUT_MS = 3000
+        internal const val WAN_READ_TIMEOUT_MS = 3000
 
         /** 「失败降级」探测的最小间隔，避免重连风暴把探测打成高频任务。 */
         private const val FAILURE_PROBE_MIN_INTERVAL_MS = 20_000L

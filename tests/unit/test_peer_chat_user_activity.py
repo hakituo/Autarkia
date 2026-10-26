@@ -60,6 +60,7 @@ class _StubStorage:
 # resolve_role_scope
 # ============================================================
 
+
 class TestResolveRoleScope:
     """role_id / conversation_id → 角色 scope 归一化。"""
 
@@ -90,6 +91,7 @@ class TestResolveRoleScope:
 # ============================================================
 # 写入与节流持久化
 # ============================================================
+
 
 class TestMarkAndPersist:
     """mark 的写入与节流持久化行为。"""
@@ -158,6 +160,7 @@ class TestMarkAndPersist:
 # 恢复
 # ============================================================
 
+
 class TestLoad:
     """启动时从 proactive_state 恢复。"""
 
@@ -186,9 +189,7 @@ class TestLoad:
 
     async def test_load_skips_invalid_entries(self):
         """非法时间戳条目被跳过，其余照常恢复。"""
-        storage = _StubStorage(
-            {USER_ACTIVITY_STATE_KEY: {"good": 100.0, "bad": "not-a-number"}}
-        )
+        storage = _StubStorage({USER_ACTIVITY_STATE_KEY: {"good": 100.0, "bad": "not-a-number"}})
         tracker = UserActivityTracker(storage)
 
         await tracker.load()
@@ -217,6 +218,7 @@ class TestLoad:
 # ============================================================
 # 判定
 # ============================================================
+
 
 class TestIsActive:
     """is_active：具体会话的活跃窗口判定。"""
@@ -350,9 +352,7 @@ class TestIsActiveForScope:
         """
         import core.utils.data.scope_registry as scope_registry
 
-        monkeypatch.setattr(
-            scope_registry, "matched_persona_scope", lambda cid: ""
-        )
+        monkeypatch.setattr(scope_registry, "matched_persona_scope", lambda cid: "")
         tracker = UserActivityTracker(_StubStorage())
         tracker._activity_ts["group_chat_999"] = time.time()
 
@@ -437,6 +437,7 @@ class TestLatestTsAndSnapshot:
 # ============================================================
 # build_default_tracker
 # ============================================================
+
 
 class TestBuildDefaultTracker:
     """按配置构造 tracker。"""
@@ -601,9 +602,7 @@ class TestObservabilityAndDefensiveBranches:
         assert any("用户活跃持久化任务异常" in text for text in errors)
         assert tracker._pending_tasks == set()
 
-    def test_is_active_for_scope_returns_false_when_registry_unimportable(
-        self, monkeypatch
-    ):
+    def test_is_active_for_scope_returns_false_when_registry_unimportable(self, monkeypatch):
         """scope 注册表不可导入时降级为 False，不抛异常。"""
         import core.utils.data.scope_registry as scope_registry
 

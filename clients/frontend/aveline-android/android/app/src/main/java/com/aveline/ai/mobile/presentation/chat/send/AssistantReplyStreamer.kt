@@ -2,6 +2,7 @@ package com.aveline.ai.mobile.presentation.chat.send
 
 import android.util.Log
 import com.aveline.ai.mobile.data.remote.api.StreamEvent
+import com.aveline.ai.mobile.data.remote.api.errorFromThrowable
 import com.aveline.ai.mobile.domain.models.Emotion
 import com.aveline.ai.mobile.domain.models.Message
 import com.aveline.ai.mobile.domain.repository.ChatBranchContext
@@ -9,6 +10,7 @@ import com.aveline.ai.mobile.domain.repository.ChatRepository
 import com.aveline.ai.mobile.presentation.chat.ChatFlushManager
 import com.aveline.ai.mobile.presentation.chat.ChatTtsController
 import com.aveline.ai.mobile.presentation.chat.ChatUiState
+import com.aveline.ai.mobile.services.media.LocalMediaStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +36,9 @@ internal class AssistantReplyStreamer(
     private val previewWriter: ConversationPreviewWriter,
     private val replyNotifier: ReplyOutcomeNotifier,
     private val mapEmotion: (String) -> Emotion?,
-    private val resolveRoleModelRoute: () -> String? = { null }
+    private val resolveRoleModelRoute: () -> String? = { null },
+    /** 媒体本地仓库：SSE 推送的图片/表情包收到即落盘。可空 + 默认值：单测不传。 */
+    private val localMediaStore: LocalMediaStore? = null
 ) {
     private companion object {
         const val TAG = "AssistantReplyStreamer"
@@ -190,7 +194,8 @@ internal class AssistantReplyStreamer(
                             ttsController.stopIfEnabled()
                             uiState.update {
                                 it.copy(
-                                    error = "生成失败: ${event.message}",
+                                    // describe() 会带上后端给的错误码/详情，不再只剩一句笼统文案
+                                    error = "生成失败: ${event.describe()}",
                                     isTyping = false,
                                     showTypingIndicator = false
                                 )
@@ -217,6 +222,8 @@ internal class AssistantReplyStreamer(
                     }
                     is StreamEvent.ImageResult -> {
                         hasMedia = true
+                        // 收到即落盘：用户滚到这条消息前文件已在本地，冷启动直接读文件
+                        localMediaStore?.prefetch(event.imageUrl)
                         // 图挂在"当前正文气泡"后面；封口后会在图下面新开一条正文气泡，
                         // 下一张图再挂到那条新气泡下，连发多张时自然串成一条链。
                         val imageMessage = Message(
@@ -245,6 +252,8 @@ internal class AssistantReplyStreamer(
                     }
                     is StreamEvent.VideoResult -> {
                         hasMedia = true
+                        // 收到即落盘：与图片同理，滚动到这条消息前文件已在本地
+                        localMediaStore?.prefetch(event.videoUrl)
                         // 与图片同理：视频也接在"当前正文气泡"后面，由封口逻辑串成链
                         val videoMessage = Message(
                             id = SendRuntime.generateMessageId(),
@@ -295,7 +304,8 @@ internal class AssistantReplyStreamer(
             guard.withUiIfActive(sessionId) {
                 uiState.update {
                     it.copy(
-                        error = "生成失败: ${e.message ?: e.javaClass.simpleName}",
+                        // 带上异常类型与原始 message，别只给用户一句无法定位的 "内部错误"
+                        error = errorFromThrowable(e, "生成失败").describe(),
                         isTyping = false,
                         showTypingIndicator = false
                     )

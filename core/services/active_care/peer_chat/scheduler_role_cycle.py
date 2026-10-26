@@ -247,17 +247,17 @@ class PeerChatRoleCycleMixin:
             if peer_qq_id:
                 return peer_qq_id
 
-        # 兜底：读角色专属环境变量 XIAOYOU_QQ_BOT_NUMBER_{ROLE_ID_UPPER}
+        # 兜底：读角色专属环境变量 AUTARKIA_QQ_BOT_NUMBER_{ROLE_ID_UPPER}
         # 向后兼容:aveline/ling 用旧 env var 名
         env_key_legacy = None
         if peer_role_id == "aveline":
-            env_key_legacy = "XIAOYOU_QQ_BOT_NUMBER"
+            env_key_legacy = "AUTARKIA_QQ_BOT_NUMBER"
         elif peer_role_id == "ling":
-            env_key_legacy = "XIAOYOU_QQ_BOT_NUMBER_LING"
+            env_key_legacy = "AUTARKIA_QQ_BOT_NUMBER_LING"
         if env_key_legacy:
             val = os.getenv(env_key_legacy, "").strip()
             if val:
                 return val
-        # N 角色通用:XIAOYOU_QQ_BOT_NUMBER_{ROLE_ID_UPPER}
-        env_key_generic = f"XIAOYOU_QQ_BOT_NUMBER_{peer_role_id.upper()}"
+        # N 角色通用:AUTARKIA_QQ_BOT_NUMBER_{ROLE_ID_UPPER}
+        env_key_generic = f"AUTARKIA_QQ_BOT_NUMBER_{peer_role_id.upper()}"
         return os.getenv(env_key_generic, "").strip()

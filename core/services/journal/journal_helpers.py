@@ -366,53 +366,76 @@ def format_peer_chat_context(peer_history: List[Dict[str, Any]], persona: str = 
     return "\n".join(lines)
 
 
+def _format_timeline(timeline: List[Dict[str, Any]]) -> str:
+    """把活动实例渲染成「时间 做什么（在哪；细节）」的逐行清单。"""
+    lines = []
+    for item in timeline:
+        label = str(item.get("label") or "").strip()
+        if not label:
+            continue
+        start = str(item.get("start") or "")[11:16]
+        end = str(item.get("end") or "")[11:16]
+        extras = [
+            str(item.get(key) or "").strip()
+            for key in ("location", "detail")
+            if str(item.get(key) or "").strip()
+        ]
+        line = f"{start}-{end} {label}"
+        if extras:
+            line += f"（{'；'.join(extras)}）"
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def format_character_daily_context(character_daily: Dict[str, Any], persona: str = "aveline") -> str:
-    """格式化角色日常活动上下文（自然描述，非流水账）
+    """格式化角色当天的生活时间线。
+
+    日记的主干是「她这一天自己做了什么」，所以这里给的是按时间排列的具体活动
+    （短动作名 + 地点 + 细节），而不是「今天主要在 studying」这种枚举概括。
+    没有归档实例时回退到旧的概括口径。
 
     Args:
         character_daily: 从 SummaryContextLoader.load_character_daily_activities 获取的数据
         persona: 当前生成日记的角色视角
 
     Returns:
-        自然语言描述的活动摘要，供 LLM 参考但不直接照抄
+        逐行的当天活动清单，供 LLM 当素材但不照着抄
     """
     if not character_daily:
         return ""
 
     parts = []
-    
-    # 当前角色的活动摘要
-    role_data = character_daily.get(persona)
-    if role_data and role_data.get("activities"):
+    role_data = character_daily.get(persona) or {}
+    timeline = role_data.get("timeline") or []
+
+    rendered = _format_timeline(timeline)
+    if rendered:
+        parts.append(rendered)
+    elif role_data.get("activities"):
         activities = role_data["activities"]
-        
-        # 统计活动类型
         completed = [a for a in activities if a.get("status") == "completed"]
         ongoing = [a for a in activities if a.get("status") == "ongoing"]
-        
-        # 提取主要活动（去重）
-        unique_activities = list(set(a.get("activity") for a in completed))
-        
+        # dict.fromkeys 去重并保序，避免 set 造成同一份素材每次顺序不同
+        unique_activities = list(
+            dict.fromkeys(a.get("activity") for a in completed if a.get("activity"))
+        )
         if unique_activities:
-            # 用更自然的方式描述
             if len(unique_activities) <= 2:
                 activity_desc = "和".join(unique_activities)
             else:
                 activity_desc = "、".join(unique_activities[:3]) + "等"
             parts.append(f"今天主要在{activity_desc}")
-        
         if ongoing:
             current = ongoing[0].get("verb", "")
             if current:
                 parts.append(f"现在正在{current}")
-        
-        peer_count = role_data.get("peer_chat_count", 0)
-        peer_ids = get_diary_peer_ids(persona)
-        if peer_count > 0 and peer_ids:
-            parts.append(f"和{get_diary_display_name(peer_ids[0])}聊了几次天")
+
+    peer_count = role_data.get("peer_chat_count", 0)
+    peer_ids = get_diary_peer_ids(persona)
+    if peer_count > 0 and peer_ids:
+        parts.append(f"和{get_diary_display_name(peer_ids[0])}聊了几次天")
 
     # 互识角色的简要状态（没有互识关系的角色不注入别人的生活）
-    peer_ids = get_diary_peer_ids(persona)
     for other_role in peer_ids:
         other_data = character_daily.get(other_role)
         if not (other_data and other_data.get("activities")):
@@ -420,12 +443,11 @@ def format_character_daily_context(character_daily: Dict[str, Any], persona: str
         activities = other_data["activities"]
         if not activities:
             continue
-        # 取最新的活动
         verb = activities[-1].get("verb", "")
         if verb:
             parts.append(f"{get_diary_display_name(other_role)}刚{verb}")
 
-    return "，".join(parts) if parts else ""
+    return "\n".join(parts) if parts else ""
 
 
 def _resolve_diary_prompt_templates(persona: str) -> Tuple[str, str]:
@@ -542,7 +564,8 @@ def build_daily_summary_messages(
         daily_context=daily_context,
         peer_chat_context=peer_chat_context,
         user_diary_context=user_diary_context or "主人今天还没有写日记。",
-        character_daily_context=character_daily_context or "无角色日常活动数据。",
+        character_daily_context=character_daily_context
+        or "（今天没有活动记录。不要替我编白天做了什么，只写有据可查的部分。）",
         diary_reread_context=diary_reread_context or "前夜没有翻看旧日记。",
     )
     return [

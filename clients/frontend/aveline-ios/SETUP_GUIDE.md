@@ -28,7 +28,7 @@
 
 选择保存位置为：
 ```
-D:\projects\xiaoyou\clients\frontend\aveline-ios\
+d:\AI\autarkia\clients\frontend\aveline-ios\
 ```
 
 项目名称会自动创建 `Aveline.xcodeproj` 文件。

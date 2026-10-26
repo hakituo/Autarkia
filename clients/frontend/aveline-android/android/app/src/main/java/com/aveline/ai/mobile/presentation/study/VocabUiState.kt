@@ -2,21 +2,6 @@ package com.aveline.ai.mobile.presentation.study
 
 import kotlinx.serialization.Serializable
 
-/**
- * 词汇复习域 UI 状态。
- *
- * 从原 [StudyUiState] 中抽取,由 [StudyVocabReviewManager] 独立维护,
- * 与 [StudyUiState] 共享同一 ViewModel 作用域但状态流分离,职责更清晰。
- *
- * @property dailyWords 每日词汇(Daily Vocabulary)列表
- * @property learnWords 待复习/待学习词汇列表(含完整释义)
- * @property isReviewMode 是否处于复习模式(全屏覆盖)
- * @property currentCardIndex 当前复习卡片索引
- * @property showAnswer 当前卡片是否展示答案
- * @property sessionStats 复习会话统计
- * @property sessionSummary 会话总结(复习完成后展示,null 表示无)
- * @property dictStats 词典统计(暂未使用)
- */
 /** 单张卡片的复习结果（用于会话总结的会/不会清单） */
 @Serializable
 data class ReviewResultItem(
@@ -61,10 +46,31 @@ const val DEFAULT_NEW_WORDS_BATCH_SIZE = 20
 const val DEFAULT_REVIEW_BATCH_SIZE = 20
 
 /** 背新词与复习共用同一组分档，避免两处设置口径不一致。 */
-val VOCAB_BATCH_SIZE_OPTIONS = listOf(10, 20, 30, 50)
+val VOCAB_BATCH_SIZE_OPTIONS = listOf(10, 20, 50)
 val NEW_WORDS_BATCH_SIZE_OPTIONS = VOCAB_BATCH_SIZE_OPTIONS
 val REVIEW_BATCH_SIZE_OPTIONS = VOCAB_BATCH_SIZE_OPTIONS
 
+/** 词汇模块子页面层级（由 [StudyScreenV2] 提升持有）。 */
+enum class VocabSubScreen {
+    DASHBOARD,
+    BOOK_LIST,
+    BOOK_DETAIL,
+    MISTAKES
+}
+
+/**
+ * 词汇复习域 UI 状态。
+ *
+ * 从原 `StudyUiState` 中抽取，由 [StudyVocabReviewManager] 独立维护，
+ * 与 `StudyUiState` 共享同一 ViewModel 作用域但状态流分离，职责更清晰。
+ *
+ * @property learnWords 待复习/待学习词汇列表(含完整释义)
+ * @property isReviewMode 是否处于复习模式(全屏覆盖)
+ * @property currentCardIndex 当前复习卡片索引
+ * @property showAnswer 当前卡片是否展示答案
+ * @property sessionStats 复习会话统计
+ * @property sessionSummary 会话总结(复习完成后展示,null 表示无)
+ */
 data class VocabUiState(
     val dailyWords: List<StudyWord> = emptyList(),
     val learnWords: List<DailyWord> = emptyList(),
@@ -104,10 +110,6 @@ data class VocabUiState(
     val todayVocab: TodayVocabSummary? = null,
     /** 当前词书学习进度 */
     val bookProgress: VocabBookProgress? = null,
-    /** 当前词书里最近学过的词（进度卡预览） */
-    val learnedWords: List<LearnedWordItem> = emptyList(),
-    /** 已学单词总数（用于「查看全部」文案） */
-    val learnedWordsTotal: Int = 0,
     /** 今日已手动记录的背诵单词总数 */
     val manualStudyToday: Int = 0,
     /** 可用词书文件名列表(来自后端 available_word_files) */
@@ -171,14 +173,4 @@ data class VocabBookProgress(
     val progressPercent: Float,
     val todayNew: Int,
     val todayReview: Int
-)
-
-/** 已学单词列表项 */
-data class LearnedWordItem(
-    val word: String,
-    val translation: String,
-    /** mastered / learning / due */
-    val status: String,
-    val intervalDays: Int,
-    val lastReviewAt: String
 )

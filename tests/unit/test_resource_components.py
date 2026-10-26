@@ -11,6 +11,7 @@
 - 不使用 ``sleep``，不依赖真实当前时间（用固定 ``time.time`` 桩）；
 - 只断言「注入的桩值被正确读出 / 计算」，不断言真实内存、显存、耗时等易变数值。
 """
+
 from __future__ import annotations
 
 import sys

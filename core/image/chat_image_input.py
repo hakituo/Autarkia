@@ -40,9 +40,10 @@ _MIME_BY_SUFFIX = {
 }
 
 # 历史消息里的图片按**原位置**还原成 image_url（主流产品都是「图一直在上下文里」）。
-# 张数与字节数封顶，避免一次带太多图把请求体撑大。
-HISTORY_IMAGE_MAX_COUNT = 3
-HISTORY_IMAGE_MAX_BYTES = 24 * 1024 * 1024
+# 0 表示不设上限：历史窗口本身就是天然边界，窗口内的图全部还原，不再只留最近几张。
+# 需要收紧时（例如线上请求体吃紧）给 restore_history_images 传正数即可。
+HISTORY_IMAGE_MAX_COUNT = 0
+HISTORY_IMAGE_MAX_BYTES = 0
 
 # 历史消息里的标记不一定在行首（可能被 caption 或其他标记包着），
 # 所以这里用 search 版正则，不复用只做整条消息匹配的 _IMAGE_MESSAGE_RE。
@@ -178,18 +179,23 @@ async def restore_history_images(
     历史落库只存文本标记，所以每轮重建 prompt 时按标记把图读回来即可，
     不需要摘要，也不需要判断「这轮是不是在追问」。
 
-    预算从新到旧分配：先保证最近的图；超出张数/字节上限的旧图保持纯文本。
-    返回实际还原的张数。
+    ``max_images`` / ``max_bytes`` 为 **0 时不设上限**（默认）：历史窗口本身
+    就是天然边界，窗口内的图全部还原。传正数则从新到旧分配预算，超限的旧图
+    保持纯文本。返回实际还原的张数。
     """
-    if max_images <= 0 or max_bytes <= 0 or not isinstance(messages, list):
+    if not isinstance(messages, list):
         return 0
 
-    remaining_count = max_images
-    remaining_bytes = max_bytes
+    limit_count = int(max_images or 0) > 0
+    limit_bytes = int(max_bytes or 0) > 0
+    remaining_count = int(max_images or 0)
+    remaining_bytes = int(max_bytes or 0)
     restored = 0
 
     for msg in reversed(messages):
-        if remaining_count <= 0 or remaining_bytes <= 0:
+        if (limit_count and remaining_count <= 0) or (
+            limit_bytes and remaining_bytes <= 0
+        ):
             break
         if not isinstance(msg, dict) or msg.get("role") != "user":
             continue
@@ -199,16 +205,18 @@ async def restore_history_images(
 
         image_parts: List[dict] = []
         for ref in refs:
-            if remaining_count <= 0:
+            if limit_count and remaining_count <= 0:
                 break
             data_url = await load_uploaded_image_data_url(ref)
             if not data_url:
                 continue
             estimated_bytes = len(data_url) * 3 // 4
-            if estimated_bytes > remaining_bytes:
+            if limit_bytes and estimated_bytes > remaining_bytes:
                 continue
-            remaining_bytes -= estimated_bytes
-            remaining_count -= 1
+            if limit_bytes:
+                remaining_bytes -= estimated_bytes
+            if limit_count:
+                remaining_count -= 1
             image_parts.append(
                 {"type": "image_url", "image_url": {"url": data_url}}
             )

@@ -18,6 +18,7 @@ import websockets.exceptions  # websockets>=11 需显式导入，否则 websocke
 from starlette.websockets import WebSocketDisconnect
 
 from core.contracts import ConnectionState
+from core.utils.websocket_logging import is_websocket_disconnect_error
 
 logger = get_logger(__name__)
 
@@ -65,32 +66,8 @@ class MessageSendingMixin:
     """消息发送相关方法"""
 
     def _is_disconnect_exception(self, error: Exception) -> bool:
-        """判断异常是否表示连接已断开"""
-        if isinstance(
-            error,
-            (
-                websockets.exceptions.ConnectionClosedError,
-                websockets.exceptions.ConnectionClosedOK,
-                WebSocketDisconnect,
-            ),
-        ):
-            return True
-        if error.__class__.__name__ == "ClientDisconnected":
-            return True
-        error_message = str(error).lower()
-        disconnect_signals = (
-            "keepalive ping timeout",
-            "no close frame received",
-            "close message has been sent",
-            "connection closed",
-            "client disconnected",
-            # Starlette/uvicorn 在连接已关闭（close 已发送或响应已完成）后
-            # 再调用 send 会抛该 RuntimeError，属于连接断开，不应重试
-            "unexpected asgi message",
-            "after sending 'websocket.close'",
-            "response already completed",
-        )
-        return any(signal in error_message for signal in disconnect_signals)
+        """判断异常是否表示连接已断开（统一实现在 websocket_logging）"""
+        return is_websocket_disconnect_error(error)
 
     async def send_with_retry(
         self,

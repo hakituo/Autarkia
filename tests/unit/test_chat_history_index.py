@@ -288,9 +288,7 @@ def test_recent_events_index_and_file_scan_agree(tmp_path, monkeypatch):
     _disable_index(monkeypatch)
     scanned = _store(tmp_path).list_recent_events(limit=3, roles=["user", "assistant"])
 
-    assert [item["event_id"] for item in indexed] == [
-        item["event_id"] for item in scanned
-    ]
+    assert [item["event_id"] for item in indexed] == [item["event_id"] for item in scanned]
     assert [item["event_id"] for item in indexed] == ["a2", "a4", "a5"]
 
 
@@ -308,8 +306,7 @@ def test_recent_events_applies_predicate_like_file_scan(tmp_path, monkeypatch):
 
     def predicate(payload: dict) -> bool:
         return bool(str(payload.get("content") or "").strip()) and not (
-            isinstance(payload.get("metadata"), dict)
-            and payload["metadata"].get("hidden")
+            isinstance(payload.get("metadata"), dict) and payload["metadata"].get("hidden")
         )
 
     indexed = _store(tmp_path).list_recent_events(limit=5, predicate=predicate)
@@ -318,9 +315,7 @@ def test_recent_events_applies_predicate_like_file_scan(tmp_path, monkeypatch):
     scanned = _store(tmp_path).list_recent_events(limit=5, predicate=predicate)
 
     assert [item["event_id"] for item in indexed] == ["p2", "p4"]
-    assert [item["event_id"] for item in indexed] == [
-        item["event_id"] for item in scanned
-    ]
+    assert [item["event_id"] for item in indexed] == [item["event_id"] for item in scanned]
 
 
 def test_conversation_query_filters_match_file_scan(tmp_path, monkeypatch):
@@ -333,7 +328,9 @@ def test_conversation_query_filters_match_file_scan(tmp_path, monkeypatch):
             _jsonl_line(_event("q2", 2.0, content="初二女生的话题", role="assistant")),
             _jsonl_line(_event("q3", 3.0, content="今天天气不错")),
             _jsonl_line(_event("q4", 4.0, content="QQ 上的记录", metadata={"platform": "qq"})),
-            _jsonl_line(_event("q5", 5.0, content="obsidian 的记录", metadata={"platform": "obsidian"})),
+            _jsonl_line(
+                _event("q5", 5.0, content="obsidian 的记录", metadata={"platform": "obsidian"})
+            ),
             _jsonl_line(_event("q6", 6.0, content="内心独白", event_type="chat_thought")),
         ],
     )
@@ -398,12 +395,11 @@ def test_query_supports_scope_role_type_and_time_range(tmp_path):
     ]
     assert [item["event_id"] for item in index.query(roles=["user"], limit=0)] == ["t1"]
     assert [
-        item["event_id"]
-        for item in index.query(exclude_event_types=["chat_thought"], limit=0)
+        item["event_id"] for item in index.query(exclude_event_types=["chat_thought"], limit=0)
     ] == ["t1", "t3"]
-    assert [
-        item["event_id"] for item in index.query(event_types=["chat_thought"], limit=0)
-    ] == ["t2"]
+    assert [item["event_id"] for item in index.query(event_types=["chat_thought"], limit=0)] == [
+        "t2"
+    ]
     assert [item["event_id"] for item in index.query(after=2.0, limit=0)] == ["t2", "t3"]
     assert [item["event_id"] for item in index.query(before=2.0, limit=0)] == ["t1"]
     assert [item["event_id"] for item in index.query(conversation_ids=[], limit=0)] == []
@@ -439,12 +435,7 @@ def test_get_event_content_uses_index_then_falls_back(tmp_path, monkeypatch):
     reset_history_index_registry()
     _disable_index(monkeypatch)
     assert _store(tmp_path).get_event_content(ref) == "点查正文"
-    assert (
-        _store(tmp_path).get_event_content(
-            {**ref, "event_id": "missing"}
-        )
-        is None
-    )
+    assert _store(tmp_path).get_event_content({**ref, "event_id": "missing"}) is None
 
 
 def test_delete_conversation_clears_index_and_files(tmp_path):
@@ -505,7 +496,11 @@ def test_concurrent_queries_and_appends_stay_consistent(tmp_path):
         except BaseException as exc:  # pragma: no cover
             errors.append(exc)
 
-    threads = [threading.Thread(target=reader), threading.Thread(target=reader), threading.Thread(target=writer)]
+    threads = [
+        threading.Thread(target=reader),
+        threading.Thread(target=reader),
+        threading.Thread(target=writer),
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:

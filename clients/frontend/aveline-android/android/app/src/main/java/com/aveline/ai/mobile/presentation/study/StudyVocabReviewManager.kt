@@ -77,12 +77,13 @@ class StudyVocabReviewManager(
      * 用户再次点击对应入口后，由 startReview/startNewWordsSession 从断点继续。
      */
     fun restoreUnfinishedSession(): Boolean {
-        sessionStore?.getNewWordsBatchSize()?.let { batchSize ->
-            vocabState.update { it.copy(newWordsBatchSize = batchSize) }
-        }
-        sessionStore?.getReviewBatchSize()?.let { batchSize ->
-            vocabState.update { it.copy(reviewBatchSize = batchSize) }
-        }
+        // 旧版本存过 30 这类已下线的档位，恢复时丢弃，避免分段选择没有选中项。
+        sessionStore?.getNewWordsBatchSize()
+            ?.takeIf { it in NEW_WORDS_BATCH_SIZE_OPTIONS }
+            ?.let { batchSize -> vocabState.update { it.copy(newWordsBatchSize = batchSize) } }
+        sessionStore?.getReviewBatchSize()
+            ?.takeIf { it in REVIEW_BATCH_SIZE_OPTIONS }
+            ?.let { batchSize -> vocabState.update { it.copy(reviewBatchSize = batchSize) } }
         val snapshot = sessionStore?.restore() ?: return false
         vocabState.update {
             it.copy(
@@ -323,6 +324,7 @@ class StudyVocabReviewManager(
                         currentCardIndex = 0,
                         showAnswer = false,
                         sessionSummary = null,
+                        sessionStats = null,
                         reviewResults = emptyList(),
                         redoCounts = emptyMap()
                     )
@@ -378,6 +380,7 @@ class StudyVocabReviewManager(
                         currentCardIndex = 0,
                         showAnswer = false,
                         sessionSummary = null,
+                        sessionStats = null,
                         reviewResults = emptyList(),
                         redoCounts = emptyMap()
                     )

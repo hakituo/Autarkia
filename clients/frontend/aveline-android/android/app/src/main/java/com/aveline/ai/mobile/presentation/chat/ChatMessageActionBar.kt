@@ -1,11 +1,16 @@
 package com.aveline.ai.mobile.presentation.chat
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
@@ -20,8 +25,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,19 +33,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.domain.models.Message
+import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 
 /**
- * ChatGPT 风格的消息操作栏。
+ * ChatGPT 风格的消息操作栏（设计稿「Chat · 输入栏」那张聊天页里的操作行）。
  *
- * 操作与版本切换放在同一行，不再塞进消息气泡内部，也不再额外悬一排版本按钮。
- * AI：复制 / TTS / 重新生成 / 版本导航 / 更多。
- * 用户：编辑 / 版本导航 / 更多。
+ * 操作与版本切换放在同一行，不塞进气泡内部：
+ * AI：复制 / TTS / 重新生成 / 版本导航 / 更多；用户：编辑 / 版本导航 / 更多。
+ *
+ * 控件语言对齐设计稿：默认是 40dp 的 ghost 图标（20dp 图标、Faint 色），
+ * 只有「重新生成」带 8% 白圆底（相当于按下/强调态），版本计数用等宽数字。
  */
 @Composable
 fun ChatMessageActionBar(
@@ -57,12 +69,7 @@ fun ChatMessageActionBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(
-                start = 12.dp,
-                end = 12.dp,
-                top = 0.dp,
-                bottom = 4.dp
-            ),
+            .padding(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 4.dp),
         horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -74,8 +81,8 @@ fun ChatMessageActionBar(
                 Icon(
                     imageVector = Icons.Rounded.Edit,
                     contentDescription = null,
-                    tint = TextSecondary,
-                    modifier = Modifier.size(18.dp)
+                    tint = TextTertiary,
+                    modifier = Modifier.size(19.dp)
                 )
             }
         } else {
@@ -86,8 +93,8 @@ fun ChatMessageActionBar(
                 Icon(
                     imageVector = Icons.Rounded.ContentCopy,
                     contentDescription = null,
-                    tint = TextSecondary,
-                    modifier = Modifier.size(18.dp)
+                    tint = TextTertiary,
+                    modifier = Modifier.size(19.dp)
                 )
             }
 
@@ -99,27 +106,29 @@ fun ChatMessageActionBar(
                     CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp,
-                        color = TextSecondary
+                        color = TextTertiary
                     )
                 } else {
                     Icon(
                         imageVector = if (isPlaying) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
                         contentDescription = null,
-                        tint = TextSecondary,
-                        modifier = Modifier.size(18.dp)
+                        tint = TextTertiary,
+                        modifier = Modifier.size(19.dp)
                     )
                 }
             }
 
+            // 重新生成是这一行里唯一的"浮起"按钮：8% 白圆底 + Ink 图标
             ToolbarButton(
                 onClick = { actions.onRegenerate(message.id) },
-                contentDescription = "重新生成"
+                contentDescription = "重新生成",
+                onSurface = true
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Refresh,
                     contentDescription = null,
-                    tint = TextSecondary,
-                    modifier = Modifier.size(18.dp)
+                    tint = TextPrimary,
+                    modifier = Modifier.size(19.dp)
                 )
             }
         }
@@ -128,32 +137,35 @@ fun ChatMessageActionBar(
             ToolbarButton(
                 onClick = { actions.onSwitchVariant(message.id, -1) },
                 contentDescription = "上一个版本",
-                enabled = message.variantIndex > 0
+                enabled = message.variantIndex > 0,
+                width = 32.dp
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
                     contentDescription = null,
-                    tint = TextSecondary,
+                    tint = TextTertiary,
                     modifier = Modifier.size(20.dp)
                 )
             }
 
             Text(
                 text = "${message.variantIndex + 1}/${message.variantCount}",
-                style = MaterialTheme.typography.labelMedium,
                 color = TextSecondary,
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace,
                 modifier = Modifier.padding(horizontal = 2.dp)
             )
 
             ToolbarButton(
                 onClick = { actions.onSwitchVariant(message.id, 1) },
                 contentDescription = "下一个版本",
-                enabled = message.variantIndex < message.variantCount - 1
+                enabled = message.variantIndex < message.variantCount - 1,
+                width = 32.dp
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = TextSecondary,
+                    tint = TextTertiary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -167,8 +179,8 @@ fun ChatMessageActionBar(
                 Icon(
                     imageVector = Icons.Rounded.MoreHoriz,
                     contentDescription = null,
-                    tint = TextSecondary,
-                    modifier = Modifier.size(18.dp)
+                    tint = TextTertiary,
+                    modifier = Modifier.size(19.dp)
                 )
             }
 
@@ -207,25 +219,32 @@ fun ChatMessageActionBar(
     }
 }
 
+/**
+ * 操作栏里的图标按钮。
+ *
+ * @param onSurface 是否带 8% 白圆底（设计稿里「按下 / 强调」那一档）
+ * @param width 版本导航用 32dp 的窄位，其余是 40dp 的方形触控区
+ */
 @Composable
 private fun ToolbarButton(
     onClick: () -> Unit,
     contentDescription: String,
     enabled: Boolean = true,
+    onSurface: Boolean = false,
+    width: Dp = 40.dp,
     content: @Composable () -> Unit
 ) {
-    IconButton(
-        onClick = onClick,
-        enabled = enabled,
+    Box(
         modifier = Modifier
-            .size(36.dp)
-            .semantics { this.contentDescription = contentDescription }
+            .width(width)
+            .height(40.dp)
+            .alpha(if (enabled) 1f else 0.38f)
+            .clip(CircleShape)
+            .background(if (onSurface) Color.White.copy(alpha = 0.08f) else Color.Transparent)
+            .clickable(enabled = enabled, onClick = onClick)
+            .semantics { this.contentDescription = contentDescription },
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier.size(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            content()
-        }
+        content()
     }
 }

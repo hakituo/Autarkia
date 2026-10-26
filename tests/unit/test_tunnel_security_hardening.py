@@ -28,13 +28,9 @@ def test_public_sensitive_paths_are_protected():
 
 def test_loopback_bypass_rejects_forwarded_external_client():
     assert is_trusted_loopback_connection("127.0.0.1", {})
-    assert is_trusted_loopback_connection(
-        "127.0.0.1", {"x-forwarded-for": "127.0.0.1"}
-    )
+    assert is_trusted_loopback_connection("127.0.0.1", {"x-forwarded-for": "127.0.0.1"})
 
-    assert not is_trusted_loopback_connection(
-        "127.0.0.1", {"cf-connecting-ip": "203.0.113.7"}
-    )
+    assert not is_trusted_loopback_connection("127.0.0.1", {"cf-connecting-ip": "203.0.113.7"})
     assert not is_trusted_loopback_connection(
         "127.0.0.1", {"x-forwarded-for": "203.0.113.7, 127.0.0.1"}
     )
@@ -42,9 +38,7 @@ def test_loopback_bypass_rejects_forwarded_external_client():
 
 
 def test_access_token_extraction_supports_http_and_ws_shapes():
-    assert (
-        get_access_token_from_headers({"authorization": "Bearer abc"}) == "abc"
-    )
+    assert get_access_token_from_headers({"authorization": "Bearer abc"}) == "abc"
     assert get_access_token_from_headers({"x-internal-token": "xyz"}) == "xyz"
     assert get_access_token_from_headers({}, {"token": "query-token"}) == "query-token"
 
@@ -56,10 +50,6 @@ def test_media_cookie_is_scoped_signature_not_raw_api_token():
 
     assert secret not in cookie
     assert validate_media_auth_cookie(cookie, secret, now=now + 1)
-    assert validate_media_auth_cookie(
-        cookie, secret, now=now + MEDIA_AUTH_TTL_SECONDS
-    )
-    assert not validate_media_auth_cookie(
-        cookie, secret, now=now + MEDIA_AUTH_TTL_SECONDS + 1
-    )
+    assert validate_media_auth_cookie(cookie, secret, now=now + MEDIA_AUTH_TTL_SECONDS)
+    assert not validate_media_auth_cookie(cookie, secret, now=now + MEDIA_AUTH_TTL_SECONDS + 1)
     assert not validate_media_auth_cookie(cookie, "wrong-secret", now=now + 1)

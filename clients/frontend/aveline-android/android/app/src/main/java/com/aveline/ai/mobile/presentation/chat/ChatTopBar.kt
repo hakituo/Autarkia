@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.data.local.storage.PersonaAvatarStorage
 import com.aveline.ai.mobile.presentation.components.PersonaAvatar
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 
 /** 聊天页顶栏头像边长。 */
@@ -80,7 +80,7 @@ fun ChatTopBar(
                 .offset(x = -CHAT_TOP_BAR_LEFT_SHIFT),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 返回键 + 其他角色未读小圆点：与列表徽章同一配色（品牌天蓝），
+            // 返回键 + 其他角色未读小圆点：与列表徽章同一配色（品牌鼠尾草绿），
             // 融合在返回键右上角，正在聊天时也能知道有别的角色找
             Box {
                 IconButton(onClick = onBackClick) {
@@ -96,7 +96,7 @@ fun ChatTopBar(
                             .align(Alignment.TopEnd)
                             .offset(x = 4.dp, y = 6.dp)
                             .size(9.dp)
-                            .background(Primary, CircleShape)
+                            .background(Accent, CircleShape)
                     )
                 }
             }

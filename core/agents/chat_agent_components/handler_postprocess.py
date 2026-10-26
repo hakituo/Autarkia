@@ -213,6 +213,19 @@ async def _persist_turn(
         except Exception as e:
             logger.debug(f"自我改进系统调用失败（不影响主流程）: {e}")
 
+    # 主人卡实时捕获：零 API 规则提取用户长期事实，fire-and-forget
+    if save_history and not skip_memory_storage and (not used_placeholder_response) and message:
+        try:
+            from core.tools.tool_visibility import resolve_profile_filename
+
+            from core.character.people.self_view_capture import capture_user_facts_async
+
+            asyncio.create_task(
+                capture_user_facts_async(user_id, message, resolve_profile_filename())
+            )
+        except Exception as e:
+            logger.debug(f"主人卡实时捕获调度失败（不影响主流程）: {e}")
+
 
 def _extract_hardware_data(strategy: Any) -> Any:
     """从响应策略里提取硬件控制数据（标准化 HardwareIntent 优先，回退旧字段）。"""

@@ -77,7 +77,9 @@ def test_scan_skips_conflict_backups(roots):
     """冲突副本只是本地留档，不能进同步扫描，否则会在两端之间循环增殖。"""
     local, _ = roots
     _write(local[BASE_USER_DATA] / "daily/2026/09/28/plan.json", "{}")
-    _write(local[BASE_USER_DATA] / "daily/2026/09/28/plan.json.sync-conflict-20261013-180212", "old")
+    _write(
+        local[BASE_USER_DATA] / "daily/2026/09/28/plan.json.sync-conflict-20261013-180212", "old"
+    )
     _write(local[BASE_STUDY] / ".state/student_state.json.sync-conflict-20261013-180212", "old")
 
     found = scan(ITEMS, local.get)

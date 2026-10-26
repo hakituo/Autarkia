@@ -37,9 +37,7 @@ def _wav_bytes(sr: int = 16000, n: int = 800) -> bytes:
 
 
 def _settings(cache_dir="cache", auto=False, auto_from_ref=False):
-    tts = types.SimpleNamespace(
-        auto_prompt_text=auto, auto_prompt_text_from_ref=auto_from_ref
-    )
+    tts = types.SimpleNamespace(auto_prompt_text=auto, auto_prompt_text_from_ref=auto_from_ref)
     return types.SimpleNamespace(
         model=types.SimpleNamespace(cache_dir=cache_dir),
         voice=types.SimpleNamespace(tts=tts),
@@ -108,9 +106,7 @@ class _Mgr:
 def env(monkeypatch, tmp_path):
     root = tmp_path / "root"
     root.mkdir()
-    env = types.SimpleNamespace(
-        root=root, tmp=tmp_path, mgr=_Mgr(), mp=monkeypatch, log=_Logger()
-    )
+    env = types.SimpleNamespace(root=root, tmp=tmp_path, mgr=_Mgr(), mp=monkeypatch, log=_Logger())
     monkeypatch.setattr(tg, "_project_root", lambda: str(root))
     monkeypatch.setattr(tg, "_project_root_path", lambda: root)
     monkeypatch.setattr(tg, "_tts_prompt_text_cache", {})
@@ -131,12 +127,14 @@ def env(monkeypatch, tmp_path):
 def _use_stt(env, engine=None, exc=None):
     """替换 get_stt_manager（函数体内 import，patch 源模块）。"""
     if exc is not None:
+
         async def _boom():
             raise exc
 
         env.mp.setattr(cv, "get_stt_manager", _boom)
         return None
     mgr = _SttMgr(engine)
+
     async def _get():
         return mgr
 
@@ -180,9 +178,7 @@ async def test_auto_prompt_env_flag_truthy(env, monkeypatch, val):
     assert _kw(env)["prompt_text"] == "环境开关"
 
 
-@pytest.mark.parametrize(
-    "kwargs", [{"auto": True}, {"auto_from_ref": True}]
-)
+@pytest.mark.parametrize("kwargs", [{"auto": True}, {"auto_from_ref": True}])
 async def test_auto_prompt_settings_flags(env, kwargs):
     env.mp.setattr(tg, "get_settings", lambda: _settings(**kwargs))
     p = _mk_ref(env)

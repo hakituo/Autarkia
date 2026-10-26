@@ -27,6 +27,7 @@ from .media import router as media_router
 from .vocab import router as vocab_router
 from .vocab_insights import router as vocab_insights_router
 from .vocab_study_time import router as vocab_study_time_router
+from .token_stats import router as token_stats_router
 from .tutor import router as tutor_router
 from .diary import router as diary_router
 from .tasks import router as tasks_router
@@ -59,6 +60,7 @@ router.include_router(media_router)
 router.include_router(vocab_router)
 router.include_router(vocab_insights_router)
 router.include_router(vocab_study_time_router)
+router.include_router(token_stats_router)
 router.include_router(tutor_router)
 router.include_router(diary_router)
 router.include_router(tasks_router)

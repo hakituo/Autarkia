@@ -16,7 +16,7 @@
 #   $env:XIAOYOU_CPP_BACKEND="cuda"   # 用 GPU 推理
 #   $env:XIAOYOU_CPP_BACKEND="cpu"    # 用 CPU 推理（默认 auto：有 CUDA 版则优先 CUDA）
 #
-# 说明：项目路径 D:\projects\xiaoyou 含空格，nvcc 对含空格路径很脆弱，
+# 说明：项目路径 D:\AI\xiaoyou-core 含空格，nvcc 对含空格路径很脆弱，
 # 脚本自动用 subst 映射到无空格盘符后编译，编译结束自动取消映射。
 
 $ErrorActionPreference = "Stop"
@@ -77,7 +77,7 @@ try {
         Pop-Location
     }
 } finally {
-    # 5. 取消 subst 映射（产物已实际落在 D:\projects\xiaoyou 下）
+    # 5. 取消 subst 映射（产物已实际落在 D:\AI\xiaoyou-core 下）
     if (-not $existing) {
         subst $Drive /D
         Write-Host "已取消 $Drive 映射。"

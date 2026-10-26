@@ -73,7 +73,7 @@ def _render_model_routing_yaml(config: Dict[str, Any]) -> str:
         "  # ============================================================",
         "",
         "  # 主对话模型",
-        f'  default_chat_model: "{config.get("default_chat_model", "cloud:deepseek:deepseek-v4-flash")}"',
+        f'  default_chat_model: "{config.get("default_chat_model", "cloud:minimax:plan:MiniMax-M3.1-Flash")}"',
         "  chat_models:",
     ]
 
@@ -252,7 +252,7 @@ def _normalize_persona_key(persona_name: str) -> str:
     return name
 
 
-def get_default_chat_model(default: str = "cloud:deepseek:deepseek-v4-flash") -> str:
+def get_default_chat_model(default: str = "cloud:minimax:plan:MiniMax-M3.1-Flash") -> str:
     config = load_model_config()
     return config.get("default_chat_model", default)
 
@@ -391,6 +391,12 @@ def get_fallback_model_for_openrouter_free(default: str = "") -> str:
         "openrouter_free",
         fallbacks.get("openrouter_free_paid", default),
     )
+
+
+def get_fallback_model_for_peer_chat_script(default: str = "") -> str:
+    """peer_chat 剧本生成主调用失败时的兜底模型路径。"""
+    config = load_model_config()
+    return config.get("fallback_models", {}).get("peer_chat_script", default)
 
 
 def get_auto_heal_model(model_type: str = "analysis", default: str = "") -> str:

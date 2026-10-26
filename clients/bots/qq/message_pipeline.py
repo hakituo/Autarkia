@@ -405,10 +405,10 @@ class MessageDispatcher:
 
     async def _dispatch_message(self, session_id, raw_message, data, self_id, msg_type, user_id, is_at_me):
         """确保会话存在后调用消息处理管线"""
-        from clients.bots.qq.session.session import XiaoyouSession
+        from clients.bots.qq.session.session import AutarkiaSession
         session = self.adapter.sessions.get(session_id)
         if not session or not session.running:
-            session = XiaoyouSession(session_id, self.adapter)
+            session = AutarkiaSession(session_id, self.adapter)
             self.adapter.sessions[session_id] = session
             await session.start()
 

@@ -1,7 +1,7 @@
 """验证 read_daily_summary / read_monthly_summary 工具能正常读取总结
 
 用法：
-    d:\\AI\\xiaoyou-core\\venv_core\\scripts\\python.exe ^
+    d:\\AI\\autarkia\\venv_core\\scripts\\python.exe ^
         tests\\scripts\\journal\\verify_summary_tools.py
 """
 from __future__ import annotations

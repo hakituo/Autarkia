@@ -8,7 +8,7 @@
 5. scope 阶段不再执行人物提取，全量 manager 只转交全局阶段一次。
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe \
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe \
         -m tests.scripts.nightly_prompt_cache.verify_people_profile_signal_gate
 """
 
@@ -87,6 +87,8 @@ def verify_distillation_metadata_persistence_path() -> None:
 
     class _DistillManager:
         def __init__(self) -> None:
+            # 蒸馏按角色白名单放行，这里声明成默认放行的 aveline
+            self.user_id = "shared__scope__aveline"
             self.lock = threading.RLock()
             self.weighted_memories = {
                 "m1": {

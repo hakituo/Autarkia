@@ -47,8 +47,8 @@ _DEFAULT_MODEL_HINT = "cloud:deepseek:obsidian:deepseek-v4-flash"
 
 # 默认共享 QQ 主会话记忆（同一个人在 QQ/Obsidian 两端聊天，记忆应共享）
 # 历史消息通过 sanitize_history_messages 在末尾标注（来自Obsidian）区分来源
-# QQ 号从环境变量 XIAOYOU_QQ_MASTER_ID 读取，避免硬编码隐私数据
-_DEFAULT_QQ_ID = os.getenv("XIAOYOU_QQ_MASTER_ID", "")
+# QQ 号从环境变量 AUTARKIA_QQ_MASTER_ID 读取，避免硬编码隐私数据
+_DEFAULT_QQ_ID = os.getenv("AUTARKIA_QQ_MASTER_ID", "")
 # Aveline 沿用历史 persona token，避免既有 Obsidian 会话历史断档；
 # 其他角色按自己的 scope 生成，防止Ye等角色的历史写进 Aveline 的会话。
 _LEGACY_DEFAULT_PERSONA_TOKEN = "core_aveline"

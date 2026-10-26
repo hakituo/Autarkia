@@ -3,8 +3,8 @@
 import json
 from datetime import datetime, timezone
 
-JSONL = r"D:\projects\xiaoyou\companion_data\user_data\daily\2026\08\23\app_usage.jsonl"
-LIMITS = r"D:\projects\xiaoyou\companion_data\user_data\digital_wellbeing\limits_2026-08-23.json"
+JSONL = r"d:\AI\autarkia\companion_data\user_data\daily\2026\08\23\app_usage.jsonl"
+LIMITS = r"d:\AI\autarkia\companion_data\user_data\digital_wellbeing\limits_2026-08-23.json"
 
 
 def _parse_dt(s):

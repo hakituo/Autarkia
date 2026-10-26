@@ -262,10 +262,10 @@ Telegram 由主程序直接托管。将 `telegram.enabled` 设为 `true` 后随 
 ```json
 {
   "napcat_ws_url": "ws://localhost:3001",
-  "xiaoyou_ws_url": "ws://localhost:8000/api/v1/ws",
-  "xiaoyou_http_base_url": "http://localhost:8000",
+  "autarkia_ws_url": "ws://localhost:8000/api/v1/ws",
+  "autarkia_http_base_url": "http://localhost:8000",
   "napcat_access_token": "",
-  "xiaoyou_access_token": "",
+  "autarkia_access_token": "",
   "openclaw_enabled": false,
   "openclaw_http_base_url": "http://127.0.0.1:18789",
   "session_idle_seconds": 1800,

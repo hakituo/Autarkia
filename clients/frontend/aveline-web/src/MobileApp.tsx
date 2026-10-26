@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { MessageSquare, Database, LayoutGrid, User, Activity, BookOpen, Utensils, Calendar } from 'lucide-react';
+import { MessageSquare, Database, LayoutGrid, User, Activity, BookOpen, Utensils, Calendar, HeartPulse, ShieldCheck } from 'lucide-react';
 import { ImpactStyle } from '@capacitor/haptics';
 import { api } from './api/apiService';
 import config from './api/config';
@@ -47,6 +47,8 @@ import PluginsPanel from './components/PluginsPanel';
 import EmotionWidget from './components/EmotionWidget';
 import { MobileStatusPanel } from './components/mobile/MobileStatusPanel';
 import ShopPanel from './components/ShopPanel';
+import { LifePanel } from './components/life/LifePanel';
+import { WellbeingPanel } from './components/wellbeing/WellbeingPanel';
 
 const STORAGE_KEY = 'aveline_chat_history_v2';
 
@@ -582,10 +584,12 @@ export function MobileApp() {
     { id: 'Chat', icon: <MessageSquare size={20} />, label: 'Chat' },
     { id: 'Status', icon: <Activity size={20} />, label: 'Status' },
     { id: 'DailyData', icon: <Calendar size={20} />, label: 'Daily' },
+    { id: 'Life', icon: <HeartPulse size={20} />, label: 'Life' },
     { id: 'Memory', icon: <Database size={20} />, label: 'Memory' },
     { id: 'Study', icon: <BookOpen size={20} />, label: 'Study' },
     { id: 'Persona', icon: <User size={20} />, label: 'Persona' },
-    { id: 'Shop', icon: <Utensils size={20} />, label: 'Food' },
+    { id: 'Shop', icon: <Utensils size={20} />, label: 'Mall' },
+    { id: 'Wellbeing', icon: <ShieldCheck size={20} />, label: 'Wellbeing' },
     { id: 'Plugins', icon: <LayoutGrid size={20} />, label: 'Plugins' },
   ];
 
@@ -784,6 +788,18 @@ export function MobileApp() {
                {activeTab === 'Shop' && (
                    <div className="flex-1 overflow-hidden relative flex flex-col p-2 pt-16">
                       <ShopPanel platform="mobile" />
+                   </div>
+               )}
+
+               {activeTab === 'Life' && (
+                   <div className="flex-1 overflow-hidden relative flex flex-col">
+                      <LifePanel platform="mobile" />
+                   </div>
+               )}
+
+               {activeTab === 'Wellbeing' && (
+                   <div className="flex-1 overflow-hidden relative flex flex-col">
+                      <WellbeingPanel />
                    </div>
                )}
              </motion.div>

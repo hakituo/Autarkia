@@ -82,7 +82,7 @@ class ChatHistoryManager:
             return []
 
 
-class XiaoyouSession:
+class AutarkiaSession:
     """小悠后端WebSocket会话"""
     
     def __init__(self, session_id: str, adapter: "QQOfficialAdapter"):
@@ -153,10 +153,10 @@ class XiaoyouSession:
         while self.running:
             try:
                 cfg = self.adapter.cfg
-                ws_url = f"{cfg.xiaoyou_ws_url}?client_id=qq_official_{self.session_id}&user_id={self.session_id}&platform=qq_official"
+                ws_url = f"{cfg.autarkia_ws_url}?client_id=qq_official_{self.session_id}&user_id={self.session_id}&platform=qq_official"
                 headers = None
-                if cfg.xiaoyou_access_token:
-                    headers = {"Authorization": f"Bearer {cfg.xiaoyou_access_token}"}
+                if cfg.autarkia_access_token:
+                    headers = {"Authorization": f"Bearer {cfg.autarkia_access_token}"}
                     
                 async with (await _ws_connect(ws_url, headers=headers)) as ws:
                     self.ws = ws
@@ -268,7 +268,7 @@ class QQOfficialAdapter:
         elif self.cfg.role_id:
             self._log_prefix = f"[{self.cfg.role_id}] "
             
-        self.sessions: dict[str, XiaoyouSession] = {}
+        self.sessions: dict[str, AutarkiaSession] = {}
         self._http_session: Optional[aiohttp.ClientSession] = None
         self._http_session_lock = LazyAsyncLock()  # P2-8: 改用 LazyAsyncLock 避免在 __init__ 中创建 asyncio.Lock（无事件循环时会出错）
         
@@ -285,10 +285,10 @@ class QQOfficialAdapter:
     def _is_master(self, user_id: str) -> bool:
         return str(user_id) == str(self.cfg.master_qq_id)
         
-    async def _get_or_create_session(self, session_id: str) -> XiaoyouSession:
+    async def _get_or_create_session(self, session_id: str) -> AutarkiaSession:
         """获取或创建后端会话"""
         if session_id not in self.sessions:
-            session = XiaoyouSession(session_id, self)
+            session = AutarkiaSession(session_id, self)
             self.sessions[session_id] = session
             await session.start()
             # 等待连接建立
@@ -407,7 +407,7 @@ class QQOfficialAdapter:
         try:
             self._log("info", "启动QQ官方机器人适配器...")
             self._log("info", f"人设: {self.cfg.profile_filename or '未配置'}")
-            self._log("info", f"后端: {self.cfg.xiaoyou_ws_url}")
+            self._log("info", f"后端: {self.cfg.autarkia_ws_url}")
             await self.proactive_messenger.start()
             await self.transport.connect(self._handle_message)
         finally:

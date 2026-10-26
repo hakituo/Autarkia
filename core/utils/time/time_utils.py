@@ -47,11 +47,15 @@ def format_timestamp(ts: float, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
     return dt.strftime(format_str)
 
 
-def get_time_period() -> str:
+def get_time_period(hour: int | None = None) -> str:
+    """获取时间段（早上、中午、下午、晚上、深夜）。
+
+    Args:
+        hour: 指定小时（0-23）；为 None 时取当前时间。调用方已持有具体时刻时
+            必须显式传入，避免"算的是那一刻、取的是现在"的分段漂移。
     """
-    获取当前时间段（早上、中午、下午、晚上、深夜）
-    """
-    hour = get_current_time().hour
+    if hour is None:
+        hour = get_current_time().hour
     if 5 <= hour < 11:
         return "早上"
     elif 11 <= hour < 13:

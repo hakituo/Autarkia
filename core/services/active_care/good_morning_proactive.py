@@ -29,9 +29,9 @@ from typing import Dict, Optional
 
 from core.services.dual_role.personas import get_qq_profile_filename as _get_qq_profile_filename
 from core.utils.logger import get_logger
-from core.utils.time_utils import get_current_time, today_str
+from core.utils.time_utils import get_current_time, get_time_period, today_str
 
-# 必须用 get_logger，否则日志只走 root logger（仅 console handler），不写入 xiaoyou_main.log
+# 必须用 get_logger，否则日志只走 root logger（仅 console handler），不写入 autarkia_main.log
 logger = get_logger(__name__)
 
 # 角色 ID → 人设文件名映射。
@@ -117,21 +117,26 @@ def _resolve_profile_filename(role_id: str) -> Optional[str]:
     return _get_qq_profile_filename(str(role_id or "").strip().lower())
 
 
+_WAKE_GREETING_BY_PERIOD = {
+    "早上": ("早晨", "必须明确包含早安或起床的词（如『早』『起床了』『醒了』等）"),
+    "中午": ("中午", "可以用『刚醒』『起来了』，或简单的『午安』，不要用早安"),
+    "下午": ("下午", "用『下午好』或表达睡过头的感觉（如『这下睡多了』），不要用早安"),
+    "晚上": ("傍晚以后", "用『傍晚好』或自嘲睡了一天（如『睡到这个点才醒』），不要用早安"),
+    "深夜": (
+        "深夜",
+        "用『这个点醒了』『刚醒』这类深夜说法，不要用早安、下午好或傍晚好",
+    ),
+}
+
+
 def _get_wake_greeting_context(hour: int) -> tuple[str, str]:
     """根据当前小时数返回 (时间段标签, 问候语要求)。
 
-    时间分段与 core.utils.time_utils.get_time_period 保持一致：
-    早晨（5-10）用早安；中午（11-12）用"刚醒/午安"；下午（13-17）
-    用"下午好/睡过头"；傍晚及以后（18+）用"傍晚好/睡多了"。
-    避免下午 13:47 还在发"早安"导致不真实。
+    时段划分直接复用 core.utils.time_utils.get_time_period，不在这里另写一套阈值：
+    14 个分支各自维护阈值时，23:00-04:59 曾漏掉分支落到「傍晚以后」，
+    凌晨 00:00 的起床问候因此写成「傍晚好」。
     """
-    if 5 <= hour < 11:
-        return "早晨", "必须明确包含早安或起床的词（如『早』『起床了』『醒了』等）"
-    if 11 <= hour < 13:
-        return "中午", "可以用『刚醒』『起来了』，或简单的『午安』，不要用早安"
-    if 13 <= hour < 18:
-        return "下午", "用『下午好』或表达睡过头的感觉（如『这下睡多了』），不要用早安"
-    return "傍晚以后", "用『傍晚好』或自嘲睡了一天（如『睡到这个点才醒』），不要用早安"
+    return _WAKE_GREETING_BY_PERIOD[get_time_period(hour)]
 
 
 def _build_specific_instruction(role_id: str, is_stay_up_recovery: bool) -> str:

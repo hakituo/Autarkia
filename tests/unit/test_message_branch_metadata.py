@@ -158,9 +158,7 @@ def test_proactive_messages_are_untouched():
         timestamp=999.0,
         metadata={"is_proactive": True},
     )
-    assert is_event_visible_in_branch(
-        event, conversation_id="web_role_aveline", scope=_scope()
-    )
+    assert is_event_visible_in_branch(event, conversation_id="web_role_aveline", scope=_scope())
 
 
 def test_missing_timestamp_only_applies_id_rule():

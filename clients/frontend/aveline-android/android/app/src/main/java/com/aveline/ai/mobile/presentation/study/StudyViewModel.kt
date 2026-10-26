@@ -95,8 +95,9 @@ class StudyViewModel @Inject constructor(
             StudyVocabSessionStore(context),
             vocabTimerManager,
             onReviewProgressChanged = {
-                // 一组背完：总览的待复习数、今日已背、词书进度都要跟着变
+                // 一组背完：总览的待复习数、今日已背、词书进度、错题本都要跟着变
                 loadReviewOverview()
+                loadMistakes()
                 vocabInsightsManager.refresh()
             }
         )

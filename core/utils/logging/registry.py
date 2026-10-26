@@ -210,7 +210,7 @@ def _write_daily_log_index(log_dir_path: str) -> None:
         "",
         "1. `important.log`：警告、错误和用户可感知的关键事件。",
         "2. `sections/`：按功能板块拆分的详细日志。",
-        "3. `xiaoyou_main.log`：完整聚合日志，仅在需要跨板块追踪时查看。",
+        "3. `autarkia_main.log`：完整聚合日志，仅在需要跨板块追踪时查看。",
         "",
         "## 板块",
         "",
@@ -511,7 +511,7 @@ def _setup_handlers():
     # 为了实现 P1 异步日志优化，我将创建一个统一的 FileHandler 处理所有日志，不再分文件。
     # 这样大大减少 IO 和句柄数。
 
-    main_log_file = os.path.join(log_dir_path, "xiaoyou_main.log")
+    main_log_file = os.path.join(log_dir_path, "autarkia_main.log")
     if "main" not in _file_handlers:
         try:
             if log_cfg.get("rotation_type") == "time":

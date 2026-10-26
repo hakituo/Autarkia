@@ -141,9 +141,7 @@ async def test_search_chat_history_确认型隐藏正文() -> None:
             "event_type": "chat_message",
         }
     ]
-    tool.set_runtime_context(
-        {"agent": object(), "user_id": "u1", "last_user_text": "还记得这个吗"}
-    )
+    tool.set_runtime_context({"agent": object(), "user_id": "u1", "last_user_text": "还记得这个吗"})
 
     reply = await tool._run(query="校园超市")
 

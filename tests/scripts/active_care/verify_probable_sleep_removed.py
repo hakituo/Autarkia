@@ -5,7 +5,7 @@ probable_sleep 是基于"用户长时间无响应"推断入睡的机制，会覆
 作息数据。已于 2026-07-30 彻底移除，夜间降频现在依赖 goodnight/sleep_hint。
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_probable_sleep_removed
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_probable_sleep_removed
 """
 
 import inspect

@@ -12,7 +12,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Constants
-HISTORY_DIR = Path("d:/AI/xiaoyou-core/history")
+HISTORY_DIR = Path("d:/AI/autarkia/history")
 LONG_TERM_DIR = HISTORY_DIR / "long_term"
 SHORT_TERM_DIR = HISTORY_DIR / "short_term"
 SENSITIVE_DIR = HISTORY_DIR / "sensitive"

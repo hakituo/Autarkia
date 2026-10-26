@@ -6,6 +6,7 @@
 authority 的要害在于「谁有资格被当成事实」：被动正则捞到的东西只能算遥测，
 常规读取（prompt / ZPD / 日记）默认看不到它。这些用例把这条边界钉死。
 """
+
 from __future__ import annotations
 
 import json
@@ -276,9 +277,7 @@ def test_legacy_confusion_uses_source_only_for_ambiguity(source, expected):
 
     判不准时**失败关闭**降级为 observed：宁可少认一条事实，不可多认一条。
     """
-    event = LearningEvent(
-        event_type=LearningEventType.SELF_REPORTED_CONFUSION, source=source
-    )
+    event = LearningEvent(event_type=LearningEventType.SELF_REPORTED_CONFUSION, source=source)
     assert effective_authority(event) == expected
 
 

@@ -49,9 +49,7 @@ class _LegacyAgent:
         active_tools=None,
     ):
         self.wrapper_called = True
-        raise AssertionError(
-            "history_override 已传入时不能走会静默丢参数的 legacy wrapper"
-        )
+        raise AssertionError("history_override 已传入时不能走会静默丢参数的 legacy wrapper")
 
 
 def _fake_runtime_modules():
@@ -66,9 +64,7 @@ def _fake_runtime_modules():
 
     journal_module.get_journal_service = lambda: _JournalService()
 
-    reminder_module = ModuleType(
-        "core.services.active_care.shared.reminder_injection"
-    )
+    reminder_module = ModuleType("core.services.active_care.shared.reminder_injection")
 
     class _ReminderStore:
         async def get_and_clear(self):
@@ -114,10 +110,13 @@ def _run_build(history_override):
         active_tools=["web_search"],
     )
 
-    with patch.dict(sys.modules, _fake_runtime_modules()), patch.object(
-        context_module,
-        "build_conversation_history",
-        _canonical_builder,
+    with (
+        patch.dict(sys.modules, _fake_runtime_modules()),
+        patch.object(
+            context_module,
+            "build_conversation_history",
+            _canonical_builder,
+        ),
     ):
         messages, events = asyncio.run(
             build_stream_messages(

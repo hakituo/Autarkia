@@ -3,6 +3,8 @@
 用法:
     python scripts/tools/regenerate_diary_summary.py              # 默认重新生成昨天
     python scripts/tools/regenerate_diary_summary.py 2026-06-17   # 指定日期
+
+角色来自注册表（get_diary_persona_ids），不再写死 aveline / ling。
 """
 import asyncio
 import os
@@ -13,6 +15,13 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(os.path.join(ROOT_DIR, ".env"))
+except Exception:  # noqa: BLE001 - 缺 dotenv 时退回进程环境变量
+    pass
+
 from datetime import datetime, timedelta  # noqa: E402
 from core.utils.time_utils import get_diary_target_date  # noqa: E402
 
@@ -20,17 +29,20 @@ from core.utils.time_utils import get_diary_target_date  # noqa: E402
 async def main(date_str: str) -> int:
     from core.services.journal.service import get_journal_service
     from core.services.journal.storage import JournalStorage
+    from core.services.journal.diary_personas import get_diary_persona_ids
 
     service = get_journal_service()
     storage: JournalStorage = service.storage
+    persona_ids = get_diary_persona_ids() or ("aveline",)
 
     # 清除摘要缓存，确保真正重新生成
     dt = datetime.strptime(date_str, "%Y-%m-%d")
-    for scope in ("aveline", "ling", "user", "any"):
+    scopes = set(persona_ids) | {"user", "any"}
+    for scope in scopes:
         cache_key = f"{dt.strftime('%Y-%m-%d')}:{scope}"
-        storage._summary_cache.pop(cache_key, None)
+        storage._summary_cache.pop(cache_key, None)  # noqa: SLF001
 
-    print(f"=== 重新生成日记摘要: {date_str} ===")
+    print(f"=== 重新生成日记摘要: {date_str} 角色={list(persona_ids)} ===")
 
     # 先看看当天有多少日记条目
     entries = await storage.get_entries(dt)
@@ -61,44 +73,48 @@ async def main(date_str: str) -> int:
                 cleaned += 1
     if cleaned:
         print(f"已清理 {cleaned} 条旧的 daily_summary 日记条目")
-        # 清缓存，避免 get_entries 返回旧内容
-        for scope in ("aveline", "ling", "user", "any"):
-            storage._summary_cache.pop(f"{dt.strftime('%Y-%m-%d')}:{scope}", None)
+        for scope in scopes:
+            storage._summary_cache.pop(f"{dt.strftime('%Y-%m-%d')}:{scope}", None)  # noqa: SLF001
 
-    # 强制重新生成 Aveline 日记
-    print("\n=== Aveline 日记 ===")
-    aveline_summary = await service.generate_daily_summary(date_str, force=True, persona="aveline")
-    print(f"日期: {aveline_summary.date}")
-    print(f"摘要: {aveline_summary.summary[:200]}...")
-    print(f"明日基调: {aveline_summary.tomorrow_tone}")
-    stats = aveline_summary.stats or {}
-    print(f"chat_turn_count: {stats.get('chat_turn_count', 'N/A')}")
+    # 逐角色强制重新生成
+    summaries = {}
+    for persona in persona_ids:
+        print(f"\n=== {persona} 日记 ===")
+        summary = await service.generate_daily_summary(date_str, force=True, persona=persona)
+        summaries[persona] = summary
+        print(f"日期: {summary.date}")
+        print(f"摘要: {str(summary.summary or '')[:200]}...")
+        print(f"明日基调: {summary.tomorrow_tone}")
+        stats = summary.stats or {}
+        reason = stats.get("reason") or stats.get("error") or ""
+        if reason:
+            print(f"失败原因: {reason}")
 
-    # 强制重新生成 Ling日记
-    print("\n=== Ling日记 ===")
-    ling_summary = await service.generate_daily_summary(date_str, force=True, persona="ling")
-    # 8/14 曾出现Ling与 Aveline 摘要逐字相同（疑似 LLM 重复输出），命中时换温度重试
-    aveline_text = str(getattr(aveline_summary, "summary", "") or "").strip()
-    ling_text = str(getattr(ling_summary, "summary", "") or "").strip()
-    if ling_text and ling_text == aveline_text:
-        print("警告: Ling与 Aveline 摘要逐字相同，换温度重试Ling...")
-        ling_summary = await service.generate_daily_summary(
-            date_str, force=True, persona="ling", temperature=0.8
-        )
-    print(f"日期: {ling_summary.date}")
-    print(f"摘要: {ling_summary.summary[:200]}...")
-    print(f"明日基调: {ling_summary.tomorrow_tone}")
-    stats = ling_summary.stats or {}
-    print(f"chat_turn_count: {stats.get('chat_turn_count', 'N/A')}")
+    # 去重保险：任意两角色摘要逐字相同时，对后者换温度重试一次
+    #（8/14 曾出现两个角色摘要逐字相同，疑似 LLM 重复输出）
+    seen: dict[str, str] = {}
+    for persona, summary in summaries.items():
+        text = str(summary.summary or "").strip()
+        if not text:
+            continue
+        if text in seen:
+            print(f"警告: {persona} 与 {seen[text]} 摘要逐字相同，换温度重试...")
+            summaries[persona] = await service.generate_daily_summary(
+                date_str, force=True, persona=persona, temperature=0.8
+            )
+        else:
+            seen[text] = persona
 
     # 验证文件是否写入
-    for scope in ("aveline", "ling"):
-        filepath = storage.get_daily_dir(dt, scope=scope) / "diary_summary.json"
+    for persona in persona_ids:
+        filepath = storage.get_daily_dir(dt, scope=persona) / "diary_summary.json"
         if filepath.exists():
-            print(f"\n[{scope}] 文件已写入: {filepath}")
+            print(f"\n[{persona}] 文件已写入: {filepath}")
             data = json.loads(filepath.read_text(encoding="utf-8"))
             gen_time = datetime.fromtimestamp(data.get("generated_at", 0))
             print(f"  generated_at 对应时间: {gen_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        else:
+            print(f"\n[{persona}] 警告: 未找到 {filepath}")
 
     return 0
 

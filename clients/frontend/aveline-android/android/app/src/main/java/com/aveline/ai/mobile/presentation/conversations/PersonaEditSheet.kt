@@ -30,14 +30,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.data.local.storage.PersonaAvatarStorage
 import com.aveline.ai.mobile.presentation.components.PersonaAvatar
-import com.aveline.ai.mobile.presentation.theme.OverlayLight
-import com.aveline.ai.mobile.presentation.theme.Primary
-import com.aveline.ai.mobile.presentation.theme.PrimaryVariant
+import com.aveline.ai.mobile.presentation.theme.Background
+import com.aveline.ai.mobile.presentation.theme.SurfaceHigh
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 
@@ -97,7 +96,7 @@ fun PersonaEditSheet(
                     modifier = Modifier
                         .size(96.dp)
                         .clip(CircleShape)
-                        .background(OverlayLight)
+                        .background(SurfaceHigh)
                         .clickable { imagePicker.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
@@ -108,13 +107,13 @@ fun PersonaEditSheet(
                             .align(Alignment.BottomEnd)
                             .size(28.dp)
                             .clip(CircleShape)
-                            .background(Primary),
+                            .background(Accent),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "更换头像",
-                            tint = Color.White,
+                            tint = Background,
                             modifier = Modifier.size(14.dp)
                         )
                     }
@@ -135,7 +134,7 @@ fun PersonaEditSheet(
                         Text(
                             text = "恢复默认头像",
                             style = MaterialTheme.typography.labelSmall,
-                            color = PrimaryVariant
+                            color = Accent
                         )
                     }
                 }
@@ -178,7 +177,7 @@ fun PersonaEditSheet(
                     onSaveName(nameInput.trim().takeIf { it.isNotEmpty() })
                     onDismiss()
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                colors = ButtonDefaults.buttonColors(containerColor = Accent)
             ) {
                 Text("保存")
             }

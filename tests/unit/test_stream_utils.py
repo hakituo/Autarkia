@@ -64,9 +64,7 @@ class TestContextBuilder:
             is None
         )
         assert (
-            StreamContextBuilder.infer_max_tokens(
-                "chat", True, False, True, pref_length="long"
-            )
+            StreamContextBuilder.infer_max_tokens("chat", True, False, True, pref_length="long")
             is None
         )
 
@@ -81,20 +79,11 @@ class TestContextBuilder:
 
     def test_infer_soft_reply_limit(self):
         # 想要长回复
-        assert (
-            StreamContextBuilder.infer_soft_reply_limit("chat", True, False, "你好")
-            == 1000
-        )
+        assert StreamContextBuilder.infer_soft_reply_limit("chat", True, False, "你好") == 1000
         # 系统事件
-        assert (
-            StreamContextBuilder.infer_soft_reply_limit("chat", False, True, "你好")
-            == 300
-        )
+        assert StreamContextBuilder.infer_soft_reply_limit("chat", False, True, "你好") == 300
         # 默认档按用户消息长度分档（2026-10-16 与 handler_modes 的 80/120/180 合并）
-        assert (
-            StreamContextBuilder.infer_soft_reply_limit("chat", False, False, "你好")
-            == 50
-        )
+        assert StreamContextBuilder.infer_soft_reply_limit("chat", False, False, "你好") == 50
         assert (
             StreamContextBuilder.infer_soft_reply_limit(
                 "chat", False, False, "你好，今天天气怎么样，我想出去玩"
@@ -107,9 +96,7 @@ class TestParallelProcessor:
     """并行处理器测试"""
 
     def test_extract_life_stats_defaults(self):
-        mood, shyness, is_sick, immune_damage, level = (
-            ParallelProcessor.extract_life_stats(None)
-        )
+        mood, shyness, is_sick, immune_damage, level = ParallelProcessor.extract_life_stats(None)
         assert (mood, shyness, is_sick, immune_damage, level) == (
             0.5,
             0.1,

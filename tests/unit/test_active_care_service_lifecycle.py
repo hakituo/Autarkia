@@ -32,7 +32,9 @@ import core.services.character_daily.engine as character_daily_mod
 # --------------------------------------------------------------------------- #
 class _StubLazy:
     """惰性构造替身（consecutive_non_responses 供 setter 读取）。"""
+
     consecutive_non_responses = 0
+
     def __init__(self, *a, **k):
         pass
 
@@ -42,8 +44,10 @@ class _StubStorage:
         self._state = dict(state or {})
         self.load_calls = 0
         self.get_calls = 0
+
     async def load_policy_scores(self):
         self.load_calls += 1
+
     async def get_proactive_state(self):
         self.get_calls += 1
         return dict(self._state)
@@ -54,10 +58,13 @@ class _StubDelayedScheduler:
         self.callback = None
         self.started = 0
         self.stopped = 0
+
     def set_callback(self, cb):
         self.callback = cb
+
     async def start(self):
         self.started += 1
+
     async def stop(self):
         self.stopped += 1
 
@@ -68,10 +75,12 @@ class _StubEventBus:
         self.unsubscriptions = []
         self.raise_subscribe = raise_subscribe
         self.raise_unsubscribe = raise_unsubscribe
+
     async def subscribe(self, topic, handler):
         if self.raise_subscribe:
             raise RuntimeError("subscribe boom")
         self.subscriptions.append((topic, handler))
+
     async def unsubscribe(self, topic, handler):
         if self.raise_unsubscribe:
             raise RuntimeError("unsubscribe boom")
@@ -81,6 +90,7 @@ class _StubEventBus:
 class _StubHealthChecker:
     def __init__(self):
         self.registered = {}
+
     def register_health_checker(self, name, func, interval=30.0):
         self.registered[name] = (func, interval)
 
@@ -88,18 +98,23 @@ class _StubHealthChecker:
 class _StubChecker:
     def __init__(self):
         self.initialize_calls = 0
+
     async def initialize(self):
         self.initialize_calls += 1
 
 
 class _HangHandler:
     """4 个后台循环的替身：永远挂起，便于用例末尾统一 cancel。"""
+
     async def run_proactive_loop(self):
         await asyncio.Event().wait()
+
     async def run_startup_check(self):
         await asyncio.Event().wait()
+
     async def run_maintenance_loop(self):
         await asyncio.Event().wait()
+
     async def run_watchdog_loop(self):
         await asyncio.Event().wait()
 
@@ -110,10 +125,12 @@ class _StubPeerChat:
         self.stopped = 0
         self.raise_start = raise_start
         self.raise_stop = raise_stop
+
     def start(self):
         if self.raise_start:
             raise RuntimeError("peer start boom")
         self.started += 1
+
     async def stop(self):
         if self.raise_stop:
             raise RuntimeError("peer stop boom")
@@ -127,12 +144,15 @@ class _StubCharacterDailyEngine:
         self.stopped = 0
         self.raise_start = raise_start
         self.raise_stop = raise_stop
+
     def set_peer_chat_scheduler(self, scheduler):
         self.peer = scheduler
+
     def start(self):
         if self.raise_start:
             raise RuntimeError("cde start boom")
         self.started += 1
+
     async def stop(self):
         if self.raise_stop:
             raise RuntimeError("cde stop boom")
@@ -151,24 +171,28 @@ def _patch_lazy_sources(monkeypatch):
     monkeypatch.setattr(executor_mod, "ActiveCareExecutor", _StubLazy)
 
 
-def _install_sources(monkeypatch, *, state=None, peer=None, engine=None, bus=None,
-                     engine_factory=None):
+def _install_sources(
+    monkeypatch, *, state=None, peer=None, engine=None, bus=None, engine_factory=None
+):
     """装配 initialize 所需的全部下游替身。"""
     _patch_lazy_sources(monkeypatch)
     monkeypatch.setattr(
         peer_sched_mod, "init_peer_chat_scheduler", lambda **kw: peer or _StubPeerChat()
     )
     monkeypatch.setattr(
-        character_daily_mod, "init_character_daily_engine",
+        character_daily_mod,
+        "init_character_daily_engine",
         engine_factory or (lambda: engine or _StubCharacterDailyEngine()),
     )
     monkeypatch.setattr(event_bus_mod, "get_event_bus", lambda: bus or _StubEventBus())
 
 
-def _make_service(monkeypatch, *, state=None, peer=None, engine=None, bus=None,
-                  engine_factory=None):
-    _install_sources(monkeypatch, state=state, peer=peer, engine=engine, bus=bus,
-                     engine_factory=engine_factory)
+def _make_service(
+    monkeypatch, *, state=None, peer=None, engine=None, bus=None, engine_factory=None
+):
+    _install_sources(
+        monkeypatch, state=state, peer=peer, engine=engine, bus=bus, engine_factory=engine_factory
+    )
     svc = ActiveCareService()
     svc._storage = _StubStorage(state=state)
     svc._delayed_scheduler = _StubDelayedScheduler()
@@ -181,8 +205,11 @@ def _make_service(monkeypatch, *, state=None, peer=None, engine=None, bus=None,
 
 async def _cleanup(svc):
     """把 initialize 期间创建的后台任务取消并等待，避免跨用例泄漏。"""
-    tasks = [t for t in (svc._proactive_task, svc._startup_task,
-                         svc._maintenance_task, svc._watchdog_task) if t is not None]
+    tasks = [
+        t
+        for t in (svc._proactive_task, svc._startup_task, svc._maintenance_task, svc._watchdog_task)
+        if t is not None
+    ]
     for t in tasks:
         t.cancel()
     if tasks:
@@ -215,9 +242,7 @@ async def test_initialize_full_flow_with_scalar_state(monkeypatch):
 
 async def test_initialize_dict_and_missing_state(monkeypatch):
     # dict 格式 → 逐 persona 转换并保留键
-    svc = _make_service(
-        monkeypatch, state={"consecutive_non_responses": {"a": "2", "b": None}}
-    )
+    svc = _make_service(monkeypatch, state={"consecutive_non_responses": {"a": "2", "b": None}})
     try:
         await svc.initialize()
         assert svc._executor.consecutive_non_responses == {"a": 2, "b": 0}
@@ -287,9 +312,11 @@ async def test_initialize_character_daily_engine_variants(monkeypatch):
         assert engine2.peer == "unset" and engine2.started == 1
     finally:
         await _cleanup(svc2)
+
     # 初始化抛异常 → 降级为 None，整体仍完成
     def _boom():
         raise RuntimeError("cde init boom")
+
     svc3 = _make_service(monkeypatch, engine_factory=_boom)
     try:
         await svc3.initialize()
@@ -329,9 +356,7 @@ async def test_setup_event_subscriptions_success_and_handler_branches(monkeypatc
 async def test_setup_event_subscriptions_short_circuit_and_failure(monkeypatch):
     called = []
     svc = _make_service(monkeypatch)
-    monkeypatch.setattr(
-        event_bus_mod, "get_event_bus", lambda: called.append(1) or _StubEventBus()
-    )
+    monkeypatch.setattr(event_bus_mod, "get_event_bus", lambda: called.append(1) or _StubEventBus())
     # 已订阅 → 短路，不再取 event bus
     svc._device_context_subscription_handler = lambda **k: None
     await svc._setup_event_subscriptions()
@@ -367,9 +392,9 @@ async def test_health_check_healthy_and_zero_wakeup(monkeypatch):
     svc._running = True
     svc._proactive_task = SimpleNamespace(done=lambda: False)
     svc.checker = SimpleNamespace(next_decision_ts=1_000.0)
-    svc._last_loop_iteration_ts = 0.0   # 未迭代 → loop_stuck 走 0
-    svc._loop_phase_started_ts = 0.0    # 未进入阶段 → loop_phase_seconds 走 else
-    svc._expected_wakeup_ts = 0.0       # 未设置 → expected_wakeup_in 走 else
+    svc._last_loop_iteration_ts = 0.0  # 未迭代 → loop_stuck 走 0
+    svc._loop_phase_started_ts = 0.0  # 未进入阶段 → loop_phase_seconds 走 else
+    svc._expected_wakeup_ts = 0.0  # 未设置 → expected_wakeup_in 走 else
     svc._register_health_checker()
     result = await svc._health_checker.registered["active_care_service"][0]()
     assert result["status"] == "healthy"

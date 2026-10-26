@@ -18,9 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 
 /**
@@ -36,10 +34,13 @@ fun ModuleHeader(
     height: androidx.compose.ui.unit.Dp = 76.dp,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
+    // 标题换成 30sp/38sp 后，标题 + 13sp 副标题在 76dp 内放不下，
+    // 有副标题时补 16dp，避免副标题被压成一条线。
+    val headerHeight = if (subtitle.isNullOrBlank()) height else height + 16.dp
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(height)
+            .height(headerHeight)
             .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -52,19 +53,13 @@ fun ModuleHeader(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                ),
-                color = Color.White
+                style = MaterialTheme.typography.displaySmall
             )
 
             if (!subtitle.isNullOrBlank()) {
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        letterSpacing = 0.8.sp
-                    ),
+                    style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
             } else {

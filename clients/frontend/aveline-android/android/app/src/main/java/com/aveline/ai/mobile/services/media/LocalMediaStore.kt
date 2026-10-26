@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.aveline.ai.mobile.data.local.preferences.AppPreferences
+import com.aveline.ai.mobile.utils.DataUriImage
 import com.aveline.ai.mobile.utils.MediaUrlResolver
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +35,8 @@ import javax.inject.Singleton
  * 关键设计：
  * - **缓存 key 与后端地址无关**：只取 URL 的 path（如 `output/image/chat/a.png`），
  *   所以同一张图换后端后仍命中同一份本地文件；
+ * - **data URI（后端表情包）同样落盘**：key 对 URI 全串取 SHA-256，首次预取或显示时
+ *   解码写入本地仓库，冷启动直接读文件，不再每次重新 Base64 解码；
  * - 落盘目录是 `filesDir/chat_media`（不是 cacheDir）：系统清理缓存不会把历史图片清掉；
  * - 下载走独立 OkHttpClient：不能复用后端的 client（它有 baseUrl 拦截器，会把
  *   外部 CDN 域名改写成本地后端），鉴权头由 AppPreferences 手动补上；
@@ -55,10 +58,18 @@ class LocalMediaStore @Inject constructor(
             "mp4", "webm", "mov", "m4v", "mkv",
             "mp3", "wav", "ogg", "m4a", "aac", "flac"
         )
+
+        /** data URI 稳定 key 的缓存条数上限（几百 KB 的 URI 反复哈希不值得）。 */
+        private const val MAX_DATA_URI_KEY_CACHE = 64
+
+        /** 批量预热失败的 URL 冷却时长：后端离线时避免每轮消息刷新都重等连接超时。 */
+        private const val PREFETCH_RETRY_COOLDOWN_MS = 5 * 60 * 1000L
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val downloadLocks = ConcurrentHashMap<String, Mutex>()
+    // 批量预热失败记录：url -> 失败时间，冷却期内不再重试
+    private val prefetchFailedAt = ConcurrentHashMap<String, Long>()
     // 同时最多 3 个媒体下载：历史消息一次渲染多条时不把后端/带宽打满
     private val downloadPermits = Semaphore(3)
     private val root: File by lazy {
@@ -86,7 +97,7 @@ class LocalMediaStore @Inject constructor(
      *
      * @param rawUrl 后端下发的原始地址（相对路径或绝对 URL），用于计算稳定 key
      * @param resolvedUrl 已补全的绝对地址；不传则用当前生效后端补全
-     * @return 本地文件；data URI / content URI / 下载失败返回 null
+     * @return 本地文件；content URI / data URI 解码失败 / 下载失败返回 null
      */
     suspend fun cache(rawUrl: String, resolvedUrl: String = resolveRemote(rawUrl)): File? {
         val key = stableKey(rawUrl) ?: return null
@@ -96,9 +107,13 @@ class LocalMediaStore @Inject constructor(
             val lock = downloadLocks.getOrPut(key) { Mutex() }
             lock.withLock {
                 lookup(rawUrl)?.let { return@withLock it }
-                downloadPermits.withPermit { download(key, resolvedUrl) }?.also {
-                    trimIfNeeded()
+                val cached = if (DataUriImage.isDataUri(rawUrl)) {
+                    // 表情包是内嵌 base64：解码写盘即可，不走网络下载
+                    storeDataUriBytes(key, rawUrl)
+                } else {
+                    downloadPermits.withPermit { download(key, resolvedUrl) }
                 }
+                cached?.also { trimIfNeeded() }
             }
         } catch (e: Exception) {
             Log.w(TAG, "媒体本地缓存失败: ${e.message}")
@@ -116,6 +131,35 @@ class LocalMediaStore @Inject constructor(
         }
     }
 
+    /**
+     * 批量预热：进聊天页时把历史消息里的媒体一次性后台落盘。
+     *
+     * 旧行为只在消息被渲染到屏幕上时才触发下载，未滚动到的历史表情包/图片永远不落盘；
+     * 后端一关就整屏转圈等网络超时。这里不依赖渲染，本窗口消息一加载就开始补。
+     *
+     * 与 [prefetch] 的差别：失败的 URL 记冷却时间 —— 消息流每次刷新（新消息落库、
+     * 翻页）都会重进这里，后端不可达时不能每轮都去等一遍连接超时。
+     */
+    fun prefetchAll(rawUrls: Collection<String>) {
+        val pending = rawUrls.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        if (pending.isEmpty()) return
+        scope.launch {
+            val now = System.currentTimeMillis()
+            pending.forEach { url ->
+                if (stableKey(url) == null) return@forEach
+                if (lookup(url) != null) return@forEach
+                val failedAt = prefetchFailedAt[url]
+                if (failedAt != null && now - failedAt < PREFETCH_RETRY_COOLDOWN_MS) return@forEach
+                val cached = runCatching { cache(url) }.getOrNull()
+                if (cached != null) {
+                    prefetchFailedAt.remove(url)
+                } else {
+                    prefetchFailedAt[url] = now
+                }
+            }
+        }
+    }
+
     // ==================== 内部实现 ====================
 
     /**
@@ -123,13 +167,15 @@ class LocalMediaStore @Inject constructor(
      *
      * - `http://host:8000/output/image/a.png` -> `output/image/a.png`
      * - `/output/image/a.png` -> `output/image/a.png`
-     * - `data:` / `content:` / `file:` 本来就是本地或内嵌数据，不参与落盘
+     * - `data:image/png;base64,...` -> `data/<sha256>.png`（对 URI 全串哈希，跨会话稳定）
+     * - `content:` / `file:` 本来就是本地数据，不参与落盘
      */
     private fun stableKey(rawUrl: String): String? {
         val trimmed = rawUrl.trim()
         if (trimmed.isEmpty()) return null
-        if (trimmed.startsWith("data:", ignoreCase = true) ||
-            trimmed.startsWith("content:", ignoreCase = true) ||
+        // 后端表情包以 data URI 下发：必须落盘，否则每次冷启动都要重新 Base64 解码
+        if (DataUriImage.isDataUri(trimmed)) return cachedDataUriKey(trimmed)
+        if (trimmed.startsWith("content:", ignoreCase = true) ||
             trimmed.startsWith("file:", ignoreCase = true)
         ) {
             return null
@@ -140,6 +186,27 @@ class LocalMediaStore @Inject constructor(
             .orEmpty()
         if (path.isNotEmpty()) return path
         return trimmed.trimStart('/').takeIf { it.isNotEmpty() }
+    }
+
+    // data URI 动辄几百 KB，聊天列表滚动时同一批 URI 会被反复 lookup；
+    // 稳定 key 只按原文算一次，之后纯内存查表
+    private val dataUriKeyCache = object : LinkedHashMap<String, String>(32, 0.75f, false) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>): Boolean =
+            size > MAX_DATA_URI_KEY_CACHE
+    }
+
+    @Synchronized
+    private fun cachedDataUriKey(uri: String): String {
+        dataUriKeyCache[uri]?.let { return it }
+        val key = "data/${sha256(uri)}.${mimeExtension(DataUriImage.mimeTypeOf(uri))}"
+        dataUriKeyCache[uri] = key
+        return key
+    }
+
+    /** 从 MIME 类型推断扩展名（image/png -> png）；未知类型用 bin（Coil 按内容识别）。 */
+    private fun mimeExtension(mime: String?): String {
+        val ext = mime?.substringAfter('/')?.lowercase()
+        return ext?.takeIf { it in KNOWN_EXTENSIONS } ?: "bin"
     }
 
     private fun fileName(key: String): String = "${sha256(key)}.${extensionOf(key)}"
@@ -159,6 +226,29 @@ class LocalMediaStore @Inject constructor(
 
     private fun resolveRemote(rawUrl: String): String =
         MediaUrlResolver.resolve(appPreferences.effectiveBackendUrl, rawUrl)
+
+    /** data URI 落盘：解码 base64 写入本地仓库，key 与内容一一对应。 */
+    private fun storeDataUriBytes(key: String, rawUri: String): File? {
+        val bytes = DataUriImage.decode(rawUri) ?: return null
+        val target = File(root, fileName(key))
+        if (target.isFile && target.length() > 0) return target
+
+        val temp = File(root, "${target.name}.tmp")
+        return try {
+            root.mkdirs()
+            temp.writeBytes(bytes)
+            if (!temp.renameTo(target)) {
+                temp.copyTo(target, overwrite = true)
+                temp.delete()
+            }
+            target.setLastModified(System.currentTimeMillis())
+            target.takeIf { it.isFile && it.length() > 0 }
+        } catch (e: Exception) {
+            Log.w(TAG, "data URI 落盘失败: ${e.message}")
+            temp.delete()
+            null
+        }
+    }
 
     private fun download(key: String, resolvedUrl: String): File? {
         if (!resolvedUrl.startsWith("http://", ignoreCase = true) &&

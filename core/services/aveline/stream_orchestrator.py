@@ -141,6 +141,9 @@ async def stream_conversation_events(
         async for chunk in service.stream_generate_response(
             user_input=user_input,
             conversation_id=cid,
+            # 客户端给的本轮 ID（Android 即 assistant 节点 ID）必须原样落库：
+            # 写入侧靠它判定「这是当前请求那一轮」，才会把消息树字段写进原始事件。
+            message_id=message_id,
             system_prompt=system_prompt,
             max_tokens=max_tokens,
             temperature=temperature,

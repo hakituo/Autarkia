@@ -18,6 +18,7 @@ from unittest.mock import MagicMock, AsyncMock, patch
 # 1.1 Backend Connection Loss Exploration
 # ============================================================
 
+
 class TestBackendConnectionLoss:
     """Tests for WebSocket reconnection after connection loss."""
 
@@ -42,7 +43,9 @@ class TestBackendConnectionLoss:
         assert hasattr(conn, "is_mobile"), "ClientConnection must have is_mobile field"
         assert hasattr(conn, "reconnect_count"), "ClientConnection must have reconnect_count field"
         # __post_init__ auto-detects mobile from platform
-        assert conn.is_mobile is True, f"Android platform should be detected as mobile, got {conn.is_mobile}"
+        assert (
+            conn.is_mobile is True
+        ), f"Android platform should be detected as mobile, got {conn.is_mobile}"
         assert conn.is_reconnect is False, "New connection should not be a reconnect"
 
     def test_mobile_platform_detection(self):
@@ -59,7 +62,9 @@ class TestBackendConnectionLoss:
             conn = ClientConnection(
                 websocket=MagicMock(), platform=platform, state=ConnectionState.CONNECTED
             )
-            assert conn.is_mobile is False, f"Platform '{platform}' should NOT be detected as mobile"
+            assert (
+                conn.is_mobile is False
+            ), f"Platform '{platform}' should NOT be detected as mobile"
 
     def test_reconnect_count_increments(self):
         """Verify reconnect_count tracks reconnection attempts."""
@@ -78,6 +83,7 @@ class TestBackendConnectionLoss:
 # ============================================================
 # 1.2 Status Page Data Issues Exploration
 # ============================================================
+
 
 class TestStatusPageDataIssues:
     """Tests for Status/Persona/Memory page data fetching."""
@@ -128,8 +134,12 @@ class TestStatusPageDataIssues:
         from core.emotion.models import EmotionState, EmotionType
 
         calc = EmotionCalculator()
-        current = EmotionState(EmotionType.HAPPY, 0.5, sub_emotions={"happy": 0.5}, emotion_mix={"happy": 0.5})
-        new_input = EmotionState(EmotionType.SAD, 0.3, sub_emotions={"sad": 0.3}, emotion_mix={"sad": 0.3})
+        current = EmotionState(
+            EmotionType.HAPPY, 0.5, sub_emotions={"happy": 0.5}, emotion_mix={"happy": 0.5}
+        )
+        new_input = EmotionState(
+            EmotionType.SAD, 0.3, sub_emotions={"sad": 0.3}, emotion_mix={"sad": 0.3}
+        )
 
         result = calc.update_state(current, new_input)
         assert hasattr(result, "emotion_mix"), "Calculator output must have emotion_mix"
@@ -149,10 +159,16 @@ class TestStatusPageDataIssues:
         # This tests the fix for the original AttributeError bug
         from core.emotion.models import EmotionState, EmotionType
 
-        emo_state = EmotionState(EmotionType.HAPPY, 0.7, sub_emotions={"happy": 0.7}, emotion_mix={"happy": 0.7})
-        current_emotion = emo_state.primary_emotion.value if emo_state and emo_state.primary_emotion else "calm"
+        emo_state = EmotionState(
+            EmotionType.HAPPY, 0.7, sub_emotions={"happy": 0.7}, emotion_mix={"happy": 0.7}
+        )
+        current_emotion = (
+            emo_state.primary_emotion.value if emo_state and emo_state.primary_emotion else "calm"
+        )
         # This line previously caused AttributeError
-        emotion_mix = getattr(emo_state, 'emotion_mix', None) or getattr(emo_state, 'sub_emotions', {})
+        emotion_mix = getattr(emo_state, "emotion_mix", None) or getattr(
+            emo_state, "sub_emotions", {}
+        )
 
         assert current_emotion == "happy"
         assert emotion_mix == {"happy": 0.7}
@@ -170,6 +186,7 @@ class TestStatusPageDataIssues:
 # 1.3 UI Duplication Issues Exploration
 # ============================================================
 
+
 class TestUIDuplicationIssues:
     """Tests for model switching UI duplication and state consistency."""
 
@@ -178,7 +195,9 @@ class TestUIDuplicationIssues:
         from core.interfaces.websocket.adapters.handlers.main_handlers import MessageHandlers
 
         handler = MessageHandlers(MagicMock())
-        assert hasattr(handler, "handle_mobile_switch_model"), "Must have handle_mobile_switch_model"
+        assert hasattr(
+            handler, "handle_mobile_switch_model"
+        ), "Must have handle_mobile_switch_model"
 
     def test_reconnect_handler_exists(self):
         """Verify reconnect handler exists for mobile clients."""
@@ -202,6 +221,7 @@ class TestUIDuplicationIssues:
 # ============================================================
 # 1.4 Chat Streaming Issues Exploration
 # ============================================================
+
 
 class TestChatStreamingIssues:
     """Tests for chat streaming implementation on mobile."""
@@ -241,6 +261,7 @@ class TestChatStreamingIssues:
 # ============================================================
 # Preservation: Web client should not be affected
 # ============================================================
+
 
 class TestWebClientPreservation:
     """Verify web client functionality is preserved after Android fixes."""
@@ -284,6 +305,7 @@ class TestWebClientPreservation:
 # 1.5 WebSocket Heartbeat Checker Startup
 # ============================================================
 
+
 class TestWebSocketHeartbeatStartup:
     """Tests for WebSocket heartbeat checker startup issue fix."""
 
@@ -302,7 +324,9 @@ class TestWebSocketHeartbeatStartup:
             await manager.initialize()
             assert manager.running is True, "initialize() 后 running 应为 True"
             assert manager.heartbeat_task is not None, "initialize() 后 heartbeat_task 应被创建"
-            assert isinstance(manager.heartbeat_task, asyncio.Task), "heartbeat_task 应为 asyncio.Task"
+            assert isinstance(
+                manager.heartbeat_task, asyncio.Task
+            ), "heartbeat_task 应为 asyncio.Task"
 
             # 清理：停止 manager
             await manager.stop()
@@ -330,7 +354,7 @@ class TestWebSocketHeartbeatStartup:
             assert adapter._initialized is False, "初始状态应为未初始化"
 
             # mock websocket_manager.initialize() 来验证是否被调用
-            with patch.object(adapter, 'websocket_manager', None):
+            with patch.object(adapter, "websocket_manager", None):
                 # 实际 initialize 会创建 websocket_manager，这里只验证流程
                 await adapter.initialize()
                 assert adapter._initialized is True, "initialize() 后应为已初始化"
@@ -352,6 +376,7 @@ class TestWebSocketHeartbeatStartup:
         mock_ws = MagicMock()
         mock_ws.application_state = MagicMock()
         from starlette.websockets import WebSocketState
+
         mock_ws.application_state = WebSocketState.DISCONNECTED
 
         is_closed = manager._is_starlette_websocket_closed(mock_ws)
@@ -384,12 +409,23 @@ class TestWebSocketHeartbeatStartup:
 
             # 模拟 FastAPI WebSocket（有 send_text 方法）
             # 用 spec 限制属性，避免 MagicMock 默认所有 hasattr 都返回 True
-            mock_ws = MagicMock(spec=["send_text", "send", "close", "application_state", "client_state", "close_code"])
+            mock_ws = MagicMock(
+                spec=[
+                    "send_text",
+                    "send",
+                    "close",
+                    "application_state",
+                    "client_state",
+                    "close_code",
+                ]
+            )
             mock_ws.application_state = WebSocketState.CONNECTED
             mock_ws.client_state = WebSocketState.CONNECTED
             mock_ws.close_code = None
             mock_ws.send_text = AsyncMock()
-            mock_ws.send = AsyncMock(side_effect=AssertionError("should not call send() on FastAPI WebSocket"))
+            mock_ws.send = AsyncMock(
+                side_effect=AssertionError("should not call send() on FastAPI WebSocket")
+            )
 
             # 注册连接
             conn = ClientConnection(

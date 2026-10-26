@@ -25,7 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aveline.ai.mobile.presentation.theme.OverlayLight
+import com.aveline.ai.mobile.presentation.theme.SurfaceHigh
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 
 /**
@@ -73,7 +73,7 @@ fun StickerPanel(
                         modifier = Modifier
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(OverlayLight)
+                            .background(SurfaceHigh)
                             .clickable { onSelect(emoji) },
                         contentAlignment = Alignment.Center
                     ) {

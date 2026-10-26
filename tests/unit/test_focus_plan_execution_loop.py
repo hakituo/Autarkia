@@ -48,36 +48,20 @@ def test_focus_sessions_accumulate_minutes_and_finish_only_at_estimated_duration
     service = _FakeJournalService(plan)
     crud = PlanCRUDService(service)
 
-    asyncio.run(
-        crud.apply_focus_session_result(
-            "2026-09-14", item.id, "focus_a", 25.0
-        )
-    )
+    asyncio.run(crud.apply_focus_session_result("2026-09-14", item.id, "focus_a", 25.0))
     assert item.actual_minutes == 25.0
     assert item.status == "in_progress"
 
     # 同一个 finish 网络重试不能重复累计。
-    asyncio.run(
-        crud.apply_focus_session_result(
-            "2026-09-14", item.id, "focus_a", 25.0
-        )
-    )
+    asyncio.run(crud.apply_focus_session_result("2026-09-14", item.id, "focus_a", 25.0))
     assert item.actual_minutes == 25.0
     assert item.focus_session_ids == ["focus_a"]
 
-    asyncio.run(
-        crud.apply_focus_session_result(
-            "2026-09-14", item.id, "focus_b", 25.0
-        )
-    )
+    asyncio.run(crud.apply_focus_session_result("2026-09-14", item.id, "focus_b", 25.0))
     assert item.actual_minutes == 50.0
     assert item.status == "in_progress"
 
-    asyncio.run(
-        crud.apply_focus_session_result(
-            "2026-09-14", item.id, "focus_c", 10.0
-        )
-    )
+    asyncio.run(crud.apply_focus_session_result("2026-09-14", item.id, "focus_c", 10.0))
     assert item.actual_minutes == 60.0
     assert item.status == "completed"
     assert item.focus_session_ids == ["focus_a", "focus_b", "focus_c"]
@@ -93,11 +77,7 @@ def test_focus_projection_keeps_terminal_status_but_still_records_real_minutes()
     service = _FakeJournalService(DailyPlan(date="2026-09-14", items=[item]))
     crud = PlanCRUDService(service)
 
-    asyncio.run(
-        crud.apply_focus_session_result(
-            "2026-09-14", item.id, "focus_after_done", 5.0
-        )
-    )
+    asyncio.run(crud.apply_focus_session_result("2026-09-14", item.id, "focus_after_done", 5.0))
 
     assert item.actual_minutes == 5.0
     assert item.status == "completed"

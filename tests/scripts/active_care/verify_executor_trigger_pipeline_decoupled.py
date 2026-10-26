@@ -20,7 +20,7 @@
 并用 fake 依赖跑通一次完整的 prepare 与 trigger 流程，确认接线未变。
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_executor_trigger_pipeline_decoupled
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_executor_trigger_pipeline_decoupled
 """
 
 from __future__ import annotations

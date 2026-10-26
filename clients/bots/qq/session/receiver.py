@@ -22,7 +22,7 @@ class SessionReceiver:
     """会话接收处理器，负责解析并分发服务端消息。"""
 
     def __init__(self, session):
-        # 持有外层 XiaoyouSession 实例
+        # 持有外层 AutarkiaSession 实例
         self.session = session
 
     async def receive_from_xiaoyou(self):

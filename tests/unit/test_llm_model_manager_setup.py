@@ -119,21 +119,18 @@ def _patch_env(
 ):
     """安装通用 patch：Llama / patch 记录器 / 内存检查 / 设置 / 资源管理器。"""
     patch_calls: list = []
-    monkeypatch.setattr(
-        llmm, "_patch_llama_cpp_internals", lambda: patch_calls.append("patch")
-    )
+    monkeypatch.setattr(llmm, "_patch_llama_cpp_internals", lambda: patch_calls.append("patch"))
     monkeypatch.setattr(llmm, "Llama", llama if llama is not None else _FakeLlama)
     monkeypatch.setattr(llmm, "check_memory_pressure", lambda: mem)
 
     if settings_raises:
+
         def _boom():
             raise RuntimeError("settings unavailable")
 
         monkeypatch.setattr("config.integrated_config.get_settings", _boom)
     elif settings is not None:
-        monkeypatch.setattr(
-            "config.integrated_config.get_settings", lambda: settings
-        )
+        monkeypatch.setattr("config.integrated_config.get_settings", lambda: settings)
 
     rc = rm_calls if rm_calls is not None else []
 
@@ -142,9 +139,12 @@ def _patch_env(
             rc.append((name, loaded))
 
     if rm_boom:
+
         def _rm_factory():
             raise RuntimeError("resource manager unavailable")
+
     else:
+
         def _rm_factory():
             return _RM()
 
@@ -191,9 +191,7 @@ def test_setup_nonexistent_path_sets_error(manager, monkeypatch):
 def test_setup_nonexistent_path_return_instance(manager, monkeypatch):
     """return_instance=True 时不应写 self.llm。"""
     _patch_env(monkeypatch, mem=_mem())
-    out = manager.setup_python_llm(
-        {"model_path": "C:/nope/none.gguf"}, return_instance=True
-    )
+    out = manager.setup_python_llm({"model_path": "C:/nope/none.gguf"}, return_instance=True)
     assert out is None
     assert manager.llm is None
 
@@ -287,9 +285,7 @@ def test_setup_force_cpu_inference_from_settings(manager, monkeypatch, gguf):
 def test_setup_python_force_cpu_flag(manager, monkeypatch, gguf):
     """self._python_force_cpu=True 时 n_gpu_layers 归零。"""
     llama_calls: list = []
-    _patch_env(
-        monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls)
-    )
+    _patch_env(monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls))
     manager._python_force_cpu = True
     manager.setup_python_llm({"model_path": gguf, "n_gpu_layers": 12})
     assert llama_calls[0]["n_gpu_layers"] == 0
@@ -298,9 +294,7 @@ def test_setup_python_force_cpu_flag(manager, monkeypatch, gguf):
 def test_setup_config_force_cpu_flag(manager, monkeypatch, gguf):
     """config.force_cpu=True 时 n_gpu_layers 归零。"""
     llama_calls: list = []
-    _patch_env(
-        monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls)
-    )
+    _patch_env(monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls))
     manager.setup_python_llm({"model_path": gguf, "force_cpu": True, "n_gpu_layers": 12})
     assert llama_calls[0]["n_gpu_layers"] == 0
 
@@ -356,9 +350,7 @@ def test_setup_use_mmap_config_error_falls_back(manager, monkeypatch, gguf):
             return super().get(key, default)
 
     llama_calls: list = []
-    _patch_env(
-        monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls)
-    )
+    _patch_env(monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls))
     inst = manager.setup_python_llm(_ExplodingConfig({"model_path": gguf}))
     assert inst is not None
     assert llama_calls[0]["use_mmap"] is False
@@ -367,9 +359,7 @@ def test_setup_use_mmap_config_error_falls_back(manager, monkeypatch, gguf):
 def test_setup_ram_mirror_offload_forces_no_mmap(manager, monkeypatch, gguf):
     """ram_mirror_offload=True 时传给 resolve_use_mmap 的第二参为真。"""
     seen: list = []
-    monkeypatch.setattr(
-        llmm, "resolve_use_mmap", lambda u, r, n: (seen.append((u, r, n)) or False)
-    )
+    monkeypatch.setattr(llmm, "resolve_use_mmap", lambda u, r, n: (seen.append((u, r, n)) or False))
     llama_calls: list = []
     _patch_env(
         monkeypatch,
@@ -392,9 +382,7 @@ def test_setup_insufficient_vram_disables_offload_kqv(manager, monkeypatch, gguf
         settings=_settings(vram_reserve_mb=2000, tts_gpu_min_free_mb=1200),
         llama=_make_llama(_ok, llama_calls),
     )
-    manager.setup_python_llm(
-        {"model_path": gguf, "n_gpu_layers": 20, "offload_kqv": True}
-    )
+    manager.setup_python_llm({"model_path": gguf, "n_gpu_layers": 20, "offload_kqv": True})
     assert llama_calls[0]["offload_kqv"] is False
 
 
@@ -415,12 +403,8 @@ def test_setup_vram_check_skipped_when_free_is_none(manager, monkeypatch, gguf):
 def test_setup_flash_attn_and_offload_disabled(manager, monkeypatch, gguf):
     """flash_attn / offload_kqv 显式关闭时透传 False。"""
     llama_calls: list = []
-    _patch_env(
-        monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls)
-    )
-    manager.setup_python_llm(
-        {"model_path": gguf, "flash_attn": False, "offload_kqv": False}
-    )
+    _patch_env(monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls))
+    manager.setup_python_llm({"model_path": gguf, "flash_attn": False, "offload_kqv": False})
     assert llama_calls[0]["flash_attn"] is False
     assert llama_calls[0]["offload_kqv"] is False
 
@@ -428,9 +412,7 @@ def test_setup_flash_attn_and_offload_disabled(manager, monkeypatch, gguf):
 def test_setup_flash_attn_forced_off_on_cpu(manager, monkeypatch, gguf):
     """CPU 推理（force_cpu）时即使 flash_attn=True 也应为 False。"""
     llama_calls: list = []
-    _patch_env(
-        monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls)
-    )
+    _patch_env(monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls))
     manager.setup_python_llm({"model_path": gguf, "force_cpu": True, "flash_attn": True})
     assert llama_calls[0]["flash_attn"] is False
 
@@ -438,9 +420,7 @@ def test_setup_flash_attn_forced_off_on_cpu(manager, monkeypatch, gguf):
 def test_setup_n_ubatch_from_config(manager, monkeypatch, gguf):
     """n_ubatch 取 config 值并与 n_batch 取小。"""
     llama_calls: list = []
-    _patch_env(
-        monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls)
-    )
+    _patch_env(monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls))
     manager.setup_python_llm({"model_path": gguf, "n_ubatch": 64, "max_batch_size": 512})
     assert llama_calls[0]["n_ubatch"] == 64
 
@@ -448,13 +428,10 @@ def test_setup_n_ubatch_from_config(manager, monkeypatch, gguf):
 def test_setup_zero_gpu_layers_nondict_config(manager, monkeypatch, gguf):
     """CPU 推理且 _gpu_config 非 dict：不写 prev、不回写配置。"""
     llama_calls: list = []
-    _patch_env(
-        monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls)
-    )
+    _patch_env(monkeypatch, mem=_mem(), settings=_settings(), llama=_make_llama(_ok, llama_calls))
     manager._gpu_config = None
     inst = manager.setup_python_llm({"model_path": gguf, "force_cpu": True})
     assert inst is not None
     assert llama_calls[0]["n_gpu_layers"] == 0
     assert manager._prev_n_gpu_layers is None
     assert manager._gpu_config is None
-

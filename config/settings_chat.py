@@ -81,10 +81,10 @@ class ChatContextBudgetSettings(BaseSettings):
         default=2400, description="单条用户输入最大字符数"
     )
     cloud_max_history_messages: int = Field(
-        default=60, description="云端模型历史注入最大消息数（连续最近窗口）"
+        default=120, description="云端模型历史注入最大消息数（连续最近窗口，120 条≈60 轮）"
     )
     cloud_max_history_chars: int = Field(
-        default=12000, description="云端模型历史注入最大字符数（长消息会话兜底）"
+        default=24000, description="云端模型历史注入最大字符数（长消息会话兜底）"
     )
     cloud_history_quantize_messages: int = Field(
         default=20,

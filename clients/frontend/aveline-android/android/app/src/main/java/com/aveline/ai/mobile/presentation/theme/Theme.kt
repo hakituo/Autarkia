@@ -1,3 +1,5 @@
+// statusBarColor / navigationBarColor 在 API 35 标记废弃，但透明系统栏仍要用这两个 API；
+// 文件级抑制只覆盖平台废弃调用，不再用于旧色名兼容。
 @file:Suppress("DEPRECATION")
 
 package com.aveline.ai.mobile.presentation.theme
@@ -24,40 +26,40 @@ import androidx.core.view.WindowCompat
  * The app primarily uses dark theme.
  */
 private val AvelineDarkColorScheme = darkColorScheme(
-    primary = Primary,
-    onPrimary = Color.White,
-    primaryContainer = SurfaceVariant,
+    primary = Accent,
+    onPrimary = Background,
+    primaryContainer = SurfaceHigh,
     onPrimaryContainer = TextPrimary,
-    
-    secondary = InteractiveSecondary,
-    onSecondary = Color.White,
-    secondaryContainer = SurfaceVariant,
+
+    secondary = Accent,
+    onSecondary = Background,
+    secondaryContainer = SurfaceHigh,
     onSecondaryContainer = TextPrimary,
-    
-    tertiary = EmotionGreen,
-    onTertiary = Color.White,
-    tertiaryContainer = SurfaceVariant,
+
+    tertiary = LifeHealth,
+    onTertiary = Background,
+    tertiaryContainer = SurfaceHigh,
     onTertiaryContainer = TextPrimary,
-    
+
     background = Background,
     onBackground = TextPrimary,
-    
+
     surface = Surface,
     onSurface = TextPrimary,
-    surfaceVariant = SurfaceVariant,
+    surfaceVariant = SurfaceHigh,
     onSurfaceVariant = TextSecondary,
-    
-    outline = BorderColor,
-    outlineVariant = BorderLight,
-    
-    error = EmotionRed,
-    onError = Color.White,
-    errorContainer = Color(0xFF3D1F1F),
-    onErrorContainer = Color(0xFFFFDAD6),
-    
-    inverseSurface = SurfaceLight,
-    inverseOnSurface = Background,
-    inversePrimary = PrimaryVariant
+
+    outline = Line,
+    outlineVariant = Line,
+
+    error = Danger,
+    onError = Background,
+    errorContainer = SurfaceHigh,
+    onErrorContainer = Danger,
+
+    inverseSurface = SurfaceHigh,
+    inverseOnSurface = TextBody,
+    inversePrimary = Accent
 )
 
 /**
@@ -65,17 +67,17 @@ private val AvelineDarkColorScheme = darkColorScheme(
  * Provided for completeness, but the app primarily uses dark theme.
  */
 private val AvelineLightColorScheme = lightColorScheme(
-    primary = InteractivePrimary,
+    primary = Accent,
     onPrimary = Color.White,
     primaryContainer = Color(0xFFD0E4FF),
     onPrimaryContainer = Color(0xFF001D36),
     
-    secondary = InteractiveSecondary,
+    secondary = Accent,
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFE8DEF8),
     onSecondaryContainer = Color(0xFF1D192B),
     
-    tertiary = EmotionGreen,
+    tertiary = Accent,
     onTertiary = Color.White,
     tertiaryContainer = Color(0xFFD1F8E7),
     onTertiaryContainer = Color(0xFF00210F),
@@ -91,7 +93,7 @@ private val AvelineLightColorScheme = lightColorScheme(
     outline = Color(0xFF73777F),
     outlineVariant = Color(0xFFC3C6CF),
     
-    error = EmotionRed,
+    error = Danger,
     onError = Color.White,
     errorContainer = Color(0xFFFFDAD6),
     onErrorContainer = Color(0xFF410002),

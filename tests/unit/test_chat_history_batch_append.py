@@ -70,7 +70,12 @@ def _event(
 
 
 def _jsonl_payloads(root: Path) -> dict[str, list[dict]]:
-    """读取 root 下所有 JSONL，返回 {相对路径: [payload, ...]}（已剔除 uuid event_id）。"""
+    """读取 root 下所有 JSONL，返回 {相对路径: [payload, ...]}。
+
+    剔除两类随运行变化的字段：随机 ``event_id``，以及由它派生的服务端
+    线性节点 ID（``srv:`` 前缀的 ``client_node_id`` / ``parent_node_id``）。
+    其余 v3 字段（幂等键、namespace、topology_status 等）必须逐字一致。
+    """
     result: dict[str, list[dict]] = {}
     for path in sorted(root.rglob("*.jsonl")):
         payloads = []
@@ -79,6 +84,10 @@ def _jsonl_payloads(root: Path) -> dict[str, list[dict]]:
                 continue
             payload = json.loads(line)
             payload.pop("event_id", None)
+            for key in ("client_node_id", "parent_node_id"):
+                value = str(payload.get(key) or "")
+                if value.startswith("srv:"):
+                    payload[key] = "<srv>"
             payloads.append(payload)
         result[path.relative_to(root).as_posix()] = payloads
     return result
@@ -107,8 +116,7 @@ def test_batch_append_matches_per_event_append(tmp_path):
 
     per_event_store = ChatHistoryStore(per_event_root)
     per_event_refs = [
-        per_event_store.append_event(**{k: v for k, v in event.items()})
-        for event in events
+        per_event_store.append_event(**{k: v for k, v in event.items()}) for event in events
     ]
 
     batch_store = ChatHistoryStore(batch_root)
@@ -178,7 +186,7 @@ def test_batch_append_filters_debug_messages_like_per_event(tmp_path):
     """被过滤的 debug/error 文本：返回 filtered 结构、不落盘、不影响同批其余事件。"""
     events = [
         _event(1, content="正常消息"),
-        _event(2, content="[DEBUG_ERROR] Error: HTTP 400: {\"code\":20012}"),
+        _event(2, content='[DEBUG_ERROR] Error: HTTP 400: {"code":20012}'),
         _event(3, content="另一条正常消息"),
     ]
 
@@ -208,12 +216,28 @@ def test_batch_append_is_readable_through_the_store(tmp_path):
     store.append_events(events)
 
     read_back = store.list_conversation_events(_CONV_A, limit=50)
-    assert [item["content"] for item in read_back] == [
-        f"第 {index} 条" for index in range(1, 21)
-    ]
+    assert [item["content"] for item in read_back] == [f"第 {index} 条" for index in range(1, 21)]
 
 
 def test_batch_append_empty_input_is_noop(tmp_path):
     store = ChatHistoryStore(tmp_path)
     assert store.append_events([]) == []
     assert list(tmp_path.rglob("*.jsonl")) == []
+
+
+def test_explicit_idempotency_key_keeps_same_second_identical_messages(tmp_path):
+    """同秒同文的真实历史消息不能因为内容哈希相同被误去重；重跑仍按显式键拦下。"""
+    first = _event(1, content="嗯")
+    second = _event(2, content="嗯")
+    first["idempotency_key"] = "ttqq|source|1"
+    second["idempotency_key"] = "ttqq|source|2"
+
+    store = ChatHistoryStore(tmp_path)
+    refs = store.append_events([first, second])
+
+    assert [ref["deduplicated"] for ref in refs] == [False, False]
+    assert len(store.list_conversation_events(_CONV_A, limit=10)) == 2
+
+    rerun = store.append_events([first, second])
+    assert [ref["deduplicated"] for ref in rerun] == [True, True]
+    assert len(store.list_conversation_events(_CONV_A, limit=10)) == 2

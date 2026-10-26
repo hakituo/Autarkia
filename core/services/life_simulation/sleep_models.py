@@ -120,6 +120,10 @@ class SleepRuntimeState:
     planned_wake_time: str = ""
     is_sleeping: bool = False
     actual_sleep_start_ts: float = 0.0
+    # 本次睡眠锁定的起床时刻（unix 秒）。>0 表示入睡时已确定这一觉睡到何时；
+    # 跨天切换作息档（工作日 23:00 睡 → 休息日 00:00 睡）后仍以锁定值为准，
+    # 避免同一夜被按 now 重算成两个窗口（00:00 误判起床、00:10 又误判入睡）。
+    sleep_window_wake_ts: float = 0.0
     actual_wakeup_ts: float = 0.0
     last_sleep_duration_hours: float = 0.0
     current_sleep_duration_hours: float = 0.0
@@ -160,6 +164,7 @@ class SleepRuntimeState:
             "planned_wake_time": self.planned_wake_time,
             "is_sleeping": self.is_sleeping,
             "actual_sleep_start_ts": self.actual_sleep_start_ts,
+            "sleep_window_wake_ts": self.sleep_window_wake_ts,
             "actual_wakeup_ts": self.actual_wakeup_ts,
             "last_sleep_duration_hours": self.last_sleep_duration_hours,
             "current_sleep_duration_hours": self.current_sleep_duration_hours,
@@ -192,6 +197,7 @@ class SleepRuntimeState:
             planned_wake_time=str(data.get("planned_wake_time") or ""),
             is_sleeping=bool(data.get("is_sleeping")),
             actual_sleep_start_ts=float(data.get("actual_sleep_start_ts") or 0.0),
+            sleep_window_wake_ts=float(data.get("sleep_window_wake_ts") or 0.0),
             actual_wakeup_ts=float(data.get("actual_wakeup_ts") or 0.0),
             last_sleep_duration_hours=float(data.get("last_sleep_duration_hours") or 0.0),
             current_sleep_duration_hours=float(data.get("current_sleep_duration_hours") or 0.0),

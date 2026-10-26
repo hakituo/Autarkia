@@ -123,9 +123,7 @@ def test_formal_focus_nudge_endpoint_never_sends(monkeypatch):
 
     monkeypatch.setattr(study_focus, "_svc", lambda: FakeService())
 
-    response = asyncio.run(
-        study_focus.trigger_nudge("formal-focus", user_id="default")
-    )
+    response = asyncio.run(study_focus.trigger_nudge("formal-focus", user_id="default"))
     payload = json.loads(response.body.decode("utf-8"))
 
     assert payload["ok"] is True

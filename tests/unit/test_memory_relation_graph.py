@@ -173,9 +173,7 @@ def test_android_client_parent_id_resolves_to_weighted_memory_uuid():
 
     graph = ensure_relation_graph(manager)
     assert any(
-        edge.target_id == "wm-user"
-        and edge.relation == "parent"
-        and edge.strength == 1.0
+        edge.target_id == "wm-user" and edge.relation == "parent" and edge.strength == 1.0
         for edge in graph["wm-ai"]
     )
 
@@ -262,9 +260,7 @@ def test_relation_graph_cache_rebuilds_when_memory_set_changes():
     first = ensure_relation_graph(manager)
     assert set(first) == {"a"}
 
-    manager.weighted_memories["b"] = _memory(
-        "b", "第二条", timestamp=101.0, topics=["项目"]
-    )
+    manager.weighted_memories["b"] = _memory("b", "第二条", timestamp=101.0, topics=["项目"])
     second = ensure_relation_graph(manager)
     assert set(second) == {"a", "b"}
     assert any(edge.target_id == "b" for edge in second["a"])

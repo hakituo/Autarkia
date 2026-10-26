@@ -331,6 +331,8 @@ async def save_conversation_history(
         now_dt = get_current_time()
         history_store = get_chat_history_store()
         event_refs = {}
+        # 客户端消息树关系由 ChatHistoryStore 在落盘时统一继承（v3 D2），
+        # 这里不再重复传，避免同一判断散落两处。
         if user_msg:
             event_refs["user"] = history_store.append_event(
                 conversation_id=session_id or "default",

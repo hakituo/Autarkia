@@ -20,6 +20,14 @@ from core.utils.debug_markers import DEBUG_ERROR_PREFIX
 BASE_URL = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
 
 
+@pytest.fixture(autouse=True)
+def _silence_usage_log(monkeypatch):
+    """测试用的是假 usage，不能写进真实 logs/prompt_cache_stats.log。"""
+    import core.llm.dashscope_client as dashscope_module
+
+    monkeypatch.setattr(dashscope_module, "log_llm_usage", lambda *args, **kwargs: None)
+
+
 # --------------------------------------------------------------------------- #
 # 替身对象
 # --------------------------------------------------------------------------- #
@@ -139,7 +147,10 @@ def _ok_payload(content: str = "hello", finish_reason: Any = "stop", usage=None)
     payload: Dict[str, Any] = {
         "output": {
             "choices": [
-                {"message": {"role": "assistant", "content": content}, "finish_reason": finish_reason}
+                {
+                    "message": {"role": "assistant", "content": content},
+                    "finish_reason": finish_reason,
+                }
             ]
         }
     }
@@ -645,15 +656,17 @@ def test_parse_sse_error_payload_yields_error_and_stops():
         _sse(_ok_payload("不应出现", "null")),
     ]
 
-    assert _drain_parser(client, chunks) == [
-        {"error": "DashScope Error: inspection failed"}
-    ]
+    assert _drain_parser(client, chunks) == [{"error": "DashScope Error: inspection failed"}]
 
 
 def test_parse_sse_skips_payloads_without_choices():
     """无 choices 的载荷（如 usage-only 心跳）被跳过。"""
     client = _make_client(_FakeSession())
-    chunks = [_sse({"output": {"choices": []}}), _sse({"output": {}}), _sse(_ok_payload("hi", "null"))]
+    chunks = [
+        _sse({"output": {"choices": []}}),
+        _sse({"output": {}}),
+        _sse(_ok_payload("hi", "null")),
+    ]
 
     assert _drain_parser(client, chunks) == [{"content": "hi"}]
 

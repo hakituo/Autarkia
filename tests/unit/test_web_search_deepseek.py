@@ -9,6 +9,7 @@
 注意：key 一律通过 patch.dict 显式注入，不依赖运行环境是否加载了 .env，
 避免 xdist 并行下因 worker 环境差异产生 flaky。
 """
+
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -112,11 +113,19 @@ async def test_search_deepseek_key_missing():
 async def test_run_deepseek_fallback_to_serper():
     """deepseek 失败时应回退到 serper"""
     tool = WebSearchTool()
-    with patch.object(WebSearchTool, "_resolve_provider", return_value="deepseek"), \
-         patch.object(WebSearchTool, "_search_deepseek",
-                      AsyncMock(return_value="Search failed with status 402")), \
-         patch.object(WebSearchTool, "_search_serper",
-                      AsyncMock(return_value="Title: serper结果\nSnippet: 内容\nURL: https://s.com")):
+    with (
+        patch.object(WebSearchTool, "_resolve_provider", return_value="deepseek"),
+        patch.object(
+            WebSearchTool,
+            "_search_deepseek",
+            AsyncMock(return_value="Search failed with status 402"),
+        ),
+        patch.object(
+            WebSearchTool,
+            "_search_serper",
+            AsyncMock(return_value="Title: serper结果\nSnippet: 内容\nURL: https://s.com"),
+        ),
+    ):
         result = await tool._run("测试", count=3)
     assert "serper结果" in result
 
@@ -127,9 +136,11 @@ async def test_run_deepseek_no_fallback_on_success():
     tool = WebSearchTool()
     deepseek_mock = AsyncMock(return_value="Title: ds\nSnippet: ok\nURL: https://d.com")
     serper_mock = AsyncMock(return_value="Title: serper\nSnippet: ok\nURL: https://s.com")
-    with patch.object(WebSearchTool, "_resolve_provider", return_value="deepseek"), \
-         patch.object(WebSearchTool, "_search_deepseek", deepseek_mock), \
-         patch.object(WebSearchTool, "_search_serper", serper_mock):
+    with (
+        patch.object(WebSearchTool, "_resolve_provider", return_value="deepseek"),
+        patch.object(WebSearchTool, "_search_deepseek", deepseek_mock),
+        patch.object(WebSearchTool, "_search_serper", serper_mock),
+    ):
         result = await tool._run("测试", count=3)
     serper_mock.assert_not_called()
     assert "ds" in result
@@ -148,6 +159,12 @@ async def test_preprocess_deepseek_all_filtered_keeps_raw():
 def test_is_search_failure_prefixes():
     """失败前缀判定覆盖各 _search_xxx 的错误返回约定"""
     tool = WebSearchTool()
-    for bad in ("Error: x", "Search failed with status 500", "Search timed out.", "No results found.", ""):
+    for bad in (
+        "Error: x",
+        "Search failed with status 500",
+        "Search timed out.",
+        "No results found.",
+        "",
+    ):
         assert tool._is_search_failure(bad) is True
     assert tool._is_search_failure("Title: 正常\nSnippet: ok") is False

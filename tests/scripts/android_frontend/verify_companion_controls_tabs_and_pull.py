@@ -40,7 +40,6 @@ def main() -> None:
     for relative in (
         "presentation/companion/CompanionScreen.kt",
         "presentation/life/LifeScreen.kt",
-        "presentation/settings/SettingsScreenV2.kt",
         "presentation/study/StudyScreenV2.kt",
     ):
         require(read(relative), "AvelineTabRow(")
@@ -66,8 +65,13 @@ def main() -> None:
         "companionPanelSwipeGesture(",
         "ChatCompanionPanel(",
         "gesturesEnabled = companionDismissGestureEnabled",
-        "statusViewModel.refreshStatus()",
+        # 详情面板改为在聊天页预加载：进页即按当前角色拉状态 / 记忆，
+        # 打开面板不再补发一次请求（旧断言要求 openCompanionPanel 里调 refreshStatus）。
+        "statusViewModel.setControlContext(fn, uiState.currentSession?.id)",
+        "memoryViewModel.setViewingPersona(fn)",
     )
+    if "statusViewModel.refreshStatus()" in chat:
+        raise AssertionError("打开详情面板不应重复刷新状态（聊天页已预加载）")
     # 面板本体（PullableDismissPanel 的组装）在 ChatCompanionPanel.kt。
     panel_host = read("presentation/chat/ChatCompanionPanel.kt")
     require(
@@ -166,9 +170,33 @@ def main() -> None:
         'listOf("状态", "日程", "模型", "人设", "记忆")',
         "1 -> CompanionScheduleTab(uiState = statusUiState)",
         "onDismissGestureEnabledChange(pagerState.settledPage == 0)",
-        "if (!pagerState.isScrollInProgress)",
-        "if (pagerState.settledPage == 1) onRefreshStatus()",
+        # 滑动性能：相邻页预组合，且副作用只挂在稳定页（settledPage）上，
+        # 不在滑动过程中反复重启 effect / 发网络请求。
+        "beyondViewportPageCount = 1",
+        "LaunchedEffect(pagerState.settledPage)",
+        "if (pagerState.settledPage == 1) onSilentRefreshStatus()",
     )
+    if "pagerState.isScrollInProgress" in companion_screen:
+        raise AssertionError("滑动中的 isScrollInProgress 不能作为副作用 key，会反复重启 effect")
+    # currentPage 只能出现在私有的 Tab 栏里：写在 CompanionScreen 主体会让每次翻页
+    # 都重组整屏（含模型页的长列表），这是模型选择页左右滑动卡顿的主因。
+    require(companion_screen, "private fun CompanionTabRow(")
+    tab_row_start = companion_screen.index("private fun CompanionTabRow(")
+    read_pos = companion_screen.find("selectedTabIndex = pagerState.currentPage")
+    if read_pos < 0 or read_pos < tab_row_start:
+        raise AssertionError("pagerState.currentPage 必须在 CompanionTabRow 内部读取，不能在主屏读")
+    if companion_screen.count("selectedTabIndex = pagerState.currentPage") != 1:
+        raise AssertionError("pagerState.currentPage 只能有一处读取点（Tab 栏）")
+
+    # 模型页：几十条模型必须走 lazy items，不能单 item 包 forEach 一次性组合。
+    model_tab = read("presentation/companion/CompanionModelTab.kt")
+    require(
+        model_tab,
+        "items(\n            items = availableModels,\n            key = { model -> model.id }",
+        "item(key = \"model-section-header\")",
+    )
+    if "availableModels.forEach" in model_tab:
+        raise AssertionError("模型列表不能再用 forEach 一次性组合全部行")
     schedule_tab = read("presentation/companion/CompanionScheduleTab.kt")
     require(
         schedule_tab,

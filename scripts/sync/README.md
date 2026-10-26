@@ -12,7 +12,7 @@
 
 ## 一、共享根：两个系统读写同一个日志文件夹
 
-新增环境变量 `XIAOYOU_SHARED_ROOT` 指向一个两边都能读写的目录，日志目录与学习数据中转目录
+新增环境变量 `AUTARKIA_SHARED_ROOT` 指向一个两边都能读写的目录，日志目录与学习数据中转目录
 就都落到它下面。**不设这个变量时，所有路径与加这个功能之前完全一致**，可以直接回退。
 
 ### 1. 选一个共享位置
@@ -28,12 +28,12 @@
 ### 2. Windows 侧设置
 
 ```powershell
-setx XIAOYOU_SHARED_ROOT "G:\xiaoyou-shared"
-mkdir "G:\xiaoyou-shared"
+setx AUTARKIA_SHARED_ROOT "G:\Autarkia-shared"
+mkdir "G:\Autarkia-shared"
 ```
 
 `setx` 写入用户环境变量，**新开的**命令行 / 服务才生效；当前窗口可临时补一句
-`$env:XIAOYOU_SHARED_ROOT = "G:\xiaoyou-shared"`。
+`$env:AUTARKIA_SHARED_ROOT = "G:\Autarkia-shared"`。
 
 ### 3. Linux 侧设置
 
@@ -47,7 +47,7 @@ sudo mount -t ntfs-3g /dev/disk/by-uuid/E2BE475FBE472B7D /mnt/G
 UUID=<分区UUID>  /mnt/G  ntfs-3g  defaults,uid=1000,gid=1000,umask=022  0  0
 
 # 3) 环境变量（对 systemd 服务与登录 shell 都生效）
-echo 'XIAOYOU_SHARED_ROOT=/mnt/G/xiaoyou-shared' | sudo tee -a /etc/environment
+echo 'AUTARKIA_SHARED_ROOT=/mnt/G/Autarkia-shared' | sudo tee -a /etc/environment
 ```
 
 ### 4. 必须关掉 Windows 快速启动
@@ -77,20 +77,20 @@ echo 'XIAOYOU_SHARED_ROOT=/mnt/G/xiaoyou-shared' | sudo tee -a /etc/environment
 
 ```bash
 # 出计划（默认 dry-run，不写任何文件）
-python scripts/sync/learning_data_sync.py --hub /mnt/G/xiaoyou-sync
+python scripts/sync/learning_data_sync.py --hub /mnt/G/Autarkia-sync
 
 # 确认后真正执行
-python scripts/sync/learning_data_sync.py --hub /mnt/G/xiaoyou-sync --apply
+python scripts/sync/learning_data_sync.py --hub /mnt/G/Autarkia-sync --apply
 ```
 
-配了 `XIAOYOU_SHARED_ROOT` 时 `--hub` 可省略，默认用 `<共享根>/learning_hub`；
-也可以继续用环境变量 `XIAOYOU_LEARNING_SYNC_HUB` 单独指定。
+配了 `AUTARKIA_SHARED_ROOT` 时 `--hub` 可省略，默认用 `<共享根>/learning_hub`；
+也可以继续用环境变量 `AUTARKIA_LEARNING_SYNC_HUB` 单独指定。
 
 ### 同步哪些数据（分组）
 
 | 分组 | 内容 | 基准根 |
 | --- | --- | --- |
-| `vocab` | FSRS 背单词进度 `vocab_progress.json` / `vocab_meta.json`、每日生词日志、长期生词本 | 项目根 |
+| `vocab` | FSRS 背单词进度 `vocab_progress.json`（按单词并集合并）/ `vocab_meta.json`、每日生词日志（按单词并集合并）、长期生词本 | 项目根 |
 | `daily` | 每日计划 / 日记 / 学习摘要、每日画像、每日背单词与测验状态 | 用户数据根 |
 | `focus` | 专注会话记录 | 用户数据根 |
 | `study_state` | 学习系统状态：学习时长、正确率、知识点掌握度、薄弱点（`.state/`） | 学习库根 |
@@ -218,7 +218,24 @@ JSONL**：`device_context.jsonl`（设备状态流水）、`notifications.jsonl`
 
 > 补充说明：复习队列的**条数**本身有自愈能力——`quiz.py` 每次都按当前进度重算候选，
 > 再与锁定队列求交集，所以进度同步过来后条数会自动对齐；队列文件主要决定**顺序**。
-> 真正会导致「待复习数不对」的是进度文件没同步过来，靠 `XIAOYOU_SYNC_ON_START=1` 解决。
+> 真正会导致「待复习数不对」的是进度文件没同步过来，靠 `AUTARKIA_SYNC_ON_START=1` 解决。
+
+### 背单词进度与每日生词日志（`vocab`）：按单词取并集
+
+`output/user_data/vocab_progress.json` 是 `{单词: 调度状态}` 的映射。两端在两次同步之间
+都可能各自背单词，整文件按 mtime 取胜会丢掉另一端新学的词（2026-10-25 实测：Linux 侧
+10-23～10-24 的进度没有一条到达 Windows，新词被重新当成「从未学过」）。因此：
+
+| 文件 | 合并规则 |
+| --- | --- |
+| `vocab_progress.json` | 按单词取并集；同一单词保留末次复习更晚的一份调度字段（`reps` / `interval` / `fsrs_*`），`history` 按 `(timestamp, quality, source)` 去重后合并 |
+| `daily/YYYY/MM/DD.txt` | 每行 `单词[ 次数]`，按单词取并集；同词取较大次数（与 `UnfamiliarWordBook` 的去重口径一致），空占位文件不会覆盖实际记录 |
+
+- 结果统一 `sort_keys`、`\n` 换行，与合并顺序无关、对已合并结果幂等；
+- 任一侧解析失败（JSON 损坏 / 非 UTF-8）时返回 `None`、不落盘，保留两端原文件：
+  合并结果会同时写回双方，拿能读的一侧去覆盖损坏文件会让可人工抢救的内容直接消失；
+- 长期生词本 `unfamiliar_word.txt` 仍按整文件复制——它可能含人工维护的空行分组与注释，
+  不在这里重排。
 
 ### 月度蒸馏记忆（`persona`）：保留信息量更大的一份
 
@@ -245,7 +262,7 @@ JSONL**：`device_context.jsonl`（设备状态流水）、`notifications.jsonl`
 ### 直接读对端仓库（Linux 挂载了 Windows 的 D 盘时）
 
 > 日常不必手动挂载，也不必手动同步：`./start.sh` 会**自动挂载** D 盘（幂等、失败不拦启动），
-> 并在**启动前与退出后各同步一次**（`XIAOYOU_SYNC_ON_START=0` 可关闭）。
+> 并在**启动前与退出后各同步一次**（`AUTARKIA_SYNC_ON_START=0` 可关闭）。
 > 两次都避开主程序运行期，因此不存在与运行中程序抢写同一批文件的问题。
 > 下面的命令是手动操作时的参考。
 
@@ -258,7 +275,7 @@ sudo mount -t ntfs-3g -o rw,uid=1000,gid=1000,umask=022 \
 
 # 2) 同步。注意 --peer-study-root 指向「对端（Windows）的学习库」，不是本机的 ~/Study
 python scripts/sync/learning_data_sync.py \
-    --peer-root /mnt/D/AI/xiaoyou-core \
+    --peer-root /mnt/D/AI/Autarkia \
     --peer-study-root /mnt/D/AI/Study \
     --apply
 ```
@@ -313,8 +330,8 @@ Windows 既看不到 Linux 的文件、也就没有可比对的对端，所以�
 - 只在退出时同步 → Linux 自己拿不到 Windows 期间产生的进度。
 
 若确实想让 Windows 也能发起同步，唯一的路子是改用 **hub 模式**：把中转目录放在两边都能读写的
-NTFS 分区上（例如 `D:\xiaoyou-sync`），Linux 用 `--hub /mnt/win_p4/xiaoyou-sync`、
-Windows 用 `--hub D:\xiaoyou-sync`，各自与 hub 对账。
+NTFS 分区上（例如 `D:\Autarkia-sync`），Linux 用 `--hub /mnt/win_p4/Autarkia-sync`、
+Windows 用 `--hub D:\Autarkia-sync`，各自与 hub 对账。
 
 ---
 
@@ -331,11 +348,11 @@ Windows 用 `--hub D:\xiaoyou-sync`，各自与 hub 对账。
 
 | 时机 | 系统 | 动作 |
 | --- | --- | --- |
-| 启动前 | Linux | `git fetch` Windows 工作副本 `/mnt/win_p4/AI/xiaoyou-core` + `--ff-only` |
-| 退出后 | Linux | `git push` 到同盘裸仓库 hub `/mnt/win_p4/AI/xiaoyou-hub.git` |
-| 启动前 | Windows | `git fetch` hub `D:\AI\xiaoyou-hub.git` + `--ff-only` |
+| 启动前 | Linux | `git fetch` Windows 工作副本 `/mnt/win_p4/AI/Autarkia` + `--ff-only` |
+| 退出后 | Linux | `git push` 到同盘裸仓库 hub `/mnt/win_p4/AI/Autarkia-hub.git` |
+| 启动前 | Windows | `git fetch` hub `D:\projects\autarkia-hub.git` + `--ff-only` |
 
-- 挂点：`start.sh` 的 `sync_code` 函数（`XIAOYOU_SYNC_CODE=0` 关闭）、`start.bat` 启动前一行。
+- 挂点：`start.sh` 的 `sync_code` 函数（`AUTARKIA_SYNC_CODE=0` 关闭）、`start.bat` 启动前一行。
 - 退出码：`0` 已同步或无需同步、`2` 被本地改动 / 分叉挡住（下次自动重试）、`1` 真错误。
   调用方一律**只警告不拦启动**，与第一节的挂载逻辑一致。
 - 只处理 `main` 分支；当前不在 main 时静默跳过，避免误合到别的分支。
@@ -343,12 +360,13 @@ Windows 用 `--hub D:\xiaoyou-sync`，各自与 hub 对账。
 
   ```bash
   # Linux
-  git init --bare /mnt/win_p4/AI/xiaoyou-hub.git
+  git init --bare /mnt/win_p4/AI/Autarkia-hub.git
   # Windows（等价，二选一即可）
-  git init --bare D:\AI\xiaoyou-hub.git
+  git init --bare D:\projects\autarkia-hub.git
   ```
 
-- 路径可用环境变量覆盖：`XIAOYOU_CODE_HUB`（hub 位置）、`XIAOYOU_CODE_PEER`（对端工作副本）。
+- 路径可用环境变量覆盖：`AUTARKIA_CODE_HUB`（hub 位置）、`AUTARKIA_CODE_PEER`（对端工作副本）；
+  旧名 `XIAOYOU_CODE_HUB` / `XIAOYOU_CODE_PEER` 仍会被读取，便于 Linux 侧 `/etc/environment` 逐步迁移。
 - ntfs-3g 挂出来的文件属主是 root，直接 `git fetch` 会报 `dubious ownership`；脚本对每个被访问的
   仓库临时加 `-c safe.directory`，不改用户全局配置。
 - GitHub（`origin-private`）仍是备份 / 发布 / 部署源，不再参与双机同步；部署走
@@ -364,12 +382,106 @@ python3 scripts/sync/code_sync.py push     # 退出后那一跳（只在 Linux �
 
 ---
 
-## 四、文件说明
+## 四、组件库双向同步（2026-10-24）
+
+`/home/user/Autarkia-Libs` 下是 9 个从主运行时抽出的独立仓库：
+
+```text
+Autarkia-Libs/
+├── Autarkia-Cadence/ Io/ Msgqueue/ Textkit/ tool/   # 已上 GitHub + PyPI
+└── unpublished/                                      # 只做双系统磁盘同步
+    ├── Autarkia-Concurrency/
+    ├── Autarkia-Emotion/
+    ├── Autarkia-Personas/
+    └── Autarkia-Vocab/
+```
+
+Windows 侧 `D:\projects\autarkia-Libs` 保持同样结构；Linux 通过 `/mnt/win_p4/AI/Autarkia-Libs`
+直接读写这份工作副本。映射真源是 `config/libs_sync.json`（库文件 ↔ 主仓源文件，支持一对多），
+不要再在别处维护路径表。
+
+### 日常流程
+
+1. 主仓改了映射文件（或组件库先改）：正常改代码，语义移植由 agent/人完成；
+2. 按 RULES.md §4 跑 `auto_commit_push.py`：
+   - 自动检测本次主仓改动命中了哪些组件库；
+   - 组件库有改动就先跑组件库 pytest，再提交、推 GitHub（已发布 5 个）；
+   - 同步到 Windows 工作副本（全部 9 个，ff-only）；
+   - 主仓照旧提交推 `origin-private`。
+3. 组件库先改、主仓后跟进：`libs_sync.py task` 生成双向移植清单，移植完后
+   `libs_sync.py ack --lib <名称>` 更新基线，再走第 2 步。
+
+```bash
+python scripts/sync/libs_sync.py status    # 漂移 / 未推送 / Windows 是否一致
+python scripts/sync/libs_sync.py task      # 生成待办（state/pending/<库>.md）
+python scripts/sync/libs_sync.py push      # 手动提交推送组件库
+python scripts/sync/libs_sync.py mirror    # Linux ↔ Windows 快进同步
+python scripts/sync/libs_sync.py baseline  # 首次/重置基线
+python scripts/sync/libs_sync.py ack --lib Autarkia-Io
+```
+
+`auto_commit_push.py` 新增参数：`--no-libs`（跳过）、`--strict-libs`（主仓改了但组件库没跟改时中止）、
+`--libs-pypi`（版本号变化时 `uv build` + `uv publish`，需要 `UV_PUBLISH_TOKEN`）。
+`start.sh` 启动/退出各跑一次 `mirror`，可用 `AUTARKIA_SYNC_LIBS=0` 关闭。
+
+### 关键约定
+
+- **同步的是 git 提交，不复制未提交文件**：谁改的谁先提交，镜像只做 `--ff-only`；
+  对端脏工作树只有在「内容已等于目标提交」时才允许 checkout 后快进，否则报 blocked。
+- **基线放在 Windows 分区** `.sync-state/`，双系统共用；哈希对 CRLF/LF 归一化，
+  9 个库统一 `core.autocrlf=input`，避免换行符被误判成改动。
+- **只自动移植「纯新增顶层符号」**：与基线相比已有函数/类逐字未变、只多出新函数/类，
+  且新符号只依赖目标模块已有的名字时，脚本会直接追加并跑测试；修改已有符号、import
+  变化、依赖缺失仍生成 diff 任务。组件库是通用化改写版（相似度普遍 0.1~0.8），
+  逐字复制会破坏依赖注入与 stdlib-only 约束，这条边界不能放宽。
+
+## 五、本机配置同步：`.env` 键级补缺 + CLI 就位（2026-10-25）
+
+代码（git 提交）、运行数据（learning_data_sync）、组件库（libs_sync）三条通道都
+覆盖不到 **gitignore 的 `.env`** 与 **装在系统里的 CLI**：前者不在提交里，后者是
+平台相关二进制、无法跨系统搬运。`scripts/sync/env_sync/`（门面 `__init__` +
+`env_merge` + `cli_setup`）补第四条通道，`start.sh` 启停各跑一次
+（`AUTARKIA_SYNC_ENV=0` 可关闭）：
+
+```bash
+python -m scripts.sync.env_sync merge --peer-root /mnt/win_p4/AI/Autarkia --auto --apply
+python -m scripts.sync.env_sync ensure-cli
+```
+
+### `.env`：键级并集、只补缺、不覆盖
+
+| 情况 | 动作 |
+| --- | --- |
+| 键只在一侧存在 | 连同其上方段头注释与下方注释示例行补到缺的一侧（双向） |
+| 两边都有、值相同 | 跳过 |
+| 两边都有、值不同 | **保持本机现状，只打印差异报告**——路径类配置（如 Windows 盘符）本就该各写各的，整文件覆盖会互相破坏 |
+
+- 解析只认活跃键（`KEY=VALUE`，行首无 `#`）；带 `#` 前缀的示例键当作注释文本随段搬运。
+- 写回保持原文件换行风格（CRLF/LF）与 BOM，权限一律收紧到 0600（`.env` 含密钥，
+  临时文件创建时就按 0600 建，先写 `.sync-tmp` 再原子替换）；非 UTF-8 的 `.env`
+  整体跳过不猜编码。
+- 合并幂等且与方向无关：补缺完成后两边键集合一致，再跑一次零改动。
+
+> 语义取舍：值不同不覆盖意味着「在一侧改了已有键的值」不会自动传播（比如轮换了
+> API key）。差异报告会列出这些键，看到后手动对齐即可——宁可少动，不静默覆盖。
+
+### `ensure-cli`：CodeRabbit CLI 就位检查
+
+- 本机有 `coderabbit` / `cr` 命令：打印版本，结束。
+- 缺装：自动跑官方 `install.sh`（单次限时 90s；直连 `cli.coderabbit.ai` 失败会
+  自动带本地代理 `http://127.0.0.1:7897` 重试一次），装到 `~/.local/bin`。
+- Windows 侧 CLI 无法由 Linux 代装，仍需手动装一次；`.env` 里的
+  `CODERABBIT_API_KEY` 则由 `merge` 自动带过去。
+
+---
+
+## 六、文件说明
 
 | 文件 | 职责 |
 | --- | --- |
 | `core/utils/shared_roots.py` | 共享根 / 日志根 / 学习数据中转目录解析（唯一真源） |
 | `scripts/sync/code_sync.py` | 双系统代码同步（`pull` / `push` / `status`，本地磁盘通道） |
+| `scripts/sync/env_sync/` | 本机配置同步：`.env` 键级补缺合并（`merge`）+ CodeRabbit CLI 就位检查（`ensure-cli`），`python -m scripts.sync.env_sync` 调用 |
 | `core/utils/project_root.py` | 项目根解析（零依赖，专门用来断开 `common → logger → config → shared_roots` 的导入环） |
 | `scripts/sync/learning_data_sync.py` | 同步 CLI 入口 |
 | `scripts/sync/learning_data/items.py` | 学习数据清单与对端路径布局 |
@@ -378,3 +490,17 @@ python3 scripts/sync/code_sync.py push     # 退出后那一跳（只在 Linux �
 | `scripts/sync/learning_data/chat_merge.py` | 并集合并分派：聊天 JSONL（按 `event_id`）/ 当天 index.json（按条目） |
 | `scripts/sync/learning_data/memory_merge.py` | 记忆并集合并（按 `id` / 指纹键取并集，同身份取更新的一份） |
 | `scripts/sync/learning_data/transfer.py` | 执行传输、并集合并、冲突留档、写回基线 |
+| `config/libs_sync.json` | 组件库 ↔ 主仓映射唯一真源（9 库、51 条映射） |
+| `scripts/sync/libs_sync.py` | 组件库同步薄壳入口 |
+| `scripts/sync/libs/manifest.py` | 清单解析与 Linux/Windows 路径解析 |
+| `scripts/sync/libs/state.py` | 同步基线与 base 快照（CRLF 归一化） |
+| `scripts/sync/libs/drift.py` | 双向漂移判定（主→库 / 库→主 / 冲突） |
+| `scripts/sync/libs/publish.py` | 检测 → 测试 → 提交 → 推送 → 镜像编排 |
+| `scripts/sync/libs/autoport.py` | 纯新增顶层符号的安全移植判定 |
+| `scripts/sync/libs/autotransfer.py` | 按漂移方向执行自动移植并写回文件 |
+| `scripts/sync/libs/gitops.py` | git 操作与 ff-only 双系统镜像 |
+| `scripts/sync/libs/tasks.py` | 生成双向移植任务（含 before/after diff） |
+| `scripts/sync/libs/safety.py` | 组件库公开仓的凭据扫描 |
+| `scripts/sync/libs/testrunner.py` | 用主仓 venv 跑组件库 pytest |
+| `scripts/sync/libs/pypi.py` | 版本变化检测与可选 PyPI 发布 |
+| `scripts/git/auto_commit/libs_bridge.py` | `auto_commit_push.py` 接入组件库同步的桥 |

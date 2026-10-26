@@ -32,6 +32,7 @@ from core.voice import qwen3_tts_cloud as qc
 # 替身：aiohttp 会话 / 响应 / 日志器
 # ============================================================
 
+
 class _FakeTimeout:
     """``aiohttp.ClientTimeout`` 替身，仅记录 total。"""
 
@@ -75,8 +76,7 @@ class _FakeRequestCM:
 class _FakeSession:
     """aiohttp.ClientSession 替身：支持 post/get、async with、close 与 closed 状态。"""
 
-    def __init__(self, *, response=None, get_response=None, post_exc=None,
-                 get_exc=None, **kwargs):
+    def __init__(self, *, response=None, get_response=None, post_exc=None, get_exc=None, **kwargs):
         self._response = response
         self._get_response = get_response
         self._post_exc = post_exc
@@ -155,6 +155,7 @@ class _RecordingLogger:
 # 工具：本地 WAV 字节、引擎装配
 # ============================================================
 
+
 def _wav_bytes(samples: int = 2400, sample_rate: int = 24000) -> bytes:
     """生成一段合法的 WAV 字节（纯本地，无网络）。"""
     buf = io.BytesIO()
@@ -166,9 +167,17 @@ def _b64(data: bytes) -> str:
     return base64.b64encode(data).decode("utf-8")
 
 
-def _make_engine(monkeypatch, *, initialized=True, api_key="sk-test",
-                 model="qwen3-tts-flash", response=None, post_exc=None,
-                 download_response=None, get_exc=None):
+def _make_engine(
+    monkeypatch,
+    *,
+    initialized=True,
+    api_key="sk-test",
+    model="qwen3-tts-flash",
+    response=None,
+    post_exc=None,
+    download_response=None,
+    get_exc=None,
+):
     """装配一个注入替身 aiohttp 的引擎。
 
     返回 ``(engine, main_sessions, download_sessions, ns)``：
@@ -208,6 +217,7 @@ def _ok_audio_response(*, audio_field, output_extra=None):
 # ============================================================
 # __init__
 # ============================================================
+
 
 def test_init_defaults_and_inheritance(monkeypatch):
     monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
@@ -275,6 +285,7 @@ def test_init_with_key_logs_info(monkeypatch):
 # ============================================================
 # initialize / _get_session / _close_session / shutdown
 # ============================================================
+
 
 def test_get_session_builds_headers_and_reuses(monkeypatch):
     engine, main_sessions, _, ns = _make_engine(monkeypatch, initialized=False)
@@ -351,6 +362,7 @@ def test_shutdown_closes_session_and_resets_flag(monkeypatch):
 # get_status
 # ============================================================
 
+
 def test_get_status_not_initialized(monkeypatch):
     monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
     engine, _, _, _ = _make_engine(monkeypatch, initialized=False, api_key=None)
@@ -381,6 +393,7 @@ def test_get_status_initialized_with_active_session(monkeypatch):
 # ============================================================
 # synthesize：正常路径与载荷
 # ============================================================
+
 
 def test_synthesize_base64_success_returns_float32(monkeypatch):
     wav = _wav_bytes()
@@ -472,9 +485,7 @@ def test_synthesize_instructions_for_instruct_model_with_optimize(monkeypatch):
         response=_ok_audio_response(audio_field={"data": _b64(_wav_bytes())}),
     )
 
-    asyncio.run(
-        engine.synthesize("x", instructions="用开心的语气", optimize_instructions=True)
-    )
+    asyncio.run(engine.synthesize("x", instructions="用开心的语气", optimize_instructions=True))
 
     payload = engine.session.post_calls[0]["json"]
     assert payload["input"]["instructions"] == "用开心的语气"
@@ -510,6 +521,7 @@ def test_synthesize_instructions_ignored_for_non_instruct_model(monkeypatch):
 # ============================================================
 # synthesize：错误分支
 # ============================================================
+
 
 def test_synthesize_raises_on_http_error(monkeypatch):
     engine, _, _, _ = _make_engine(
@@ -561,6 +573,7 @@ def test_synthesize_reraises_unexpected_exception(monkeypatch):
 # synthesize：音频 URL 下载
 # ============================================================
 
+
 def test_synthesize_downloads_audio_from_url(monkeypatch):
     wav = _wav_bytes()
     engine, _, downloads, _ = _make_engine(
@@ -594,6 +607,7 @@ def test_synthesize_raises_when_download_fails(monkeypatch):
 # synthesize：旧格式与多种 Base64 结构
 # ============================================================
 
+
 def test_synthesize_legacy_audio_url_field(monkeypatch):
     wav = _wav_bytes()
     engine, _, downloads, _ = _make_engine(
@@ -624,9 +638,7 @@ def test_synthesize_legacy_base64_string(monkeypatch):
 def test_synthesize_nested_dict_base64(monkeypatch):
     engine, _, _, _ = _make_engine(
         monkeypatch,
-        response=_ok_audio_response(
-            audio_field={"data": {"data": _b64(_wav_bytes())}}
-        ),
+        response=_ok_audio_response(audio_field={"data": {"data": _b64(_wav_bytes())}}),
     )
 
     audio = asyncio.run(engine.synthesize("x"))
@@ -648,6 +660,7 @@ def test_synthesize_raw_bytes_data(monkeypatch):
 # ============================================================
 # _encode_audio_to_base64
 # ============================================================
+
 
 @pytest.mark.parametrize(
     ("ext", "mime"),
@@ -684,6 +697,7 @@ def test_encode_audio_missing_file_raises(monkeypatch, tmp_path):
 # ============================================================
 # synthesize_bytes
 # ============================================================
+
 
 def test_synthesize_bytes_returns_wav(monkeypatch):
     engine, _, _, _ = _make_engine(monkeypatch, initialized=True)

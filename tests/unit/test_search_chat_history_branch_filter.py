@@ -45,9 +45,7 @@ def test_filter_hides_abandoned_branch_events():
 
 def test_filter_is_noop_without_branch_scope():
     events = [_event(message_id="node-b", timestamp=120.0)]
-    assert (
-        SearchChatHistoryTool._filter_branch_visible(events, "web_role_aveline") == events
-    )
+    assert SearchChatHistoryTool._filter_branch_visible(events, "web_role_aveline") == events
 
 
 def test_filter_keeps_everything_for_empty_event_list():

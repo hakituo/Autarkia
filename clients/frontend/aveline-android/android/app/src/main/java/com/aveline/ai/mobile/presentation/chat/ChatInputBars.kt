@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.foundation.BorderStroke
@@ -39,13 +38,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.aveline.ai.mobile.presentation.components.AudioWaveform
 import com.aveline.ai.mobile.presentation.components.InputArea
-import com.aveline.ai.mobile.presentation.theme.CardBorder
+import com.aveline.ai.mobile.presentation.theme.Line
 // 主题色 Surface 与 Material3 的 Surface 可组合函数同名，起别名避免解析歧义
 import com.aveline.ai.mobile.presentation.theme.Surface as SurfaceColor
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
@@ -54,10 +51,18 @@ import com.aveline.ai.mobile.services.UploadState
 import com.aveline.ai.mobile.utils.CoilImageModel
 
 /**
- * 聊天页底部输入栏：麦克风 + 输入框 + "+"（更多）/ 发送按钮。
+ * 聊天页底部输入栏：「+」/ 输入区 / 麦克风 / 发送。
  *
  * "+" 不再直接打开相册，只负责切换聊天更多面板。真正的相册、文件入口在
- * [ChatMorePanel] 中，避免发送按钮切回 "+" 后误触直接弹系统选择器。
+ * [ChatMorePanel] 中，避免操作按钮误触直接弹系统选择器。
+ *
+ * 录音时输入栏**原位**切成语音态（[ChatVoiceInputPanel]），不再另挂一条转写横幅：
+ * 第一行是实时转写，底部「取消 / 完成」直接接管本轮录音。
+ *
+ * @param voicePartialText ASR 流式中间文本（已确认句 + 当前句）
+ * @param voiceAmplitude 当前音量（0-1），驱动波形
+ * @param onVoiceCancel 丢弃本轮录音
+ * @param onVoiceFinish 结束本轮录音，并把已经实时上屏的文本立刻落进输入框
  */
 @Composable
 fun ChatBottomBar(
@@ -70,8 +75,25 @@ fun ChatBottomBar(
     isRecording: Boolean,
     hasPendingAttachment: Boolean = false,
     showMorePanel: Boolean = false,
+    voicePartialText: String = "",
+    voiceAmplitude: Float = 0f,
+    onVoiceCancel: () -> Unit = {},
+    onVoiceFinish: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val voicePanel: (@Composable () -> Unit)? = if (isRecording) {
+        {
+            ChatVoiceInputPanel(
+                partialText = voicePartialText,
+                amplitude = voiceAmplitude,
+                onCancel = onVoiceCancel,
+                onFinish = onVoiceFinish
+            )
+        }
+    } else {
+        null
+    }
+
     InputArea(
         text = text,
         onTextChange = onTextChange,
@@ -90,6 +112,7 @@ fun ChatBottomBar(
         // 输入栏不再随“面板是否展开”改变自己的内边距，否则开关面板时它的高度会变，
         // “+”按钮会跟着上下跳一下。
         applyBottomInsets = false,
+        voicePanel = voicePanel,
         modifier = modifier
     )
 }
@@ -103,8 +126,8 @@ fun ChatBottomBar(
  *
  * 配色说明：这里刻意不走 `MaterialTheme.colorScheme.surface + tonalElevation`。
  * M3 的 tonal elevation 会按 primary 往底色里混一层蓝紫调，和整页中性深色
- * （Background #05060A / Surface #121214）放在一起会明显偏色。
- * 面板统一用 App 自己的 Surface 实色 + CardBorder 顶部分隔线，
+ * （Background #0C0C0D / Surface #151516）放在一起会明显偏色。
+ * 面板统一用 App 自己的 Surface 实色 + Line 顶部分隔线，
  * 内部磁贴沿用输入栏那套半透明白玻璃（`Color(0x1AFFFFFF)`）语言。
  */
 @Composable
@@ -120,7 +143,7 @@ fun ChatMorePanel(
         contentColor = TextPrimary,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
-        border = BorderStroke(1.dp, CardBorder)
+        border = BorderStroke(1.dp, Line)
     ) {
         Column(
             modifier = Modifier
@@ -166,7 +189,7 @@ private fun ChatMoreAction(
             contentColor = TextPrimary,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
-            border = BorderStroke(1.dp, CardBorder)
+            border = BorderStroke(1.dp, Line)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
@@ -314,70 +337,6 @@ fun UploadProgressIndicator(
                 }
             }
             else -> {}
-        }
-    }
-}
-
-/**
- * 语音实时转写条：录音 / 收尾识别期间贴在输入栏上方，把 ASR 的流式中间结果即时上屏。
- *
- * 底层 ASR 本来就是边录边解码（sherpa-ncnn 每 32ms 出一版中间文本，系统识别走 partial results），
- * 这里把 VoiceInputManager 的 partialText 直接展示出来，用户不用等说完才看到字；
- * 右侧按钮可直接停止录音，与点麦克风是同一个动作。
- *
- * @param partialText 实时识别文本（已确认句 + 当前句）
- * @param amplitude 当前音量（0-1），驱动波形起伏
- * @param isProcessing 是否已进入收尾识别阶段（已停止录音、最终结果尚未返回）
- * @param onStop 停止录音回调
- */
-@Composable
-fun ChatVoiceTranscribingBar(
-    partialText: String,
-    amplitude: Float,
-    isProcessing: Boolean,
-    onStop: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // 固定高度，避免波形随音量起伏时把整条转写条撑得一跳一跳
-        AudioWaveform(
-            amplitude = amplitude,
-            isRecording = !isProcessing,
-            barCount = 4,
-            modifier = Modifier.height(28.dp)
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Text(
-            text = when {
-                partialText.isNotBlank() -> partialText
-                isProcessing -> "正在识别…"
-                else -> "正在聆听…"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (partialText.isNotBlank()) TextPrimary else TextSecondary,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-
-        IconButton(
-            onClick = onStop,
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Stop,
-                contentDescription = "停止录音",
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(18.dp)
-            )
         }
     }
 }

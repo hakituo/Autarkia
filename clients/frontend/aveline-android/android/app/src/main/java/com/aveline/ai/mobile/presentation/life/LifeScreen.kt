@@ -30,14 +30,14 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.aveline.ai.mobile.presentation.components.AvelineTabRow
 import com.aveline.ai.mobile.presentation.components.ModuleHeader
-import com.aveline.ai.mobile.presentation.health.DailyDataUiState
+import com.aveline.ai.mobile.presentation.health.daily.DailyDataUiState
 import com.aveline.ai.mobile.presentation.theme.EmotionGreen
 import kotlinx.coroutines.launch
 
 /**
  * Life 模块 Tab 枚举。
  *
- * 说明:现有 [com.aveline.ai.mobile.presentation.health.DailyTab] 仅包含
+ * 说明:现有 [com.aveline.ai.mobile.presentation.health.daily.DailyTab] 仅包含
  * PORTRAIT / SCHEDULE / FILES 三个值,无法表达"饮水 / 餐食"两个独立 tab。
  * 为遵循"只创建新文件、不修改旧文件"的约束,这里新建 LifeTab 枚举。
  */
@@ -122,10 +122,8 @@ fun LifeScreen(
             .statusBarsPadding()
     ) {
         // 顶部模块标题（不再放刷新键：数据由 ON_RESUME 与定时任务自动刷新）
-        ModuleHeader(
-            title = "Life",
-            subtitle = "日常生活"
-        )
+        // 标题与侧边栏同名，去掉副标题（设计稿：页头只留「生活」）。
+        ModuleHeader(title = "生活")
 
         AvelineTabRow(
             titles = tabs.map { it.title },
@@ -170,65 +168,44 @@ fun LifeScreen(
                 contentAlignment = Alignment.TopStart
             ) {
                 when (tab) {
-                    LifeTab.HEALTH -> Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                    LifeTab.HEALTH -> LifeTabScroll {
                         LifeHealthTab(
                             uiState = uiState,
                             onSyncSamsungHealth = onSyncSamsungHealth
                         )
-                        Spacer(modifier = Modifier.height(24.dp))
                     }
 
-                    LifeTab.WATER -> Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        LifeWaterTab(
-                            uiState = uiState
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
+                    LifeTab.WATER -> LifeTabScroll {
+                        LifeWaterTab(uiState = uiState)
                     }
 
-                    LifeTab.SCHEDULE -> Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                    LifeTab.SCHEDULE -> LifeTabScroll {
                         LifeScheduleTab(
                             uiState = uiState,
                             onUpdateSchedule = onUpdateSchedule
                         )
-                        Spacer(modifier = Modifier.height(24.dp))
                     }
 
-                    LifeTab.MEAL -> Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        LifeMealTab(
-                            uiState = uiState
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
+                    LifeTab.MEAL -> LifeTabScroll {
+                        LifeMealTab(uiState = uiState)
                     }
                 }
             }
         }
+    }
+}
+
+/** 单个 Tab 的滚动容器：统一上下留白，横向内边距由外层 pager 提供。 */
+@Composable
+private fun LifeTabScroll(content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Spacer(modifier = Modifier.height(8.dp))
+        content()
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }

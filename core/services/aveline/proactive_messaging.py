@@ -291,12 +291,15 @@ async def dispatch_proactive_message(
                 _role_id = str(_ep.get("role_id") or "").strip()
                 if _role_id:
                     save_cid = f"peer_{_role_id}"
+            # 非互聊消息带上推送用的 message_id：Android 直接拿它当本地节点 ID，
+            # 用户回复的 parent 就是它，服务端必须认得（2026-10-26 孤立根事故）
             await service.append_proactive_message(
                 conversation_id=save_cid,
                 content=content,
                 thought=thought,
                 is_peer_script=_is_ps,
                 peer_speaker=_speaker,
+                **({} if _is_ps else {"client_message_id": payload["message_id"]}),
             )
             user_online = ws_manager.is_user_online(broadcast_user_id)
             if user_online:
@@ -388,10 +391,12 @@ async def append_proactive_message(
     thought: str = "",
     is_peer_script: bool = False,
     peer_speaker: str = "",
+    client_message_id: str = "",
 ):
     """
     Append a proactive message (from Active Care) to conversation history.
     This ensures the message is visible in the chat interface history.
+    ``client_message_id``：推送给客户端的 message_id，作为该事件的消息树节点。
     """
     try:
         # [OPTIMIZATION] Unified Memory System
@@ -457,6 +462,7 @@ async def append_proactive_message(
         try:
             import uuid
             from core.services.chat_history_store import get_chat_history_store
+            from memory.topology.cursors import proactive_node_fields
             store = get_chat_history_store()
 
             # 【思考可见性】将 thought 以内心独白形式拼入 content，
@@ -471,13 +477,14 @@ async def append_proactive_message(
                     conversation_id=conversation_id,
                     role="assistant",
                     content=chat_history_content,
-                    message_id=uuid.uuid4().hex,
+                    message_id=str(client_message_id or "").strip() or uuid.uuid4().hex,
                     event_type="proactive_message",
                     metadata={
                         "source": "active_care",
                         "is_proactive": True,
                         "type": "proactive",
                         "has_thought": bool(thought_text),
+                        **proactive_node_fields(conversation_id, client_message_id),
                     },
                 )
 

@@ -138,3 +138,8 @@ class SingletonFactory:
     def instance(self) -> Optional[T]:
         """获取当前实例（不触发创建）"""
         return self._instance
+
+
+def singleton_key(cls: type) -> str:
+    """Return a stable key for singleton registration."""
+    return f"{cls.__module__}.{cls.__qualname__}"

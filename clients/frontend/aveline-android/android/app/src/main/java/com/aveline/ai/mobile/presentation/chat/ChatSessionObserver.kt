@@ -2,11 +2,13 @@ package com.aveline.ai.mobile.presentation.chat
 
 import android.util.Log
 import com.aveline.ai.mobile.data.local.preferences.AppPreferences
+import com.aveline.ai.mobile.data.remote.api.StreamEvent
 import com.aveline.ai.mobile.data.remote.api.WebSocketManager
 import com.aveline.ai.mobile.data.remote.api.WebSocketMessage
 import com.aveline.ai.mobile.domain.models.Emotion
 import com.aveline.ai.mobile.domain.repository.ChatRepository
 import com.aveline.ai.mobile.domain.repository.SessionRepository
+import com.aveline.ai.mobile.services.media.LocalMediaStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,7 +61,12 @@ class ChatSessionObserver(
      * uiState 与列表预览 —— 两个角色的副标题变成同一段话就是这么来的。
      * 默认放行，兼容单测与尚未确定角色的首帧。
      */
-    private val isOwnedSession: (String) -> Boolean = { true }
+    private val isOwnedSession: (String) -> Boolean = { true },
+    /**
+     * 媒体本地仓库：本窗口历史消息里的图片/表情包/视频进页面即后台落盘，
+     * 不再依赖"滚到屏幕上"才触发下载。可空 + 默认值：单测直接构造时不传。
+     */
+    private val localMediaStore: LocalMediaStore? = null
 ) {
     companion object {
         private const val TAG = "ChatSessionObserver"
@@ -93,12 +100,27 @@ class ChatSessionObserver(
         if (uiState.value.hasOlderMessages) historyWindowSize.update { it + HISTORY_PAGE_SIZE }
     }
 
-    /** 开始监听：当前会话 + 消息流 + 连接状态 + WS 事件。 */
+    /** 开始监听：当前会话 + 消息流 + 连接状态 + 动作描写开关 + WS 事件。 */
     fun start() {
         observeCurrentSession()
         observeMessages()
         observeConnectionState()
+        observeStageDirectionSetting()
         observeWebSocketMessages()
+    }
+
+    /**
+     * 跟随设置页的「动作描写」开关。
+     *
+     * 订阅 Flow 而不是在渲染时读一次：用户从设置页返回聊天页时开关可能已经变了，
+     * 靠 `uiState` 里的一次性快照会让已上屏的消息仍然保持旧的括号渲染。
+     */
+    private fun observeStageDirectionSetting() {
+        scope.launch {
+            appPreferences.stageDirectionEnabledFlow.collect { enabled ->
+                uiState.update { it.copy(stageDirectionEnabled = enabled) }
+            }
+        }
     }
 
     private fun observeCurrentSession() {
@@ -169,6 +191,14 @@ class ChatSessionObserver(
                     }
                     Log.d(TAG, "observeMessages: 从数据库加载 ${messages.size} 条消息")
                     uiState.update { it.copy(messages = messages, hasOlderMessages = window.hasOlder) }
+
+                    // 历史媒体预热：本窗口的图片/表情包/视频/附件在后台顺序落盘（已落盘的跳过）。
+                    // 后端离线后再进页面，表情包能直接读本地文件，而不是等网络超时一直转圈。
+                    localMediaStore?.prefetchAll(
+                        messages.flatMap { msg ->
+                            listOfNotNull(msg.imageUrl, msg.videoUrl) + msg.attachments.map { it.url }
+                        }
+                    )
 
                     // 写入最后一条消息预览到 PersonaLocalMeta，供会话列表页副标题使用。
                     // 预览归属以"消息自身的 sessionId"为准（见 ChatIncomingMessageHandler），
@@ -266,7 +296,11 @@ class ChatSessionObserver(
                         } else {
                             uiState.update {
                                 it.copy(
-                                    error = message.message,
+                                    // 后端的 error_code 一并展示，便于区分敏感拦截/限流/超时
+                                    error = StreamEvent.Error(
+                                        message = message.message,
+                                        errorCode = message.errorCode,
+                                    ).describe(),
                                     isTyping = false,
                                     showTypingIndicator = false
                                 )

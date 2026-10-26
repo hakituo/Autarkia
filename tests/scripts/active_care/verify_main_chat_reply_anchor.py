@@ -18,7 +18,7 @@
 （用户消息已被回应），把主程序回复作为延续锚点（build_continuation_input），
 而不是重新回应用户。
 
-运行：D:\\AI\\xiaoyou-core\\venv_cpu\\Scripts\\python.exe tests\\scripts\\active_care\\verify_main_chat_reply_anchor.py
+运行：D:\\AI\\autarkia\\venv_cpu\\Scripts\\python.exe tests\\scripts\\active_care\\verify_main_chat_reply_anchor.py
 """
 
 from __future__ import annotations

@@ -1,0 +1,85 @@
+# Python Core CI
+# 私有仓库：仅手动触发（节省额度）；公开切片仓库 hakituo/Autarkia：push 到 main 自动跑全量单测，
+# 作为项目展示的一部分。公开仓库不包含 tests/variants/（人设、角色日程等私密测试）。
+name: Core CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: 单元测试 (pytest)
+    # 私有仓库的 push 不自动跑，保持手动触发；公开仓库 push 自动跑。
+    if: github.repository == 'hakituo/Autarkia' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+
+      - name: 配置 uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          # 锁定目标 Python：本机 venv_core/venv_cpu 为 3.10，Linux 迁移后统一到 3.13。
+          # 不指定时 uv 吃 ubuntu-latest 自带解释器（实测会漂到更新版本），
+          # 出现「本地一个版本、CI 一个版本」的双轨。
+          python-version: '3.13'
+          enable-cache: true
+          cache-dependency-glob: 'uv.lock'
+
+      - name: 按 uv.lock 可复现安装依赖
+        run: uv sync --extra dev --frozen
+
+      - name: 运行 ruff（仅私有仓库）
+        # 公开切片经过脱敏替换（人名/路径/标识符），会给 lint 结果引入额外噪声；
+        # 公开仓库只展示测试结果，lint 门禁保留在私有开发仓库。
+        if: github.repository != 'hakituo/Autarkia'
+        run: uv run ruff check
+
+      - name: 运行单元测试
+        # pyproject addopts 已默认排除 gpu / slow / e2e / integration，并带 `-n 4` 并行。
+        # 此外显式排除"收集期或运行期依赖重型可选依赖/外部服务/本机数据"的用例——
+        # 它们不属于轻量 GitHub-hosted CI 应跑的地盘，本地完整环境(venv_core / models extra)仍会跑：
+        #  --ignore: 需 transformers / core.models / vision / 网络 / 本机数据
+        #  --ignore-glob: STT 连接器整组依赖 transformers + pydub（voice extra），轻量 CI 装不了
+        #  --deselect: 仅剔除单个依赖受限用例，保留同文件的其余可靠单测
+        # 注意：需真实后端/模型/本机数据的脚本已移入 tests/diagnostics/（该目录不被 pytest 收集），
+        # 不再需要在命令行 --ignore。私密人设/角色日程测试在 tests/variants/，公开切片不发布该目录。
+        # 公开仓库额外 deselect：这些用例依赖被排除的私密 prompt / 人设数据，私有仓库不剔除。
+        run: |
+          DESELECT=(
+            --deselect tests/unit/test_empty_responses.py::test_active_care_health_checker_registration_and_status
+            --deselect tests/unit/test_empty_responses.py::test_local_llm_adapter_skip_preload_when_cpp_llm_enabled
+          )
+          if [ "${{ github.repository }}" = "hakituo/Autarkia" ]; then
+            DESELECT+=(
+              --deselect 'tests/journal_plan/test_plan_workflow.py::test_active_care_prompt_injection'
+              --deselect 'tests/journal_plan/test_plan_workflow.py::test_prompt_templates'
+              --deselect 'tests/unit/test_active_care_poke_gate.py::SleepSafeMorningCase::test_sleep_session_active_uses_sleep_safe_template'
+              --deselect 'tests/unit/test_active_care_poke_gate.py::SleepSafeMorningCase::test_sleep_session_inactive_uses_normal_template'
+              --deselect 'tests/unit/test_data_paths_scope.py::test_build_shared_persona_conversation_id[\u4e03\u6fd1 Aveline.json-shared__persona__\u4e03\u6fd1_Aveline]'
+              --deselect 'tests/unit/test_peer_chat_parsers.py::TestParseAssignmentsFromScript::test_persona_aliases_normalize[\u4e03\u6fd1 Aveline-aveline]'
+              --deselect 'tests/unit/test_memory_notes_retrieval.py::test_sfw_request_excludes_sensitive_notes_like_legacy_memories'
+              --deselect 'tests/unit/test_segment_episode_extractor.py::test_offline_role_prefix_is_long_stable_and_role_specific'
+              --deselect 'tests/unit/test_segment_model_routes.py::test_deepseek_route_uses_role_key_and_falls_back_to_default'
+              --deselect 'tests/unit/test_segment_model_routes.py::test_policy_routes_match_provider_choice'
+            )
+          fi
+          uv run pytest \
+            --ignore=tests/unit/test_embedding_backend.py \
+            --ignore=tests/unit/test_intent_service.py \
+            --ignore=tests/unit/test_memory_vector_cache.py \
+            --ignore=tests/unit/test_stream_utils.py \
+            --ignore=tests/unit/test_active_care_executor_connections.py \
+            --ignore=tests/unit/test_tts_manager_optimized.py \
+            --ignore-glob=tests/unit/test_stt_connector_*.py \
+            "${DESELECT[@]}"

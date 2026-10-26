@@ -14,7 +14,7 @@ sleep_manager 无条件调用 trigger_character_goodnight_async / trigger_charac
 5. activity_return.instruction.resolve_profile_filename 对未知角色返回 None
 6. trigger_character_goodnight / trigger_character_good_morning 对未知角色返回 False
 
-运行：D:\\AI\\xiaoyou-core\\venv_cpu\\Scripts\\python.exe tests\\scripts\\active_care\\verify_unknown_role_no_fallback.py
+运行：D:\\AI\\autarkia\\venv_cpu\\Scripts\\python.exe tests\\scripts\\active_care\\verify_unknown_role_no_fallback.py
 """
 
 from __future__ import annotations

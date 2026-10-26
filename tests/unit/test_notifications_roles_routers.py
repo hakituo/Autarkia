@@ -54,9 +54,7 @@ def test_mark_notifications_read(notifications_client):
             json={"title": f"n{index}", "content": "x", "user_id": "u2"},
         )
 
-    marked = notifications_client.post(
-        "/notifications/read", json={"user_id": "u2"}
-    ).json()
+    marked = notifications_client.post("/notifications/read", json={"user_id": "u2"}).json()
     assert marked["data"]["marked"] == 2
     assert marked["data"]["unread"] == 0
 

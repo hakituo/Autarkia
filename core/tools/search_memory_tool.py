@@ -18,6 +18,11 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from core.tools.base import BaseTool
+from core.tools.memory_notes_search import (
+    SOURCE_NOTES,
+    merge_with_notes,
+    search_note_entries,
+)
 from core.tools.recall_intent import (
     CONTENT_USAGE_NOTE,
     build_confirmation_reply,
@@ -84,6 +89,11 @@ class SearchMemoryTool(BaseTool):
         if not agent:
             logger.debug("agent 上下文为空，将只搜索聊天记录")
 
+        # 派生笔记（每段梗概）：v3 G，C8 结论里最好的主检索单元
+        note_results = await asyncio.to_thread(
+            search_note_entries, user_id, query, limit, request_scope=scope
+        )
+
         # 搜索长期记忆
         memory_results = []
         try:
@@ -123,14 +133,33 @@ class SearchMemoryTool(BaseTool):
                 
                 store = get_chat_history_store()
                 
+                def _fetch_chat_items():
+                    items = store.list_conversation_events(
+                        conversation_id=user_id,
+                        limit=limit * 3,
+                        query=query,
+                        roles=["user"],
+                    )
+                    # 与 search_chat_history 共用同一套分支边界 + 世界线闸门，
+                    # 避免换一个工具就能从旁路拿到被回滚的兄弟线内容（v3 E2）。
+                    try:
+                        from core.agents.chat_agent_components.message_branch import (
+                            filter_events_by_branch_scope,
+                        )
+                        from memory.topology.read_gate import filter_raw_events
+
+                        items = filter_events_by_branch_scope(
+                            items, conversation_id=user_id
+                        )
+                        items = filter_raw_events(items, conversation_id=user_id).events
+                    except Exception as filter_error:  # noqa: BLE001
+                        logger.warning(
+                            f"聊天记录可见性过滤失败，按原样返回: {filter_error}"
+                        )
+                    return items
+
                 # 只搜索 user 角色的消息
-                chat_items = await asyncio.to_thread(
-                    store.list_conversation_events,
-                    conversation_id=user_id,
-                    limit=limit * 3,
-                    query=query,
-                    roles=["user"],
-                )
+                chat_items = await asyncio.to_thread(_fetch_chat_items)
                 
                 # 按时间过滤
                 if days_back is not None:
@@ -173,6 +202,7 @@ class SearchMemoryTool(BaseTool):
                 seen_content.add(content)
                 all_results.append(item)
 
+        all_results = merge_with_notes(note_results, all_results, limit)
         if not all_results:
             return "未找到相关记忆或聊天记录。"
 
@@ -204,7 +234,10 @@ class SearchMemoryTool(BaseTool):
             source_label = ""
             if source == "chat_history":
                 source_label = "[聊天] "
-            elif source:
+            elif source == SOURCE_NOTES:
+                source_label = "[梗概] "
+            elif source and not mem.get("summary"):
+                # 已蒸馏记忆是角色第一人称的自述，再挂 [user]/[assistant] 会读成旁观者口径
                 source_label = f"[{source}] "
             cat = mem.get("category", "")
             cat_label = f"({cat}) " if cat and cat != "chat" else ""

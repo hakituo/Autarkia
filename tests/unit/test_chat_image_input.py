@@ -42,9 +42,7 @@ def test_load_uploaded_image_data_url_reads_only_upload_directory(tmp_path, monk
     monkeypatch.setattr(chat_image_input, "get_project_root", lambda: tmp_path)
 
     data_url = asyncio.run(
-        chat_image_input.load_uploaded_image_data_url(
-            "/output/image/uploads/sample.png"
-        )
+        chat_image_input.load_uploaded_image_data_url("/output/image/uploads/sample.png")
     )
 
     assert data_url is not None
@@ -55,9 +53,7 @@ def test_load_uploaded_image_data_url_reads_only_upload_directory(tmp_path, monk
     outside = tmp_path / "output" / "image" / "secret.png"
     outside.write_bytes(raw)
     rejected = asyncio.run(
-        chat_image_input.load_uploaded_image_data_url(
-            "/output/image/uploads/../secret.png"
-        )
+        chat_image_input.load_uploaded_image_data_url("/output/image/uploads/../secret.png")
     )
     assert rejected is None
 
@@ -69,9 +65,7 @@ def test_find_image_refs_in_message_extracts_all_and_dedupes():
         "[图片: /etc/passwd]\n看看"
     )
 
-    assert chat_image_input.find_image_refs_in_message(content) == [
-        "/output/image/uploads/a.png"
-    ]
+    assert chat_image_input.find_image_refs_in_message(content) == ["/output/image/uploads/a.png"]
 
 
 def test_find_image_refs_in_message_reads_multimodal_text_parts():
@@ -80,9 +74,7 @@ def test_find_image_refs_in_message_reads_multimodal_text_parts():
         {"type": "image_url", "image_url": {"url": "data:image/png;base64,xx"}},
     ]
 
-    assert chat_image_input.find_image_refs_in_message(content) == [
-        "/output/image/uploads/b.jpg"
-    ]
+    assert chat_image_input.find_image_refs_in_message(content) == ["/output/image/uploads/b.jpg"]
 
 
 def test_find_image_refs_in_message_tolerates_bad_input():
@@ -131,6 +123,23 @@ def test_restore_history_images_prefers_newest_and_respects_limit(tmp_path, monk
     assert isinstance(messages[0]["content"], str)
     assert isinstance(messages[1]["content"], list)
     assert isinstance(messages[2]["content"], list)
+
+
+def test_restore_history_images_default_has_no_count_limit(tmp_path, monkeypatch):
+    """默认不设张数上限：历史窗口内的图全部还原。"""
+    names = ("a.png", "b.png", "c.png", "d.png", "e.png")
+    for name in names:
+        _write_upload(tmp_path, name)
+    monkeypatch.setattr(chat_image_input, "get_project_root", lambda: tmp_path)
+    messages = [
+        {"role": "user", "content": f"[图片: /output/image/uploads/{name}]\n{name}"}
+        for name in names
+    ]
+
+    restored = asyncio.run(chat_image_input.restore_history_images(messages))
+
+    assert restored == len(names)
+    assert all(isinstance(msg["content"], list) for msg in messages)
 
 
 def test_restore_history_images_keeps_text_when_file_missing(tmp_path, monkeypatch):

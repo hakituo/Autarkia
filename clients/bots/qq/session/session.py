@@ -7,7 +7,7 @@
 - qq_adapter_session_connection.py WS 连接/重连/诊断
 - qq_adapter_session_receiver.py   消息接收分发
 
-XiaoyouSession 作为门面保留，外部 API 完全兼容，原方法委托到各子模块。
+AutarkiaSession 作为门面保留，外部 API 完全兼容，原方法委托到各子模块。
 保留 asyncio / random 导入以兼容测试中的 patch 路径。
 """
 import asyncio
@@ -23,7 +23,7 @@ from clients.bots.qq.session.connection import SessionConnectionManager
 from clients.bots.qq.session.receiver import SessionReceiver
 
 
-class XiaoyouSession:
+class AutarkiaSession:
     """QQ 适配器会话门面类，委托各子模块完成实际工作。"""
 
     _global_proactive_messages = {}
@@ -108,15 +108,15 @@ class XiaoyouSession:
         async with self._get_global_proactive_lock():
             expired_keys = [
                 k
-                for k, ts in XiaoyouSession._global_proactive_messages.items()
+                for k, ts in AutarkiaSession._global_proactive_messages.items()
                 if (now - float(ts)) > max(120.0, window_seconds * 2)
             ]
             for k in expired_keys:
-                XiaoyouSession._global_proactive_messages.pop(k, None)
-            last_ts = float(XiaoyouSession._global_proactive_messages.get(normalized) or 0.0)
+                AutarkiaSession._global_proactive_messages.pop(k, None)
+            last_ts = float(AutarkiaSession._global_proactive_messages.get(normalized) or 0.0)
             if last_ts and (now - last_ts) <= window_seconds:
                 return True
-            XiaoyouSession._global_proactive_messages[normalized] = now
+            AutarkiaSession._global_proactive_messages[normalized] = now
             return False
 
     async def start(self):

@@ -5,6 +5,7 @@
 
 全部依赖以替身注入：不加载真实模型、不使用 GPU、不发网络请求、不写仓库内文件。
 """
+
 from __future__ import annotations
 
 import os
@@ -166,9 +167,7 @@ def test_memory_pressure_swallows_psutil_error(monkeypatch):
     """取内存数据抛异常 → 走 except，返回 (False, 0.0)。"""
     import core.modules.llm.model_loader as model_loader
 
-    monkeypatch.setattr(
-        model_loader, "psutil", _FakePsutil(error=RuntimeError("no /proc"))
-    )
+    monkeypatch.setattr(model_loader, "psutil", _FakePsutil(error=RuntimeError("no /proc")))
     assert _loader()._check_memory_pressure() == (False, 0.0)
 
 
@@ -223,6 +222,7 @@ def test_thread_count_falls_back_when_config_value_invalid(monkeypatch):
 
 def test_thread_count_falls_back_when_config_not_mapping():
     """config.get 本身抛异常 → desired 归零后走 cpu_count（真实核数，不做数值断言）。"""
+
     class _BadConfig(dict):
         def get(self, key, default=None):
             raise RuntimeError("config boom")

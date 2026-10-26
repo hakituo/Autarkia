@@ -39,9 +39,7 @@ def _wav_bytes(sr: int = 16000, n: int = 800) -> bytes:
 
 def _settings(cache_dir="cache", auto=False, auto_from_ref=False):
     """假 settings：只保留被测代码实际读取的字段。"""
-    tts = types.SimpleNamespace(
-        auto_prompt_text=auto, auto_prompt_text_from_ref=auto_from_ref
-    )
+    tts = types.SimpleNamespace(auto_prompt_text=auto, auto_prompt_text_from_ref=auto_from_ref)
     return types.SimpleNamespace(
         model=types.SimpleNamespace(cache_dir=cache_dir),
         voice=types.SimpleNamespace(tts=tts),
@@ -88,9 +86,7 @@ def env(monkeypatch, tmp_path):
     """把项目根 / 配置 / TTS manager 全部重定向到临时目录与假对象。"""
     root = tmp_path / "root"
     root.mkdir()
-    env = types.SimpleNamespace(
-        root=root, tmp=tmp_path, mgr=_Mgr(), mp=monkeypatch, log=_Logger()
-    )
+    env = types.SimpleNamespace(root=root, tmp=tmp_path, mgr=_Mgr(), mp=monkeypatch, log=_Logger())
     monkeypatch.setattr(tg, "_project_root", lambda: str(root))
     monkeypatch.setattr(tg, "_project_root_path", lambda: root)
     monkeypatch.setattr(tg, "_tts_prompt_text_cache", {})

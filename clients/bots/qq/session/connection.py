@@ -16,7 +16,7 @@ class SessionConnectionManager:
     """会话连接管理器，负责 WS 连接循环与重连退避。"""
 
     def __init__(self, session):
-        # 持有外层 XiaoyouSession 实例
+        # 持有外层 AutarkiaSession 实例
         self.session = session
 
     async def run_loop(self):
@@ -26,10 +26,10 @@ class SessionConnectionManager:
         try:
             while session.running:
                 try:
-                    ws_url = f"{session._cfg.xiaoyou_ws_url}?client_id={session._client_id}&user_id={session.session_id}&platform=qq"
+                    ws_url = f"{session._cfg.autarkia_ws_url}?client_id={session._client_id}&user_id={session.session_id}&platform=qq"
                     headers = None
-                    if session._cfg.xiaoyou_access_token:
-                        headers = {"Authorization": f"Bearer {session._cfg.xiaoyou_access_token}"}
+                    if session._cfg.autarkia_access_token:
+                        headers = {"Authorization": f"Bearer {session._cfg.autarkia_access_token}"}
 
                     t_conn_start = time.time()
                     async with (await _ws_connect(ws_url, headers=headers)) as ws:
@@ -260,7 +260,7 @@ class SessionConnectionManager:
         if is_loopback and not port_open:
             text = (
                 "连接核心服务失败：本机未检测到 Autarkia 监听端口。\n"
-                f"当前配置：{session._cfg.xiaoyou_ws_url}\n"
+                f"当前配置：{session._cfg.autarkia_ws_url}\n"
                 "请先启动后端（运行 main.py 或 start_services.bat），再重试。"
             )
             await session.adapter.send_to_napcat(session.session_id, text)
@@ -270,7 +270,7 @@ class SessionConnectionManager:
         if port_open:
             text = (
                 "连接核心服务失败：目标端口已打开，但 WS 握手失败。\n"
-                f"当前配置：{session._cfg.xiaoyou_ws_url}\n"
+                f"当前配置：{session._cfg.autarkia_ws_url}\n"
                 "请确认后端已启动且 WebSocket 路由为 /api/v1/ws。"
             )
             await session.adapter.send_to_napcat(session.session_id, text)
@@ -279,7 +279,7 @@ class SessionConnectionManager:
 
         text = (
             "连接核心服务失败：目标拒绝连接。\n"
-            f"当前配置：{session._cfg.xiaoyou_ws_url}\n"
+            f"当前配置：{session._cfg.autarkia_ws_url}\n"
             "请检查后端地址/端口是否正确，以及防火墙/代理设置。"
         )
         await session.adapter.send_to_napcat(session.session_id, text)

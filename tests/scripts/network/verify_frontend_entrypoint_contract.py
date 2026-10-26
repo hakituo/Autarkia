@@ -25,7 +25,7 @@ def main() -> None:
     start_pet = read("start_scripts/start_pet.bat")
     launcher = read("launcher.py")
     build_exe = read("build_exe.py")
-    spec = read("XiaoyouCore.spec")
+    spec = read("Autarkia.spec")
     ports_doc = read("docs/important/PORTS.md")
 
     require("port: 3000" in vite, "Vite 前端端口必须固定为 3000")

@@ -12,9 +12,7 @@ import os
 import sys
 import time
 
-sys.path.append(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from memory.core.distillation import trim_short_term_memory
 

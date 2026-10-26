@@ -31,24 +31,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.aveline.ai.mobile.presentation.theme.CardBackground
-import com.aveline.ai.mobile.presentation.theme.CardBorder
-import com.aveline.ai.mobile.presentation.theme.CardRadius
-import com.aveline.ai.mobile.presentation.theme.TextMuted
+import androidx.compose.ui.graphics.Color
+import com.aveline.ai.mobile.presentation.theme.Line
+import com.aveline.ai.mobile.presentation.theme.AvelineRadius
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 
 /**
  * 统一分区卡片组件。
  *
  * 所有 Screen 的分区卡片统一使用此组件,确保样式一致:
- * - 圆角 [CardRadius] (16.dp)
- * - 背景 [CardBackground] (0x33000000)
- * - 边框 1.dp [CardBorder] (0x14FFFFFF)
+ * - 圆角 [AvelineRadius] (14.dp)
+ * - 背景透明（只留边框）
+ * - 边框 1.dp [Line] (0x14FFFFFF)
  * - 内容 padding 16.dp
- * - 标题: labelSmall + Bold + letterSpacing=2.sp + [TextTertiary]
+ * - 标题: labelMedium + [TextTertiary]
  * - 标题底部间距 12.dp
  *
  * 支持:图标、副标题、可折叠。
@@ -76,9 +73,9 @@ fun SectionCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(CardRadius),
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
-        border = BorderStroke(1.dp, CardBorder)
+        shape = RoundedCornerShape(AvelineRadius),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(1.dp, Line)
     ) {
         Column(
             modifier = Modifier
@@ -121,17 +118,14 @@ fun SectionCard(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = title,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 2.sp
-                            ),
+                            style = MaterialTheme.typography.labelMedium,
                             color = TextTertiary
                         )
                         if (!subtitle.isNullOrBlank()) {
                             Text(
                                 text = subtitle,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = TextMuted,
+                                color = TextTertiary,
                                 modifier = Modifier.padding(top = 2.dp)
                             )
                         }

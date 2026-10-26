@@ -19,6 +19,7 @@ import com.aveline.ai.mobile.presentation.components.MediaViewer
  * 通过 [modifier] 传进来，所以这里不感知手势细节。
  *
  * @param forceFollowLatestRequest 用户主动发送的事件序号（只影响滚动语义）
+ * @param imeVisible 软键盘是否可见（由聊天页根层在 imePadding 之外读出后传下来）
  * @param onEditMessage 点某条消息的"编辑"时回调 (messageId, text)，用于打开编辑对话框
  */
 @Composable
@@ -27,6 +28,7 @@ internal fun ChatContentArea(
     uiState: ChatUiState,
     displayName: String,
     forceFollowLatestRequest: Int,
+    imeVisible: Boolean,
     horizontalContentGestureState: HorizontalContentGestureState,
     onEditMessage: (String, String) -> Unit,
     modifier: Modifier = Modifier
@@ -57,12 +59,14 @@ internal fun ChatContentArea(
             displayName = displayName,
             horizontalContentGestureState = horizontalContentGestureState,
             forceFollowLatestRequest = forceFollowLatestRequest,
+            imeVisible = imeVisible,
             hasOlderMessages = uiState.hasOlderMessages,
             onLoadOlderMessages = viewModel::loadOlderMessages,
             onMediaClick = { media ->
                 previewUrl = media.url
                 previewIsVideo = media.isVideo
             },
+            stageDirectionEnabled = uiState.stageDirectionEnabled,
             actions = remember(viewModel) {
                 ChatMessageActions(
                     onPlayTTS = viewModel::toggleTTS,

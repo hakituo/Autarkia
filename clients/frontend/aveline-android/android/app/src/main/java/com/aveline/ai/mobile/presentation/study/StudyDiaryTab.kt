@@ -31,7 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.domain.models.DiaryEntry
 import com.aveline.ai.mobile.presentation.components.SectionCard
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 import java.text.SimpleDateFormat
@@ -216,7 +216,7 @@ private fun DiaryEntryCard(entry: DiaryEntry) {
             Text(
                 text = entry.timeStr,
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = Primary,
+                color = Accent,
             )
             Box(
                 modifier = Modifier

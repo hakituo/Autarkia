@@ -29,6 +29,7 @@ import memory.core.record_ops as record_ops
 # 替身对象
 # ---------------------------------------------------------------------------
 
+
 class _FakeTopicWeightCache:
     """记录 update_topic / remove_topic 调用的主题权重缓存替身。"""
 
@@ -161,6 +162,7 @@ class _FixedTime:
 # batch_add_memories
 # ---------------------------------------------------------------------------
 
+
 def test_batch_add_empty_items_returns_empty_without_side_effects():
     """空输入直接返回空列表，不调用 add_memory、不调度落盘。"""
     manager = _FakeManager()
@@ -236,6 +238,7 @@ def test_batch_add_uses_rw_write_lock_when_enabled():
 # ---------------------------------------------------------------------------
 # batch_delete_memories
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def rebuild_spy(monkeypatch):
@@ -408,6 +411,7 @@ def test_batch_delete_uses_rw_write_lock_when_enabled(rebuild_spy):
 # batch_search_memories
 # ---------------------------------------------------------------------------
 
+
 def test_batch_search_empty_queries_returns_empty():
     """空查询列表直接返回空列表。"""
     manager = _FakeManager()
@@ -464,6 +468,7 @@ def test_batch_search_exception_yields_empty_list_for_that_query():
 # ---------------------------------------------------------------------------
 # batch_update_weights
 # ---------------------------------------------------------------------------
+
 
 def test_batch_update_empty_updates_returns_empty():
     """空更新列表返回空列表。"""
@@ -595,6 +600,7 @@ def test_batch_update_does_not_share_state_across_calls(monkeypatch):
 # ---------------------------------------------------------------------------
 # 真实索引重建依赖的最小契约（确保替身与生产接口一致）
 # ---------------------------------------------------------------------------
+
 
 def test_fake_manager_index_containers_are_defaultdicts():
     """替身未预置索引容器，验证 rebuild 会自行创建 defaultdict。"""

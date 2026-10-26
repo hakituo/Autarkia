@@ -11,6 +11,7 @@ import com.aveline.ai.mobile.presentation.chat.send.ReplyOutcomeNotifier
 import com.aveline.ai.mobile.presentation.chat.send.SendPreflight
 import com.aveline.ai.mobile.presentation.chat.send.SendRuntime
 import com.aveline.ai.mobile.services.foreground.RoleReplyNotifier
+import com.aveline.ai.mobile.services.media.LocalMediaStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -57,7 +58,9 @@ class ChatSendController(
      * 因此 SSE 收尾必须自己弹通知，否则「切出去等回复」永远收不到提示。
      * 可空 + 默认值：单测直接构造时不传。
      */
-    private val replyNotifier: RoleReplyNotifier? = null
+    private val replyNotifier: RoleReplyNotifier? = null,
+    /** 媒体本地仓库：SSE 收到表情包/图片立即落盘。可空 + 默认值：单测直接构造时不传。 */
+    private val localMediaStore: LocalMediaStore? = null
 ) {
     companion object {
         /** HTTP SSE 是否在跑（进程级，供新页面继承 WS 抑制状态）。 */
@@ -94,7 +97,8 @@ class ChatSendController(
         previewWriter = previewWriter,
         replyNotifier = outcomeNotifier,
         mapEmotion = mapEmotion,
-        resolveRoleModelRoute = resolveRoleModelRoute
+        resolveRoleModelRoute = resolveRoleModelRoute,
+        localMediaStore = localMediaStore
     )
 
     fun sendMessage(

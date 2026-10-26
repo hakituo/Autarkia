@@ -21,10 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,8 +43,7 @@ import com.aveline.ai.mobile.presentation.components.ModuleHeader
 import com.aveline.ai.mobile.presentation.components.PersonaAvatar
 import com.aveline.ai.mobile.presentation.components.rememberClickGate
 import com.aveline.ai.mobile.presentation.theme.Background
-import com.aveline.ai.mobile.presentation.theme.Primary
-import com.aveline.ai.mobile.presentation.theme.StatusOnline
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
@@ -88,7 +85,13 @@ fun ConversationListScreen(
     /** 手选音色：(persona filename, 音色名)。 */
     onSelectVoice: (String, String) -> Unit = { _, _ -> },
     /** 恢复跟随角色默认音色：(persona filename)。 */
-    onResetVoice: (String) -> Unit = {}
+    onResetVoice: (String) -> Unit = {},
+    /** 是否显示页头「消息」：平板常驻侧栏用自己的品牌头，这里传 false。 */
+    showHeader: Boolean = true,
+    /** 是否自行处理状态栏 inset：侧栏已在外层统一处理，这里传 false 避免重复留白。 */
+    applyStatusBarPadding: Boolean = true,
+    /** 当前正在聊天的角色：平板侧栏据此高亮所在行。 */
+    selectedRole: String? = null
 ) {
     // 当前编辑的 persona（长按弹出编辑面板）
     var editingItem by remember { mutableStateOf<ConversationItem?>(null) }
@@ -96,11 +99,13 @@ fun ConversationListScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .statusBarsPadding()
+            .then(if (applyStatusBarPadding) Modifier.statusBarsPadding() else Modifier)
     ) {
         // 不放置常驻刷新按钮：会话列表在 ViewModel init 时自动拉一次，本地改昵称/头像后
         // 也会自动重渲染（见 ConversationListViewModel.init），不需要用户手动点。
-        ModuleHeader(title = "消息")
+        if (showHeader) {
+            ModuleHeader(title = "消息")
+        }
 
         // 错误条
         uiState.error?.takeIf { it.isNotBlank() }?.let { error ->
@@ -194,6 +199,7 @@ fun ConversationListScreen(
                     RoleRow(
                         roleItem = roleItem,
                         avatarStorage = avatarStorage,
+                        isSelected = roleItem.role == selectedRole,
                         onClick = {
                             onOpenChat(
                                 roleItem.role,
@@ -261,6 +267,7 @@ fun ConversationListScreen(
 private fun RoleRow(
     roleItem: RoleItem,
     avatarStorage: PersonaAvatarStorage,
+    isSelected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
@@ -270,6 +277,7 @@ private fun RoleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(if (isSelected) Color(0x1AFFFFFF) else Color.Transparent)
             .combinedClickable(
                 onClick = { if (clickGate()) onClick() },
                 onLongClick = onLongClick
@@ -337,14 +345,14 @@ private fun RoleRow(
  * 未读徽章：品牌色实心胶囊 + 深色数字（QQ 徽章的形态，不用红色）。
  *
  * 配色说明：红色在本应用里已被"离线/错误"语义占用，而且高饱和红与整体
- * 低饱和深色配色冲突；这里用 Primary（品牌天蓝）做底、Background 深色做字，
- * 与 App 主题同源，深色字在天蓝上对比度也足够。
+ * 低饱和深色配色冲突；这里用 Accent（品牌鼠尾草绿）做底、Background 深色做字，
+ * 与 App 主题同源，深色字在浅色底上对比度也足够。
  */
 @Composable
 private fun UnreadBadge(count: Int, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .background(Primary, RoundedCornerShape(50))
+            .background(Accent, RoundedCornerShape(50))
             .padding(horizontal = 5.dp, vertical = 1.dp)
     ) {
         Text(
@@ -358,113 +366,7 @@ private fun UnreadBadge(count: Int, modifier: Modifier = Modifier) {
 }
 
 /**
- * 单个会话行
- */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-@Composable
-private fun ConversationRow(
-    item: ConversationItem,
-    avatarStorage: PersonaAvatarStorage,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            )
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // 头像：本地图片优先 → 网络 URL → emoji 兜底
-        ConversationAvatar(item = item, avatarStorage = avatarStorage)
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-            // 中部：昵称 + 预览/描述
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = item.displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = TextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    if (item.isActive) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = StatusOnline.copy(alpha = 0.2f)
-                        ) {
-                            Text(
-                                text = "当前",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = StatusOnline,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                    // 右侧时间（"X 分钟前"），无消息则不显示
-                    item.lastMessageAt?.let { ts ->
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = formatRelativeTime(ts),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextTertiary,
-                            maxLines = 1
-                        )
-                    }
-                }
-                // 副标题：最后一条消息预览优先，无则显示 persona.description
-                val subtitle = item.lastMessagePreview?.takeIf { it.isNotBlank() }
-                    ?: item.description
-                if (subtitle.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-        // 右侧：编辑按钮（提示长按也可）
-        Icon(
-            imageVector = Icons.Default.Edit,
-            contentDescription = "长按编辑",
-            tint = TextTertiary,
-            modifier = Modifier.size(16.dp)
-        )
-    }
-}
-
-/**
- * 会话头像：本地图片 → 网络 URL → 首字母兜底（实现见 [PersonaAvatar]）
- */
-@Composable
-private fun ConversationAvatar(
-    item: ConversationItem,
-    avatarStorage: PersonaAvatarStorage,
-    modifier: Modifier = Modifier
-) {
-    PersonaAvatar(
-        displayName = item.displayName,
-        avatarUrl = item.avatarUrl,
-        localAvatarPath = item.localAvatarPath,
-        avatarStorage = avatarStorage,
-        modifier = modifier
-    )
-}
-
-/**
- * 角色级别头像（与 ConversationAvatar 视觉一致，但用 RoleItem 数据）
+ * 角色级别头像（与公共 PersonaAvatar 视觉一致，但用 RoleItem 数据）
  */
 @Composable
 private fun RoleAvatar(

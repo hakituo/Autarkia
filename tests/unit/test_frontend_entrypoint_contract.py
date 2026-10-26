@@ -29,9 +29,7 @@ def test_split_mode_does_not_mount_frontend_catch_all() -> None:
     assert "frontend" not in names
 
 
-def test_single_port_mode_mounts_frontend_when_explicitly_enabled(
-    tmp_path, monkeypatch
-) -> None:
+def test_single_port_mode_mounts_frontend_when_explicitly_enabled(tmp_path, monkeypatch) -> None:
     frontend_dir = tmp_path / "dist"
     frontend_dir.mkdir()
     (frontend_dir / "index.html").write_text("<html>ok</html>", encoding="utf-8")

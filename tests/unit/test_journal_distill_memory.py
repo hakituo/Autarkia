@@ -21,9 +21,7 @@ def _make_service() -> JournalSummaryService:
 
 def _patch_common(monkeypatch, tmp_path, stream):
     monkeypatch.setattr("core.utils.common.get_project_root", lambda: tmp_path)
-    monkeypatch.setattr(
-        "core.services.journal.summary_service.call_llm_stream", stream
-    )
+    monkeypatch.setattr("core.services.journal.summary_service.call_llm_stream", stream)
 
 
 _PROFILE_REL = ("core", "character", "configs", "extra")

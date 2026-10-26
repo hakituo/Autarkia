@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, RefreshCw, CheckCircle, Clock, Grid, AlertTriangle, BarChart, Book, Search, ChevronRight, ArrowLeft, Play, Zap, Award, Flame, XCircle, FolderOpen, NotebookPen, Eye } from 'lucide-react';
+import { BookOpen, RefreshCw, CheckCircle, Clock, Grid, AlertTriangle, BarChart, Book, Search, ChevronRight, ArrowLeft, Play, Zap, Award, Flame, XCircle, FolderOpen, NotebookPen, Eye, CalendarDays } from 'lucide-react';
 import { api } from '../api/apiService';
 import { InfoCard } from './InfoCard';
 import { StudyFileManager } from './StudyFileManager';
 import { FocusMonitorPanel } from './study/FocusMonitorPanel';
+import { StudyPlanView } from './study/StudyPlanView';
 
 interface WordTranslation {
   type: string;
@@ -57,10 +58,12 @@ interface SessionStats {
   streak: number;
 }
 
-type ViewType = 'daily' | 'records' | 'tools' | 'files' | 'dictionary' | 'curve' | 'mistakes' | 'focus';
+type ViewType = 'daily' | 'plan' | 'records' | 'tools' | 'files' | 'dictionary' | 'curve' | 'mistakes' | 'focus';
 
 const StudyPanel: React.FC = () => {
   const [activeView, setActiveView] = useState<ViewType>('daily');
+  // 从「计划」点「开始专注」时带过去的事项与时长
+  const [focusPrefill, setFocusPrefill] = useState<{ subject: string; minutes: number } | null>(null);
   const [words, setWords] = useState<DailyWord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -346,6 +349,7 @@ const StudyPanel: React.FC = () => {
     <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-2 no-scrollbar">
       {[
         { id: 'daily', label: 'Learn', icon: <Zap size={16} /> },
+        { id: 'plan', label: 'Plan', icon: <CalendarDays size={16} /> },
         { id: 'records', label: 'Records', icon: <NotebookPen size={16} /> },
         { id: 'tools', label: 'Tools', icon: <Grid size={16} /> },
         { id: 'files', label: 'Project', icon: <FolderOpen size={16} /> },
@@ -1540,8 +1544,16 @@ const StudyPanel: React.FC = () => {
                     )}
                  </div>
             )}
+            {activeView === 'plan' && (
+                <StudyPlanView
+                    onStartFocus={(subject, minutes) => {
+                        setFocusPrefill({ subject, minutes });
+                        setActiveView('focus');
+                    }}
+                />
+            )}
             {activeView === 'focus' && (
-                <FocusMonitorPanel />
+                <FocusMonitorPanel prefill={focusPrefill} onPrefillConsumed={() => setFocusPrefill(null)} />
             )}
           </motion.div>
         </AnimatePresence>

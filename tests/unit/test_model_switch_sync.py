@@ -86,38 +86,22 @@ def test_switch_model_syncs_session_locks_and_broadcasts(monkeypatch):
     import core.interfaces.websocket.websocket_manager as wsm_module
     import routers.v1.models as models_router
 
-    pro_entry = SimpleNamespace(
-        model_path="cloud:deepseek:rushuang:deepseek-v4-pro"
-    )
-    fake_model_manager = SimpleNamespace(
-        _models={"deepseek-v4-pro": pro_entry}
-    )
+    pro_entry = SimpleNamespace(model_path="cloud:deepseek:rushuang:deepseek-v4-pro")
+    fake_model_manager = SimpleNamespace(_models={"deepseek-v4-pro": pro_entry})
     fake_llm = _FakeLLMModule()
 
     # 连接 A：带旧的会话级锁（flash），应被同步为 pro
-    ws_locked = _FakeWs(
-        pref="cloud:deepseek:rushuang:deepseek-v4-flash"
-    )
+    ws_locked = _FakeWs(pref="cloud:deepseek:rushuang:deepseek-v4-flash")
     # 连接 B：无会话锁，不应被新增锁
     ws_unlocked = _FakeWs()
-    fake_ws_manager = _FakeWsManager(
-        {ws_locked: SimpleNamespace(), ws_unlocked: SimpleNamespace()}
-    )
+    fake_ws_manager = _FakeWsManager({ws_locked: SimpleNamespace(), ws_unlocked: SimpleNamespace()})
 
-    monkeypatch.setattr(
-        models_router, "get_settings", lambda: _make_settings()
-    )
-    monkeypatch.setattr(
-        model_manager_module, "get_model_manager", lambda: fake_model_manager
-    )
+    monkeypatch.setattr(models_router, "get_settings", lambda: _make_settings())
+    monkeypatch.setattr(model_manager_module, "get_model_manager", lambda: fake_model_manager)
     monkeypatch.setattr(llm_package, "get_llm_module", lambda: fake_llm)
-    monkeypatch.setattr(
-        wsm_module, "get_websocket_manager", lambda: fake_ws_manager
-    )
+    monkeypatch.setattr(wsm_module, "get_websocket_manager", lambda: fake_ws_manager)
 
-    request = models_router.SwitchModelRequest(
-        model_name="deepseek-v4-pro", provider="deepseek"
-    )
+    request = models_router.SwitchModelRequest(model_name="deepseek-v4-pro", provider="deepseek")
     result = asyncio.run(models_router.switch_model(request))
 
     assert result["success"] is True
@@ -125,10 +109,7 @@ def test_switch_model_syncs_session_locks_and_broadcasts(monkeypatch):
     assert fake_llm.unloaded is True
 
     # 旧锁被同步为目标模型完整路由
-    assert (
-        ws_locked.forced_model_preference
-        == "cloud:deepseek:rushuang:deepseek-v4-pro"
-    )
+    assert ws_locked.forced_model_preference == "cloud:deepseek:rushuang:deepseek-v4-pro"
     # 无锁连接不会被追加锁
     assert not hasattr(ws_unlocked, "forced_model_preference")
 
@@ -138,6 +119,4 @@ def test_switch_model_syncs_session_locks_and_broadcasts(monkeypatch):
     assert update["type"] == "model_update"
     assert update["data"]["provider"] == "deepseek"
     assert update["data"]["model"] == "deepseek-v4-pro"
-    assert (
-        update["data"]["path"] == "cloud:deepseek:rushuang:deepseek-v4-pro"
-    )
+    assert update["data"]["path"] == "cloud:deepseek:rushuang:deepseek-v4-pro"

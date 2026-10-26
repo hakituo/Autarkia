@@ -101,7 +101,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     }
 
     // 从 localStorage 获取访问令牌
-    const token = localStorage.getItem('XIAOYOU_ACCESS_TOKEN');
+    const token = localStorage.getItem('AUTARKIA_ACCESS_TOKEN');
     if (token) {
       wsUrl += `?token=${encodeURIComponent(token)}`;
     }

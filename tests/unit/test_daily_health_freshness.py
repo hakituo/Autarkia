@@ -60,9 +60,7 @@ def test_window_boundary_is_inclusive():
 
 
 def test_missing_time_stays_fresh():
-    fresh, earlier = split_health_entries(
-        [{"symptom": "感冒"}], now=datetime(2026, 9, 17, 20, 0)
-    )
+    fresh, earlier = split_health_entries([{"symptom": "感冒"}], now=datetime(2026, 9, 17, 20, 0))
     assert fresh == ["感冒"]
     assert earlier == []
 
@@ -99,9 +97,12 @@ def test_today_summary_marks_stale_health_and_warns_model(manager):
         "date": "2026-09-17",
         "health": [{"symptom": "恶心", "detail": "", "time": "00:09"}],
     }
-    with patch.object(manager, "_load_record", return_value=record), patch(
-        "core.services.daily.manager.get_current_time",
-        return_value=datetime(2026, 9, 17, 20, 30),
+    with (
+        patch.object(manager, "_load_record", return_value=record),
+        patch(
+            "core.services.daily.manager.get_current_time",
+            return_value=datetime(2026, 9, 17, 20, 30),
+        ),
     ):
         summary = manager.get_today_summary()
 
@@ -115,9 +116,12 @@ def test_today_summary_keeps_fresh_health_as_current(manager):
         "date": "2026-09-17",
         "health": [{"symptom": "胃痛", "detail": "", "time": "19:30"}],
     }
-    with patch.object(manager, "_load_record", return_value=record), patch(
-        "core.services.daily.manager.get_current_time",
-        return_value=datetime(2026, 9, 17, 20, 30),
+    with (
+        patch.object(manager, "_load_record", return_value=record),
+        patch(
+            "core.services.daily.manager.get_current_time",
+            return_value=datetime(2026, 9, 17, 20, 30),
+        ),
     ):
         summary = manager.get_today_summary()
 

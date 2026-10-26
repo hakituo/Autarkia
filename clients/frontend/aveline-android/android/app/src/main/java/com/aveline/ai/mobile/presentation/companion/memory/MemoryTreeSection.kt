@@ -43,9 +43,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.domain.models.Memory
-import com.aveline.ai.mobile.presentation.theme.CardBackground
-import com.aveline.ai.mobile.presentation.theme.CardBorder
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Line
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
@@ -159,7 +158,7 @@ private fun BucketHeaderRow(
     onToggle: () -> Unit
 ) {
     Column {
-        HorizontalDivider(color = CardBorder, thickness = 1.dp)
+        HorizontalDivider(color = Line, thickness = 1.dp)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -171,7 +170,7 @@ private fun BucketHeaderRow(
                 modifier = Modifier
                     .width(3.dp)
                     .height(18.dp)
-                    .background(Primary, RoundedCornerShape(2.dp))
+                    .background(Accent, RoundedCornerShape(2.dp))
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
@@ -270,10 +269,10 @@ private fun MemoryLeafRow(
                 .fillMaxWidth()
                 .combinedClickable(onClick = onClick, onLongClick = onDelete),
             shape = RoundedCornerShape(12.dp),
-            color = if (memory.isImportant) MemoryImportantColor.copy(alpha = 0.08f) else CardBackground,
+            color = if (memory.isImportant) MemoryImportantColor.copy(alpha = 0.08f) else Color.Transparent,
             border = BorderStroke(
                 width = 1.dp,
-                color = if (memory.isImportant) MemoryImportantColor.copy(alpha = 0.28f) else CardBorder
+                color = if (memory.isImportant) MemoryImportantColor.copy(alpha = 0.28f) else Line
             )
         ) {
             Column(modifier = Modifier.padding(start = 12.dp, top = 10.dp, end = 6.dp, bottom = 8.dp)) {

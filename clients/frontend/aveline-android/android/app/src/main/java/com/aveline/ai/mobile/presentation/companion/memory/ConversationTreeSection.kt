@@ -14,8 +14,8 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -39,9 +39,8 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.aveline.ai.mobile.presentation.theme.CardBackground
-import com.aveline.ai.mobile.presentation.theme.CardBorder
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Line
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
@@ -105,7 +104,7 @@ internal fun ConversationTreeToolbar(
                     )
                 },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Primary.copy(alpha = 0.85f),
+                    selectedContainerColor = Accent.copy(alpha = 0.85f),
                     containerColor = Color(0x1A000000)
                 )
             )
@@ -136,7 +135,7 @@ internal fun LazyListScope.conversationTreeItems(
 @Composable
 private fun ConversationMessageRow(row: ConversationTreeRow.MessageRow) {
     val message = row.message
-    val roleColor = if (message.isUser) Primary else Color(0xFFA78BFA)
+    val roleColor = if (message.isUser) Accent else Color(0xFFA78BFA)
     val thought = message.thought?.trim().orEmpty()
     var thoughtExpanded by rememberSaveable(message.id) { mutableStateOf(false) }
 
@@ -159,8 +158,8 @@ private fun ConversationMessageRow(row: ConversationTreeRow.MessageRow) {
                 .fillMaxWidth()
                 .alpha(if (row.onActivePath) 1f else 0.45f),
             shape = RoundedCornerShape(10.dp),
-            color = CardBackground,
-            border = BorderStroke(1.dp, CardBorder)
+            color = Color.Transparent,
+            border = BorderStroke(1.dp, Line)
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -216,7 +215,7 @@ private fun ConversationMessageRow(row: ConversationTreeRow.MessageRow) {
 @Composable
 private fun ThoughtToggle(expanded: Boolean, onClick: () -> Unit) {
     Surface(
-        color = Primary.copy(alpha = 0.14f),
+        color = Accent.copy(alpha = 0.14f),
         shape = RoundedCornerShape(4.dp),
         modifier = Modifier.clickable(onClick = onClick)
     ) {
@@ -225,17 +224,17 @@ private fun ThoughtToggle(expanded: Boolean, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             val chevron =
-                if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight
+                if (expanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight
             Icon(
                 imageVector = chevron,
                 contentDescription = null,
-                tint = Primary,
+                tint = Accent,
                 modifier = Modifier.size(12.dp)
             )
             Text(
                 text = "心想",
                 style = MaterialTheme.typography.labelSmall,
-                color = Primary
+                color = Accent
             )
         }
     }
@@ -245,7 +244,7 @@ private fun ThoughtToggle(expanded: Boolean, onClick: () -> Unit) {
 @Composable
 private fun ThoughtBody(text: String) {
     Surface(
-        color = Primary.copy(alpha = 0.08f),
+        color = Accent.copy(alpha = 0.08f),
         shape = RoundedCornerShape(6.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -271,16 +270,16 @@ private fun ConversationBranchRow(row: ConversationTreeRow.BranchRow, onClick: (
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Default.KeyboardArrowRight,
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
-            tint = Primary,
+            tint = Accent,
             modifier = Modifier.size(16.dp)
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(
             text = "其他 ${row.hiddenCount} 个版本",
             style = MaterialTheme.typography.labelMedium,
-            color = Primary
+            color = Accent
         )
     }
 }
@@ -318,7 +317,7 @@ private fun ServerBadge() {
 
 @Composable
 private fun VariantBadge(index: Int, count: Int, active: Boolean) {
-    val color = if (active) Primary else TextTertiary
+    val color = if (active) Accent else TextTertiary
     Surface(
         color = color.copy(alpha = 0.14f),
         shape = RoundedCornerShape(4.dp)

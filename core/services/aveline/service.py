@@ -379,6 +379,7 @@ class AvelineService:
         self, conversation_id: str, content: str, thought: str = "",
         is_peer_script: bool = False,
         peer_speaker: str = "",
+        client_message_id: str = "",
     ):
         from core.services.aveline.proactive_messaging import append_proactive_message
         await append_proactive_message(
@@ -388,6 +389,7 @@ class AvelineService:
             thought=thought,
             is_peer_script=is_peer_script,
             peer_speaker=peer_speaker,
+            client_message_id=client_message_id,
         )
 
     # --- 视觉/图像服务委托 ---
@@ -435,12 +437,14 @@ class AvelineService:
         api_key_env: Optional[str] = None,
         platform: Optional[str] = None,
         history_override: Optional[list[Dict[str, str]]] = None,
+        message_id: Optional[str] = None,
     ):
         from core.services.aveline.response_generator import stream_generate_response
         async for chunk in stream_generate_response(
             self,
             user_input,
             conversation_id,
+            message_id=message_id,
             system_prompt=system_prompt,
             max_tokens=max_tokens,
             temperature=temperature,
@@ -468,12 +472,14 @@ class AvelineService:
         save_history: bool = True,
         user_name: Optional[str] = None,
         length_preference: Optional[str] = None,
+        message_id: Optional[str] = None,
     ) -> Tuple[str, Dict[str, Any]]:
         from core.services.aveline.response_generator import generate_response
         return await generate_response(
             self,
             user_input,
             conversation_id,
+            message_id=message_id,
             system_prompt=system_prompt,
             max_tokens=max_tokens,
             temperature=temperature,

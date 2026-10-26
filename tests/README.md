@@ -7,7 +7,6 @@
 ```
 tests/
 ├── benchmark/          # 性能基准测试
-├── character_daily/    # 角色日程 pytest 测试
 ├── diagnostics/        # 长期诊断与审计工具（手动运行，非 pytest）
 ├── integration/        # 集成测试
 ├── journal_plan/       # 日记/计划 pytest 测试
@@ -15,12 +14,13 @@ tests/
 ├── scripts/            # 测试相关的长期维护脚本
 │   ├── doc_records/    # 配套验证 scripts/doc_records/
 │   └── git/            # 配套验证 .githooks/
+├── variants/          # 私密测试（人设 / 角色日程 / prompt）；公开仓库不发布该目录
 ├── stress/             # 压力测试
 ├── tools/              # 工具相关测试
 ├── unit/               # pytest 单元测试（主力回归测试）
 ├── utils/              # 工具函数测试
 ├── README.md           # 本文件
-└── conftest.py         # pytest 配置
+└── conftest.py         # pytest 配置与共享 fixture
 ```
 
 ---
@@ -41,9 +41,11 @@ venv_core\Scripts\python.exe -m pytest tests/unit -v
 
 ---
 
-## 2. 角色日程测试 (`character_daily/`)
+## 2. 敏感测试 (`variants/`)
 
-角色日程与主动关怀的 pytest 测试，包括活动解析、计划执行、消息延后、睡眠恢复等。
+依赖私密人设、角色日程、prompt 模板或本机角色数据的 pytest 测试。这些测试在私有仓库照常运行，
+但 `scripts/publish/publish_whitelist.json` 会把整个 `tests/variants/` 目录排除在公开切片之外，
+因此公开仓库的 Core CI 不会收集它们。子目录按来源组织，例如 `variants/character_daily/` 是原角色日程测试。
 
 ---
 

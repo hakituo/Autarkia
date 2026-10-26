@@ -36,9 +36,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aveline.ai.mobile.presentation.theme.EmotionGreen
-import com.aveline.ai.mobile.presentation.theme.Primary
-import com.aveline.ai.mobile.presentation.theme.SurfaceVariant
+import com.aveline.ai.mobile.presentation.theme.Background
+import com.aveline.ai.mobile.presentation.theme.Accent
+import com.aveline.ai.mobile.presentation.theme.SurfaceHigh
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 
@@ -91,10 +91,10 @@ fun StudyFocusTab(
                 FocusPhase.BREAK -> "休息一下"
                 FocusPhase.LONG_BREAK -> "长休息"
             },
-            color = when (focusState.phase) {
-                FocusPhase.WORK -> Primary
-                FocusPhase.BREAK -> EmotionGreen
-                FocusPhase.LONG_BREAK -> Color(0xFF64B5F6)
+            color = if (focusState.phase == FocusPhase.LONG_BREAK) {
+                Color(0xFF64B5F6)
+            } else {
+                Accent
             },
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
@@ -117,17 +117,17 @@ fun StudyFocusTab(
             CircularProgressIndicator(
                 progress = { 1f },
                 modifier = Modifier.fillMaxSize(),
-                color = SurfaceVariant,
+                color = SurfaceHigh,
                 strokeWidth = 12.dp,
                 trackColor = Color.Transparent
             )
             CircularProgressIndicator(
                 progress = { progress },
                 modifier = Modifier.fillMaxSize(),
-                color = when (focusState.phase) {
-                    FocusPhase.WORK -> Primary
-                    FocusPhase.BREAK -> EmotionGreen
-                    FocusPhase.LONG_BREAK -> Color(0xFF64B5F6)
+                color = if (focusState.phase == FocusPhase.LONG_BREAK) {
+                    Color(0xFF64B5F6)
+                } else {
+                    Accent
                 },
                 strokeWidth = 12.dp,
                 trackColor = Color.Transparent
@@ -152,7 +152,7 @@ fun StudyFocusTab(
                 onClick = onReset,
                 modifier = Modifier.size(56.dp),
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = SurfaceVariant
+                    containerColor = SurfaceHigh
                 )
             ) {
                 Icon(
@@ -166,13 +166,13 @@ fun StudyFocusTab(
                 onClick = onToggleTimer,
                 modifier = Modifier.size(72.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = Primary
+                    containerColor = Accent
                 )
             ) {
                 Icon(
                     imageVector = if (focusState.isRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = if (focusState.isRunning) "暂停" else "开始",
-                    tint = Color.White,
+                    tint = Background,
                     modifier = Modifier.size(32.dp)
                 )
             }
@@ -181,7 +181,7 @@ fun StudyFocusTab(
                 onClick = onSkipPhase,
                 modifier = Modifier.size(56.dp),
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = SurfaceVariant
+                    containerColor = SurfaceHigh
                 )
             ) {
                 Icon(
@@ -198,7 +198,7 @@ fun StudyFocusTab(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
+            colors = CardDefaults.cardColors(containerColor = SurfaceHigh)
         ) {
             Row(
                 modifier = Modifier
@@ -255,7 +255,7 @@ private fun StatItem(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = value,
-            color = Primary,
+            color = Accent,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold
         )

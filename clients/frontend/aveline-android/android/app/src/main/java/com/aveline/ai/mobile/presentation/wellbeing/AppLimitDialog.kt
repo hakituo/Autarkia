@@ -34,9 +34,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.data.remote.dto.AppLimitDto
-import com.aveline.ai.mobile.presentation.theme.CardBackground
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
+import com.aveline.ai.mobile.presentation.theme.Background
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 
@@ -154,7 +154,6 @@ fun AppLimitDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(CardBackground)
                             .clickable { expanded = !expanded }
                             .padding(14.dp)
                     ) {
@@ -170,7 +169,6 @@ fun AppLimitDialog(
                                 .fillMaxWidth()
                                 .height(240.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(CardBackground)
                                 .padding(4.dp)
                         ) {
                             if (installedApps.isEmpty()) {
@@ -250,9 +248,9 @@ fun AppLimitDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = Primary,
+                        focusedBorderColor = Accent,
                         unfocusedBorderColor = Color(0xFF27272A),
-                        cursorColor = Primary
+                        cursorColor = Accent
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -323,7 +321,7 @@ fun AppLimitDialog(
                     )
                 }
             ) {
-                Text("保存", color = Primary)
+                Text("保存", color = Accent)
             }
         },
         dismissButton = {
@@ -339,13 +337,13 @@ private fun DurationChip(label: String, selected: Boolean, onClick: () -> Unit) 
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) Primary else CardBackground)
+            .background(if (selected) Accent else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
         Text(
             text = label,
-            color = if (selected) Color.White else TextSecondary,
+            color = if (selected) Background else TextSecondary,
             style = MaterialTheme.typography.bodySmall
         )
     }

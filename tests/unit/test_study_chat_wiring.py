@@ -6,6 +6,7 @@
 生产主对话走的是流式（stream_chat），非流式是另一条入口。
 两条都必须接 observe_learning_message，否则等于半个系统不工作。
 """
+
 from __future__ import annotations
 
 import inspect
@@ -18,8 +19,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 # 两条入口各自调用 observe_learning_message 的位置
 WIRED_SITES = (
     PROJECT_ROOT / "core/agents/chat_agent_components/handler.py",
-    PROJECT_ROOT
-    / "core/agents/chat_agent_components/streaming_pipeline/preparation.py",
+    PROJECT_ROOT / "core/agents/chat_agent_components/streaming_pipeline/preparation.py",
 )
 
 

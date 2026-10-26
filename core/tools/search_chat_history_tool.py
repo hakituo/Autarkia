@@ -283,22 +283,36 @@ class SearchChatHistoryTool(BaseTool):
             return events
         try:
             from core.agents.chat_agent_components.message_branch import (
-                get_chat_history_branch_scope,
-                is_event_visible_in_branch,
+                filter_events_by_branch_scope,
+            )
+
+            return filter_events_by_branch_scope(
+                events, conversation_id=conversation_id
             )
         except Exception:  # noqa: BLE001
             return events
 
-        scope = get_chat_history_branch_scope()
-        if not scope:
+    @staticmethod
+    def _filter_worldline_visible(
+        events: List[dict], conversation_id: str
+    ) -> List[dict]:
+        """按统一可见性谓词再过滤一次（v3 E2）。
+
+        分支边界只覆盖 Android 流式请求；这条闸门让同一查询在所有入口
+        都走 ``MemoryReadContext``。生产默认 compat：历史 unknown 事件放行并
+        记录原因码，只有「已有明确 anchor 的兄弟线」会被隐藏。
+        """
+        if not events:
             return events
-        return [
-            event
-            for event in events
-            if is_event_visible_in_branch(
-                event, conversation_id=conversation_id, scope=scope
-            )
-        ]
+        try:
+            from memory.topology.read_gate import filter_raw_events
+
+            return filter_raw_events(
+                events, conversation_id=conversation_id
+            ).events
+        except Exception as e:  # noqa: BLE001 - 拓扑故障不得清空搜索
+            logger.warning(f"世界线可见性过滤失败，按原样返回: {e}")
+            return events
 
     @staticmethod
     def _event_matches(
@@ -435,6 +449,7 @@ class SearchChatHistoryTool(BaseTool):
             ]
 
         events = self._filter_branch_visible(events, conversation_id)
+        events = self._filter_worldline_visible(events, conversation_id)
 
         return self._dedup_and_trim(events, limit)
 
@@ -534,6 +549,7 @@ class SearchChatHistoryTool(BaseTool):
             ]
 
         events = self._filter_branch_visible(events, conversation_id)
+        events = self._filter_worldline_visible(events, conversation_id)
 
         return self._dedup_and_trim(events, limit)
 
@@ -648,6 +664,8 @@ class SearchChatHistoryTool(BaseTool):
 
         if not usable:
             return None
+        # peer 互聊没有「当前会话 anchor」，只做跨入口一致的 compat 闸门
+        events = self._filter_worldline_visible(events, "")
         return self._dedup_and_trim(events, limit)
 
     # ------------------------------------------------------------------
@@ -712,6 +730,9 @@ class SearchChatHistoryTool(BaseTool):
                     scope=scope,
                     file_filter=file_filter,
                     source=source,
+                )
+                results = await asyncio.to_thread(
+                    self._filter_worldline_visible, results, ""
                 )
             except Exception as e:
                 logger.warning(f"搜索与{peer_name}的聊天记录失败: {e}")

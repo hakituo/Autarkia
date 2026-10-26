@@ -10,7 +10,7 @@
 # 手动执行时可以不传 SHA：此时所有"有变化才做"的判断退化为"总是做"。
 #
 # 可覆盖的环境变量：
-#   REPO_DIR       仓库路径          默认 /home/user/xiaoyou-core
+#   REPO_DIR       仓库路径          默认 /home/user/Autarkia
 #   VENV_DIR       虚拟环境路径       默认 $REPO_DIR/venv_linux
 #   PY             python 解释器      默认 $VENV_DIR/bin/python
 #   SERVICE_NAME   systemd 单元名     默认 xiaoyou-core
@@ -24,7 +24,7 @@
 # 退出码：0 成功；非 0 表示部署中断，CI 会变红，需要人工介入。
 set -euo pipefail
 
-REPO_DIR="${REPO_DIR:-/home/user/xiaoyou-core}"
+REPO_DIR="${REPO_DIR:-/home/user/Autarkia}"
 VENV_DIR="${VENV_DIR:-$REPO_DIR/venv_linux}"
 PY="${PY:-$VENV_DIR/bin/python}"
 SERVICE_NAME="${SERVICE_NAME:-xiaoyou-core}"

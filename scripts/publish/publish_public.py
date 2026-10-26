@@ -16,7 +16,7 @@
     5. 残留扫描门禁：目标目录出现禁止字符串/密钥模式 → 报警并以非 0 退出
 
 用法（Windows / Linux 通用，需在仓库根目录运行）：
-    venv_cpu python scripts/publish/publish_public.py --target D:/AI/xiaoyou-public
+    venv_cpu python scripts/publish/publish_public.py --target D:/AI/Autarkia-public
     venv_cpu python scripts/publish/publish_public.py --dry-run        # 只列清单不写入
     venv_cpu python scripts/publish/publish_public.py --scan-only --target <dir>  # 只扫描已有目录
     venv_cpu python scripts/publish/publish_public.py --clean          # 复制前清空目标（保留 .git）
@@ -43,7 +43,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = Path(__file__).resolve().parent / "publish_whitelist.json"
 
 # 默认发布目录：与 private 仓库同级
-DEFAULT_TARGET = PROJECT_ROOT.parent / "xiaoyou-public"
+DEFAULT_TARGET = PROJECT_ROOT.parent / "Autarkia-public"
 
 # 视为文本处理的扩展名（无扩展名的常见文件如 Dockerfile/.gitignore 会尝试 utf-8 解码）
 TEXT_EXTS = {
@@ -556,7 +556,12 @@ def publish(target: Path, cfg: dict[str, Any], dry_run: bool = False) -> dict[st
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="公开仓库白名单发布脚本")
-    parser.add_argument("--target", type=Path, default=DEFAULT_TARGET, help="目标目录（默认与 private 仓库同级的 xiaoyou-public）")
+    parser.add_argument(
+        "--target",
+        type=Path,
+        default=DEFAULT_TARGET,
+        help="目标目录（默认与 private 仓库同级的 Autarkia-public）",
+    )
     parser.add_argument("--config", type=Path, default=CONFIG_PATH, help="白名单配置 JSON 路径")
     parser.add_argument("--dry-run", action="store_true", help="只统计与列清单，不写入任何文件")
     parser.add_argument("--scan-only", action="store_true", help="只扫描已有目标目录（不复制）")

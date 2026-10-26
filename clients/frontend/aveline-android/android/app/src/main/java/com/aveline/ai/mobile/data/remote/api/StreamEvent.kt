@@ -16,8 +16,36 @@ sealed class StreamEvent {
     /** 流结束 */
     data class Done(val emotion: String? = null, val messageId: String? = null) : StreamEvent()
 
-    /** 错误 */
-    data class Error(val message: String) : StreamEvent()
+    /**
+     * 错误。
+     *
+     * 后端在 error 事件里还会下发 `error_code` 与 `details`（`raw_error` / `upstream_status` /
+     * `upstream_body`），HTTP 非 2xx 时还有状态码。旧实现只取 `message` 一个字符串，
+     * 用户能看到的就只有「AI 服务暂时不可用，请稍后重试」这类笼统文案，
+     * 422 敏感词拦截、超时、限流在界面上长得一模一样。
+     * 这里把能拿到的字段全留下，由 [describe] 统一拼给 UI。
+     */
+    data class Error(
+        val message: String,
+        val errorCode: String? = null,
+        val detail: String? = null,
+        val httpStatus: Int? = null,
+    ) : StreamEvent() {
+        /** 拼给用户看的完整文案：状态/错误码 + 后端原话，详情另起一行。 */
+        fun describe(): String {
+            val tags = buildList {
+                httpStatus?.let { add("HTTP $it") }
+                errorCode?.trim()?.takeIf { it.isNotEmpty() }?.let { add(it) }
+            }
+            val head = if (tags.isEmpty()) {
+                message
+            } else {
+                "${tags.joinToString(" ") { "[$it]" }} $message"
+            }
+            val tail = detail?.trim()?.takeIf { it.isNotEmpty() }
+            return if (tail == null) head else "$head\n$tail"
+        }
+    }
 
     /** 重置：AI 开始调用工具时下发，通知前端清空当前正在生成的临时消息（不影响历史） */
     object Reset : StreamEvent()
@@ -119,13 +147,7 @@ object SseParser {
             obj["detail"] != null
         if (!hasErrorSignal) return null
 
-        val message = obj["message"]?.jsonPrimitive?.contentOrNull
-            ?: obj["error"]?.jsonPrimitive?.contentOrNull
-            ?: obj["detail"]?.jsonPrimitive?.contentOrNull
-            ?: "未知错误"
-        val code = obj["error_code"]?.jsonPrimitive?.contentOrNull
-        val text = if (code.isNullOrBlank()) message else "[$code] $message"
-        return StreamEvent.Error(text)
+        return errorFromJsonObject(obj)
     }
 
     private fun parseEvent(obj: JsonObject): StreamEvent? {
@@ -144,21 +166,12 @@ object SseParser {
                         val messageId = obj["message_id"]?.jsonPrimitive?.contentOrNull
                         return StreamEvent.Done(emotion = emotion, messageId = messageId)
                     }
-                    "error" -> {
-                        val msg = obj["message"]?.jsonPrimitive?.contentOrNull
-                            ?: obj["error"]?.jsonPrimitive?.contentOrNull
-                            ?: "未知错误"
-                        return StreamEvent.Error(msg)
-                    }
+                    // error_code / details 一并带出，与 type=error 事件同一套解析
+                    "error" -> return errorFromJsonObject(obj)
                     else -> return null
                 }
             }
-            "error" -> {
-                val msg = obj["message"]?.jsonPrimitive?.contentOrNull
-                    ?: obj["error"]?.jsonPrimitive?.contentOrNull
-                    ?: "未知错误"
-                return StreamEvent.Error(msg)
-            }
+            "error" -> return errorFromJsonObject(obj)
             "response_reset" -> {
                 // AI 开始调用工具，前端应清空当前正在生成的临时消息
                 return StreamEvent.Reset

@@ -6,7 +6,7 @@
 3. 打印生成内容供人工评估质量
 
 运行：
-    d:\\AI\\xiaoyou-core\\venv_core\\scripts\\python.exe ^
+    d:\\AI\\autarkia\\venv_core\\scripts\\python.exe ^
         tests\\scripts\\journal\\verify_monthly_summary.py 2026-06-30
 
 参数：

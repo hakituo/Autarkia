@@ -14,7 +14,7 @@ conversation_id 后缀为 __persona__core_aveline，而 QQ receiver 在 dual QQ
    与 activity_return 产出的 conversation_id 后缀匹配（不会被丢弃）
 4. send_activity_return_message 传给 executor 的 profile_filename 是 QQ 人设
 
-运行：D:\\AI\\xiaoyou-core\\venv_cpu\\Scripts\\python.exe tests\\scripts\\active_care\\verify_sleep_again_persona_match.py
+运行：D:\\AI\\autarkia\\venv_cpu\\Scripts\\python.exe tests\\scripts\\active_care\\verify_sleep_again_persona_match.py
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # 确保项目根目录在 sys.path
-_PROJECT_ROOT = "D:\\AI\\xiaoyou-core"
+_PROJECT_ROOT = "D:\\AI\\autarkia"
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 

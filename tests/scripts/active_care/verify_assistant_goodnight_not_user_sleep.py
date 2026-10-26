@@ -13,7 +13,7 @@ peer_chat 的 is_user_sleeping() 也会被误判 → 错误门禁。
 用户是否入睡只依据用户真实行为（用户说晚安 / sleep_hint + 沉默）。
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_assistant_goodnight_not_user_sleep
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_assistant_goodnight_not_user_sleep
 """
 
 import asyncio

@@ -13,7 +13,7 @@
    不再用"缓存命中"解释或提高 temperature 碰运气。
 
 运行：
-    d:\\AI\\xiaoyou-core\\venv_core\\scripts\\python.exe ^
+    d:\\AI\\autarkia\\venv_core\\scripts\\python.exe ^
         tests\\scripts\\nightly\\verify_diary_nightly_fix.py
 """
 from __future__ import annotations

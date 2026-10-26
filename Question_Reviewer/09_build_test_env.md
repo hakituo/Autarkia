@@ -67,7 +67,7 @@
 *   **复现步骤**:
     1. 正常使用项目（开发、运行服务、IDE 操作）
     2. 过一段时间执行 `git status` 报 `fatal: not a git repository`
-    3. 检查发现 `D:\projects\xiaoyou\.git` 目录已不存在
+    3. 检查发现 `d:\AI\xiaoyou-core\.git` 目录已不存在
 *   **预期行为**: `.git` 目录应一直存在，除非用户主动删除
 *   **实际行为**: `.git` 目录在无明显操作的情况下消失
 *   **排查过程**:
@@ -133,7 +133,7 @@
 *   **复现步骤**:
     *   在项目根目录执行 `.\venv_core\Scripts\python.exe -m pytest tests\integration\test_resource_manager.py -q -o addopts=`。
 *   **预期行为**: pytest 正常收集并执行指定测试文件。
-*   **实际行为**: pytest 在 `pytest_ignore_collect` 阶段访问 `D:\projects\xiaoyou\lib64`，抛出 `OSError: [WinError 1920] 系统无法访问此文件`。
+*   **实际行为**: pytest 在 `pytest_ignore_collect` 阶段访问 `D:\AI\xiaoyou-core\lib64`，抛出 `OSError: [WinError 1920] 系统无法访问此文件`。
 *   **解决方案**:
     *   临时执行命令时显式加上 `--ignore=lib64`。
     *   后续如果要彻底收敛，可在 pytest 配置或目录布局里继续处理该路径的 Windows 兼容性。
@@ -424,7 +424,7 @@
 *   **问题描述**: 用户反馈 `python main.py` 跑 14 小时后 RSS 飙到 8.5GB，想用 memory watcher 诊断却不知道看门狗默认关闭且代码本身是屎山。
 *   **复现步骤**:
     1. tasklist 查看 python 进程 → PID 24008/24084/27612/5256/2872/21312/35948/31868 多个，其中 PID 24084 RSS=8.5GB
-    2. Get-CimInstance Win32_Process -Filter 'ProcessId=24084' → cmdline=`python main.py`, cwd=D:\projects\xiaoyou, n_threads=478
+    2. Get-CimInstance Win32_Process -Filter 'ProcessId=24084' → cmdline=`python main.py`, cwd=D:\AI\xiaoyou-core, n_threads=478
     3. psutil.Process(24084).memory_maps() top 20 → 几乎全是 torch CUDA DLL（torch_cuda 763MB / cudnn 778MB / cublasLt 645MB / cusparse 341MB / cusolver 355MB / cufft 173MB / torch_cpu 208MB），还有 libpaddle.pyd 99MB + mklml.dll 80MB
     4. config/yaml/app.yaml: memory_watchdog.enabled=false → 看门狗根本没启动，今天的 xiaoyou_main.log 搜不到任何 MemoryWatchdog 记录
     5. core/utils/memory_watchdog.py 行 1-315 是轻量异步版、行 316-1101 是旧重量级版（_log_detailed_analysis 多次遍历 gc.get_objects()），同一文件两个 MemoryWatchdog 类共存
@@ -498,7 +498,7 @@
     2. 在 Agent 中先杀了 daemon 进程，后续每次编译都需要新建 daemon out log，首次编译时 daemon 已存在所以能过
 *   **修复方案**:
     1. 用户手动在 Settings → Conversation → Custom Sandbox Configuration 放行 D:\gradle_cache 完整目录（读+写）
-    2. 或：设置环境变量 GRADLE_USER_HOME 指向项目内路径(如 D:\projects\xiaoyou\clients\frontend\aveline-android\.gradle_home) 并把 D:\gradle_cache 下的 daemon/wrapper/caches 做 Junction/复制（复制约 1~3GB）
+    2. 或：设置环境变量 GRADLE_USER_HOME 指向项目内路径(如 d:\AI\xiaoyou-core\clients\frontend\aveline-android\.gradle_home) 并把 D:\gradle_cache 下的 daemon/wrapper/caches 做 Junction/复制（复制约 1~3GB）
     3. 或：不再先 Stop-Process 杀 java daemon；编译成功一次后保持 daemon 运行，复用存活 daemon 不会新建 out.log
 *   **验证**:
     1. `执行 gradlew :app:compileDebugKotlin 不再报 sandbox restricted`
@@ -936,3 +936,43 @@
     2. 建议后续：路径测试按 tmp_path/环境变量参数化；活动背景测试接入 study_sandbox 类隔离；ling 目录与活动实例锁定两项单独开任务对齐实现与测试预期。
 *   **验证**:
     1. `git stash push -u 后复跑 test_activity_instance_runtime 与 test_ling_v1_v2_catalog，同样 2 failed；git stash pop 已复原全部改动。`
+
+### QR-20261022-PYTEST-SLOW-COLLECT pytest 全量运行看起来卡死：收集期重型导入 + 管道缓冲 (2026-10-22)
+*   **问题描述**: 跑 CI 同款全量 pytest 时，终端一两分钟没有任何输出，看起来像卡死；实测用例本身约 1 分钟能跑完，并没有真的挂起。
+*   **复现步骤**:
+    1. venv_cpu\Scripts\python.exe -m pytest -q --ignore=... （Core CI 同款参数）
+    2. 命令末尾接 2>&1 | Select-Object -Last 15
+    3. 观察：进程启动后长时间没有任何输出，直到全部结束才一次性吐出末尾几行
+*   **预期行为**:
+    1. 启动后应能看到 pytest 进度或收集信息，能判断是在跑还是卡住
+*   **实际行为**:
+    1. 单文件 13 个用例也要 10.1 秒
+    2. 收集 tests/unit 需要 32.5 秒，全量收集 38.8 秒
+    3. 加管道后这段时间终端完全空白
+*   **根因**:
+    1. Select-Object -Last 必须消费完整条管道才输出，pytest 的进度点被整体缓冲，期间终端空白（看起来卡的直接原因）
+    2. core.services.data_ops.bert_runtime_mixin 模块级导入 transformers(AutoTokenizer) 与 onnxruntime，-X importtime 实测该模块累计 7.6 秒，级联 torch / sklearn
+    3. -n 4 的每个 xdist worker 都重复导入这条链，worker 启动期的 bringing up nodes 同样无输出
+    4. 未安装 pytest-timeout，真死锁时没有上限
+*   **修复方案**:
+    1. bert_runtime_mixin._initialize() 内延迟导入 AutoTokenizer 与 onnxruntime，模块级只留 numpy
+    2. 看进度不要用会缓冲整条管道的 Select-Object -Last；需要截取就先重定向到文件再读
+    3. 子集排查用 -n 0；全量用 -n 4，不要 -n auto
+*   **验证**:
+    1. `pytest tests/unit --collect-only -q -n 0：32.5s → 18.0s`
+    2. `pytest --collect-only -q -n 0：38.8s → 19.3s`
+    3. `导入 bert_analyzer 后 sys.modules 不含 transformers / torch / onnxruntime / sklearn`
+    4. `CI 同款全量：65.7s → 58.2s，6129 passed`
+    5. `data_ops 相关单测 182 passed`
+
+### 10.143 test_cross_platform_paths 在 Windows 本地必挂（缺平台 skipif），另有 2 项存量失败 (2026-10-23)
+*   **问题描述**: 跑 core-ci 同款全量 pytest（6185 passed / 10 failed）。分诊结论：10 个失败全部与当次改动（主人卡 self-view）无关。(1) tests/unit/test_cross_platform_paths.py 7 个失败：该文件 docstring 明说断言按 POSIX 语义设计（Windows 上无需模拟），但没有加 skipif(os.name == 'nt')，在 Windows 本地跑必挂（D:\projects\study 被原生 Path 判定为绝对路径第一关原样返回，不会镜像到 ~/Study）；CI 在 Linux 上跑所以一直绿。(2) tests/character_daily/test_read_no_reply.py::test_evaluate_state_idle_short_delay_disabled：同日工作区有并行任务改动 config/character_daily_config.py，属他人改动范围。(3) tests/unit/test_empty_responses.py::test_local_llm_adapter_skip_preload_when_cpp_llm_enabled 与 tests/unit/test_study_daily_library_version.py::test_library_note_path_traversal_is_rejected：与本次改动零交集的存量失败。
+*   **根因**:
+    1. test_cross_platform_paths 的失败不是环境损坏而是测试自身缺陷：按平台语义应跳过的用例没有打平台标记，导致 Windows 本地全量 pytest 永远有 7 个假红灯，干扰分诊（每次都要重新确认不是新问题）
+*   **修复方案**:
+    1. 本次不顺手改（范围外），先登记
+    2. 建议：给 test_cross_platform_paths.py 的 POSIX 专属断言用例加 skipif(os.name == 'nt') 标记
+    3. test_read_no_reply 由 character_daily 配置改动方验证；test_empty_responses 与 test_study_daily_library_version 待按「先单跑再读断言」流程另行分诊修复
+*   **验证**:
+    1. `git diff 证明 data_paths.py 仅新增 get_user_self_views_dir/get_user_self_view_path 两个函数，未触碰 resolve_cross_platform_path`
+    2. `单跑 test_cross_platform_paths.py 复现 7 failed，与全量结果一致`

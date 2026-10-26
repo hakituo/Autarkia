@@ -38,6 +38,7 @@ UPDATES = "scripts/doc_records/split_updates_to_daily.py"
 COMMIT = "scripts/git/auto_commit_push.py"
 DEPLOY = "scripts/deploy/deploy_linux.sh"
 BACKUP = "scripts/backup/auto_backup.py"
+LIBS_SYNC = "scripts/sync/libs_sync.py"
 
 
 def interpreter() -> str:
@@ -124,6 +125,10 @@ def cmd_backup(_args, extra) -> int:
     return run_py(BACKUP, extra)
 
 
+def cmd_libs(_args, extra) -> int:
+    return run_py(LIBS_SYNC, extra)
+
+
 HANDLERS = {
     "status": cmd_status,
     "log": cmd_log,
@@ -132,6 +137,7 @@ HANDLERS = {
     "commit": cmd_commit,
     "deploy": cmd_deploy,
     "backup": cmd_backup,
+    "libs": cmd_libs,
 }
 
 
@@ -163,6 +169,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser(
         "backup", help="运行时数据按月快照备份，参数透传给 auto_backup.py", add_help=False
+    )
+
+    sub.add_parser(
+        "libs", help="组件库同步，参数透传给 libs_sync.py", add_help=False
     )
 
     return parser

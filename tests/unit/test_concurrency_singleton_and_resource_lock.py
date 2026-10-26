@@ -212,9 +212,7 @@ class _AsyncioProxy:
 def lock(monkeypatch):
     """构造状态可控的 GlobalResourceLock 实例；类级单例由 monkeypatch 自动还原。"""
     monkeypatch.setattr(resource_lock.GlobalResourceLock, "_instance", None)
-    monkeypatch.setattr(
-        resource_lock.GlobalResourceLock, "_load_settings", lambda self: None
-    )
+    monkeypatch.setattr(resource_lock.GlobalResourceLock, "_load_settings", lambda self: None)
     instance = resource_lock.GlobalResourceLock()
     instance._enabled = True
     instance._max_concurrent = 1
@@ -426,9 +424,7 @@ class TestAcquireTimeout:
     @pytest.mark.asyncio
     async def test_timeout_raises_runtime_error_and_resets_counters(self, lock, monkeypatch):
         # 用代理让 wait_for 确定性地抛超时，不依赖真实时间流逝
-        monkeypatch.setattr(
-            resource_lock, "asyncio", _AsyncioProxy(asyncio, raise_timeout=True)
-        )
+        monkeypatch.setattr(resource_lock, "asyncio", _AsyncioProxy(asyncio, raise_timeout=True))
 
         with pytest.raises(RuntimeError, match="等待 GPU 资源超时"):
             async with lock.acquire("r"):

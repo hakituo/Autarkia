@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Autarkia · LLM 用量看板</title>
+<link rel="stylesheet" href="/static/token_stats/css/base.css" />
+<link rel="stylesheet" href="/static/token_stats/css/layout.css" />
+<link rel="stylesheet" href="/static/token_stats/css/components.css" />
+<link rel="stylesheet" href="/static/token_stats/css/breathing.css" />
+</head>
+<body>
+<div class="breathing" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
+<header>
+  <div class="brand">
+    <strong>Autarkia</strong>
+    <span>LLM 用量看板</span>
+  </div>
+  <div class="head-actions">
+    <span class="status" id="status">加载中…</span>
+    <button id="refresh" class="primary">刷新</button>
+    <button id="token-toggle" class="ghost" title="跨机访问需要填写访问令牌">访问令牌</button>
+  </div>
+</header>
+
+<main>
+  <div id="token-bar" class="card filters" style="display:none; margin-bottom:14px">
+    <div class="filter-grid">
+      <div class="field">
+        <label>访问令牌（本机留空即可，仅存浏览器 localStorage）</label>
+        <input id="token" type="password" placeholder="Bearer token" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button id="token-save">保存并刷新</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="card filters">
+    <div class="presets" id="presets">
+      <button data-preset="today">今天</button>
+      <button data-preset="7d">近 7 天</button>
+      <button data-preset="30d" class="active">近 30 天</button>
+      <button data-preset="month">本月</button>
+      <button data-preset="all">全部</button>
+    </div>
+    <div class="filter-grid">
+      <div class="field">
+        <label>开始日期</label>
+        <button id="start" type="button" class="date-btn">
+          <span class="date-btn-text">不限</span>
+          <svg class="date-btn-icon" viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="2.2" y="3.6" width="11.6" height="10" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+            <path d="M2.2 6.6h11.6M5.4 2v3.2M10.6 2v3.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="field">
+        <label>结束日期</label>
+        <button id="end" type="button" class="date-btn">
+          <span class="date-btn-text">不限</span>
+          <svg class="date-btn-icon" viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="2.2" y="3.6" width="11.6" height="10" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+            <path d="M2.2 6.6h11.6M5.4 2v3.2M10.6 2v3.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="field">
+        <label>时间粒度</label>
+        <div class="seg" id="granularity">
+          <button data-value="day" class="active">按日</button>
+          <button data-value="month">按月</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>模型</label>
+        <select id="model"><option value="">全部模型</option></select>
+      </div>
+      <div class="field">
+        <label>Provider</label>
+        <select id="provider"><option value="">全部</option></select>
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <div style="display:flex; gap:8px">
+          <button id="apply" class="primary" style="flex:1">应用筛选</button>
+          <button id="reset" class="ghost">重置</button>
+        </div>
+      </div>
+    </div>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="h2-text">成本构成</span> <span class="hint" id="cost-hint"></span></h2>
+        <span class="hint">按价目表实时折算</span>
+      </div>
+      <div class="cost-total">
+        <span class="amt" id="cost-amount">—</span>
+        <span class="sub" id="cost-sub"></span>
+      </div>
+      <div class="cost-bar" id="cost-bar"></div>
+      <div class="cost-list" id="cost-list"></div>
+      <div class="cover">
+        <span>计价覆盖</span>
+        <span class="cover-bar"><i id="cover-fill"></i></span>
+        <span id="cover-text">—</span>
+      </div>
+      <div class="note" id="cost-note"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="h2-text">价目表</span> <span class="hint" id="pricing-hint"></span></h2>
+        <div class="card-actions">
+          <button id="sync-pricing" class="mini" title="忽略缓存，立刻重抓全部启用的价格来源">同步价格</button>
+        </div>
+      </div>
+      <div class="src-list" id="src-list"></div>
+      <div class="card-head">
+        <h2><span class="h2-text">在用模型价格</span> <span class="hint" id="model-price-hint"></span></h2>
+      </div>
+      <div class="price-list" id="model-price-list"></div>
+      <details class="sub-menu">
+        <summary>无价与待补价 <span class="hint" id="gap-hint"></span></summary>
+        <div class="gap-list" id="gap-list"></div>
+      </details>
+    </div>
+  </section>
+
+  <section class="card chart-card">
+    <div class="card-head">
+      <h2><span class="h2-text">用量趋势</span> <span class="hint" id="chart-hint"></span></h2>
+      <div class="card-actions">
+        <label class="legend" style="cursor:pointer">
+          <input type="checkbox" id="show-rate" style="accent-color:#4c9aff" />
+          叠加命中率曲线
+        </label>
+        <label class="legend" style="cursor:pointer">
+          <input type="checkbox" id="show-cost" style="accent-color:#f2ce77" />
+          叠加成本曲线
+        </label>
+        <div class="legend">
+          <span><i style="background: var(--hit)"></i>缓存命中</span>
+          <span><i style="background: var(--miss)"></i>缓存未命中</span>
+          <span><i style="background: var(--out)"></i>输出</span>
+        </div>
+      </div>
+    </div>
+    <div class="chart-wrap" id="chart-wrap"><div id="chart"></div></div>
+    <div class="note" id="chart-note"></div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="h2-text">API 请求次数</span> <span class="hint" id="req-hint"></span></h2>
+        <span class="hint">悬停查看单桶明细，点击下钻</span>
+      </div>
+      <div class="stat-strip" id="req-stats"></div>
+      <div class="chart-wrap" id="req-chart-wrap"><div id="req-chart"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="h2-text">请求来源排行</span></h2>
+        <span class="hint">按调用次数排序</span>
+      </div>
+      <div class="rank-list" id="req-sources"></div>
+      <div class="note" id="req-note"></div>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card">
+      <div class="card-head"><h2><span class="h2-text">按模型</span></h2><span class="hint">点击表头排序</span></div>
+      <div class="table-scroll"><table id="table-model"></table></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2><span class="h2-text">按调用来源</span></h2><span class="hint">Top 30</span></div>
+      <div class="table-scroll"><table id="table-source"></table></div>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card">
+      <div class="card-head"><h2><span class="h2-text">按 Provider</span></h2></div>
+      <div class="table-scroll"><table id="table-provider"></table></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2><span class="h2-text">按 Key</span></h2></div>
+      <div class="table-scroll"><table id="table-key"></table></div>
+    </div>
+  </section>
+
+  <section class="card card-block">
+    <div class="card-head">
+      <h2><span class="h2-text">按采购渠道</span></h2>
+      <span class="hint">同一模型走不同渠道价格不同：带斜杠的是网关，direct 是直连官方</span>
+    </div>
+    <div class="table-scroll"><table id="table-channel"></table></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2><span class="h2-text">时间明细</span> <span class="hint">最新在前</span></h2>
+      <div class="card-actions">
+        <div class="tabs" id="detail-limit">
+          <button data-limit="30" class="active">30 条</button>
+          <button data-limit="60">60 条</button>
+          <button data-limit="0">全部</button>
+        </div>
+        <button id="export" class="mini">导出 CSV</button>
+      </div>
+    </div>
+    <div class="table-scroll"><table id="table-detail"></table></div>
+    <div class="note" id="coverage-note"></div>
+  </section>
+</main>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script type="module" src="/static/token_stats/js/main.js"></script>
+</body>
+</html>

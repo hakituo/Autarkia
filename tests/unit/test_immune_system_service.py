@@ -72,7 +72,7 @@ class _FakeLifecycle:
             "services": {
                 name: {"initialized": initialized}
                 for name, initialized in self._services_initialized.items()
-            }
+            },
         }
 
     async def restart_service(self, name):
@@ -99,26 +99,20 @@ def _patch_runtime_dependencies(monkeypatch, *, monitor=None, scheduler=None):
     只在来源模块上打桩才会生效；直接改 immune.service 的属性既无效也会因为
     该模块没有同名符号而抛 AttributeError。
     """
-    resource_monitor_mod = importlib.import_module(
-        "core.services.monitoring.resource_monitor"
-    )
-    task_scheduler_mod = importlib.import_module(
-        "core.services.scheduler.task.task_scheduler"
-    )
+    resource_monitor_mod = importlib.import_module("core.services.monitoring.resource_monitor")
+    task_scheduler_mod = importlib.import_module("core.services.scheduler.task.task_scheduler")
 
     fake_monitor = monitor if monitor is not None else _FakeResourceMonitor()
     fake_scheduler = scheduler if scheduler is not None else _FakeScheduler()
 
-    monkeypatch.setattr(
-        resource_monitor_mod, "get_resource_monitor", lambda: fake_monitor
-    )
-    monkeypatch.setattr(
-        task_scheduler_mod, "get_global_scheduler", lambda: fake_scheduler
-    )
+    monkeypatch.setattr(resource_monitor_mod, "get_resource_monitor", lambda: fake_monitor)
+    monkeypatch.setattr(task_scheduler_mod, "get_global_scheduler", lambda: fake_scheduler)
     return fake_monitor, fake_scheduler
 
 
-def _make_service(monkeypatch, settings=None, lifecycle=None, health_checker=None, performance_monitor=None):
+def _make_service(
+    monkeypatch, settings=None, lifecycle=None, health_checker=None, performance_monitor=None
+):
     import core.services.immune.service as immune_mod
 
     _patch_runtime_dependencies(monkeypatch)
@@ -157,9 +151,7 @@ def test_self_heal_skips_until_lifecycle_initialized(monkeypatch):
     service = _make_service(
         monkeypatch,
         lifecycle=lifecycle,
-        health_checker=_FakeHealthChecker(
-            {"active_care_service": {"status": "unhealthy"}}
-        ),
+        health_checker=_FakeHealthChecker({"active_care_service": {"status": "unhealthy"}}),
     )
 
     asyncio.run(service._tick())
@@ -171,9 +163,7 @@ def test_self_heal_skips_during_lifecycle_shutdown(monkeypatch):
     service = _make_service(
         monkeypatch,
         lifecycle=lifecycle,
-        health_checker=_FakeHealthChecker(
-            {"active_care_service": {"status": "unhealthy"}}
-        ),
+        health_checker=_FakeHealthChecker({"active_care_service": {"status": "unhealthy"}}),
     )
 
     asyncio.run(service._tick())

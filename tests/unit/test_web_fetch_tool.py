@@ -43,8 +43,10 @@ async def test_run_formats_and_truncates():
         final_url="https://x.com/",
         content_type="text/html",
     )
-    with patch.object(WebFetchTool, "_assert_public_host", AsyncMock()), \
-         patch.object(WebFetchTool, "_fetch", AsyncMock(return_value=result)):
+    with (
+        patch.object(WebFetchTool, "_assert_public_host", AsyncMock()),
+        patch.object(WebFetchTool, "_fetch", AsyncMock(return_value=result)),
+    ):
         out = await tool._run("https://x.com", max_chars=500)
 
     assert out.startswith("Title: 标题")
@@ -66,8 +68,10 @@ async def test_run_rejects_private_host():
 async def test_run_timeout_returns_error():
     """超时返回可读错误，不抛异常。"""
     tool = WebFetchTool()
-    with patch.object(WebFetchTool, "_assert_public_host", AsyncMock()), \
-         patch.object(WebFetchTool, "_fetch", AsyncMock(side_effect=asyncio.TimeoutError)):
+    with (
+        patch.object(WebFetchTool, "_assert_public_host", AsyncMock()),
+        patch.object(WebFetchTool, "_fetch", AsyncMock(side_effect=asyncio.TimeoutError)),
+    ):
         out = await tool._run("https://x.com")
     assert "超时" in out
 
@@ -77,7 +81,9 @@ async def test_run_empty_body_returns_error():
     """页面没有正文时明确提示，避免模型编内容。"""
     tool = WebFetchTool()
     result = FetchResult(title="", text="   ", final_url="https://x.com/", content_type="text/html")
-    with patch.object(WebFetchTool, "_assert_public_host", AsyncMock()), \
-         patch.object(WebFetchTool, "_fetch", AsyncMock(return_value=result)):
+    with (
+        patch.object(WebFetchTool, "_assert_public_host", AsyncMock()),
+        patch.object(WebFetchTool, "_fetch", AsyncMock(return_value=result)),
+    ):
         out = await tool._run("https://x.com")
     assert "没有可读正文" in out

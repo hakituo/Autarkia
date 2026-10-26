@@ -1,19 +1,24 @@
 package com.aveline.ai.mobile.presentation.health
 
+import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.aveline.ai.mobile.domain.models.BatteryStatus
-import com.aveline.ai.mobile.domain.models.DeviceContext
-import com.aveline.ai.mobile.domain.models.HealthData
-import com.aveline.ai.mobile.domain.models.NetworkType
 import com.aveline.ai.mobile.data.samsung.SamsungHealthReader
 import com.aveline.ai.mobile.data.samsung.SamsungHealthSnapshot
 import com.aveline.ai.mobile.data.samsung.toSyncJson
 import com.aveline.ai.mobile.data.wear.WearDataSource
+import com.aveline.ai.mobile.domain.models.BatteryStatus
+import com.aveline.ai.mobile.domain.models.HealthData
+import com.aveline.ai.mobile.domain.models.NetworkType
 import com.aveline.ai.mobile.domain.repository.ContextRepository
 import com.aveline.ai.mobile.domain.repository.HealthRepository
+import com.aveline.ai.mobile.presentation.health.daily.DailyDataUiState
+import com.aveline.ai.mobile.presentation.health.daily.DailyTab
+import com.aveline.ai.mobile.presentation.health.daily.loadAiNutritionEntries
+import com.aveline.ai.mobile.presentation.health.daily.mergeInto
+import com.aveline.ai.mobile.presentation.health.daily.parseDailyPortrait
+import com.aveline.ai.mobile.presentation.health.daily.string
 import com.aveline.ai.mobile.services.health.StartupHealthSyncManager
-import android.app.Activity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import javax.inject.Inject
@@ -22,142 +27,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-enum class DailyTab {
-    PORTRAIT,
-    SCHEDULE,
-    FILES,
-}
-
-data class DailyRecentFile(
-    val path: String,
-    val name: String,
-    val size: Int?,
-    val mtime: Int?,
-    val ext: String?,
-)
-
-data class DailyStudySession(
-    val topic: String,
-    val content: String,
-    val time: String,
-)
-
-data class DailyMeal(
-    val type: String,
-    val content: String,
-    val time: String,
-)
-
-data class DailyDataUiState(
-    val activeTab: DailyTab = DailyTab.PORTRAIT,
-    val isLoading: Boolean = false,
-    val error: String? = null,
-    val message: String? = null,
-    val lastRefreshTime: Long = 0L,
-    val portraitDate: String = "",
-    val wakeup: String? = null,
-    val sleep: String? = null,
-    val drinkTotalMl: Int = 0,
-    val drinkCount: Int = 0,
-    val studyTotalMinutes: Int = 0,
-    val studyCount: Int = 0,
-    val studySessions: List<DailyStudySession> = emptyList(),
-    val meals: List<DailyMeal> = emptyList(),
-    val reducedModeActive: Boolean = false,
-    val reducedModeReason: String = "",
-    val reducedModeExpectedEndTs: Long? = null,
-    val weightKg: Double? = null,
-    val recentFiles: List<DailyRecentFile> = emptyList(),
-    // 健康数据 (由 Samsung Health + 手表实时数据填充)
-    val steps: Long? = null,
-    val heartRate: Int? = null,
-    val heartRateTimestamp: Long? = null,
-    val healthWeightKg: Double? = null,
-    val heightM: Double? = null,
-    val bodyFatPercent: Double? = null,
-    val skeletalMusclePercent: Double? = null,
-    // 身体成分扩展字段(kg)
-    val muscleMass: Double? = null,
-    val bodyFatMass: Double? = null,
-    val fatFreeMass: Double? = null,
-    val skeletalMuscleMass: Double? = null,
-    val totalBodyWater: Double? = null,
-    val sleepMinutes: Long? = null,
-    val sleepStartTime: Long? = null,
-    val sleepEndTime: Long? = null,
-    // 睡眠阶段时长(分钟), null 表示该阶段无记录
-    val sleepStageAwakeMinutes: Long? = null,
-    val sleepStageLightMinutes: Long? = null,
-    val sleepStageDeepMinutes: Long? = null,
-    val sleepStageRemMinutes: Long? = null,
-    // 睡眠得分 (0-100)
-    val sleepScore: Int? = null,
-    val bloodPressureSystolic: Double? = null,
-    val bloodPressureDiastolic: Double? = null,
-    val bodyTemperature: Double? = null,
-    val bloodGlucose: Double? = null,
-    // Samsung Health 扩展数据
-    val skinTemperature: Double? = null,
-    val bloodOxygen: Double? = null,
-    val floorsClimbed: Double? = null,
-    val waterIntakeMl: Double? = null,
-    val nutritionCalories: Double? = null,
-    val nutritionProtein: Double? = null,
-    val nutritionCarbs: Double? = null,
-    val nutritionFat: Double? = null,
-    val nutritionSaturatedFat: Double? = null,
-    val nutritionTransFat: Double? = null,
-    val nutritionDietaryFiber: Double? = null,
-    val nutritionSugar: Double? = null,
-    val nutritionCholesterol: Double? = null,
-    val nutritionSodium: Double? = null,
-    val nutritionPotassium: Double? = null,
-    val nutritionVitaminA: Double? = null,
-    val nutritionVitaminC: Double? = null,
-    val nutritionCalcium: Double? = null,
-    val nutritionIron: Double? = null,
-    val exerciseSessions: List<com.aveline.ai.mobile.data.samsung.ExerciseSnapshot> = emptyList(),
-    // 今日逐条饮食记录(来自 Samsung Health 营养数据: 食物名/餐次/热量)
-    val nutritionEntries: List<com.aveline.ai.mobile.data.samsung.NutritionEntry> = emptyList(),
-    // 今日逐条饮水记录(来自 Samsung Health: 时间+量)
-    val waterIntakeEntries: List<com.aveline.ai.mobile.data.samsung.WaterIntakeEntry> = emptyList(),
-    val sleepApneaSign: String? = null,
-    val irregularHeartRhythmStatus: String? = null,
-    val energyScore: Double? = null,
-    val stepsToday: Long? = null,
-    val activeCaloriesBurned: Double? = null,
-    val totalCaloriesBurned: Double? = null,
-    val activeTimeMinutes: Long? = null,
-    val totalDistanceKm: Double? = null,
-    val sleepGoalBedTime: String? = null,
-    val sleepGoalWakeTime: String? = null,
-    val stepsGoal: Int? = null,
-    val activeCaloriesGoal: Int? = null,
-    val activeTimeGoalMinutes: Long? = null,
-    val waterIntakeGoalMl: Double? = null,
-    val nutritionGoalCalories: Double? = null,
-    // 设备上下文 (电池/网络/亮度/音量) - 来自 ContextRepository, 不需要特殊权限
-    val batteryLevel: Int? = null,
-    val isCharging: Boolean = false,
-    val batteryStatus: BatteryStatus = BatteryStatus.UNKNOWN,
-    val networkType: NetworkType = NetworkType.UNKNOWN,
-    val screenBrightness: Int? = null,
-    val volumeLevel: Int? = null
-)
-
+/**
+ * Life（生活）页的数据源。
+ *
+ * 三星健康这条链路的关键点：**启动同步读到的快照必须被 Life 页复用**。
+ * 以前启动同步读完就把快照丢掉，Life 页只能自己再读一遍全量 SDK（几十个查询，
+ * 要好几秒），用户看到的"生活页面卡几秒"就是这么来的。
+ * 现在快照留在 [StartupHealthSyncManager.cache] 里，本 ViewModel 订阅它，
+ * 进页面即可直接渲染；只有数据确实过期时才重新读 SDK。
+ */
 @HiltViewModel
 class DailyDataViewModel @Inject constructor(
     private val healthRepository: HealthRepository,
@@ -180,7 +61,25 @@ class DailyDataViewModel @Inject constructor(
 
     init {
         collectWearHealthData()
+        observeStartupHealthCache()
         refreshData()
+    }
+
+    /**
+     * 订阅启动同步产出的快照。
+     *
+     * 启动同步在后台跑，Life 页可能在它完成之前就被打开；
+     * 订阅之后快照一到就直接渲染，不必等用户手动刷新，也不必再读一次 SDK。
+     */
+    private fun observeStartupHealthCache() {
+        viewModelScope.launch {
+            startupHealthSyncManager.cache.collect { cache ->
+                if (cache == null) return@collect
+                applySnapshot(cache.snapshot, cache.readAt)
+                // 启动同步已经上报过就别再报一次；上报失败的那份需要补报。
+                if (!cache.reported) syncSamsungHealthToBackend(cache.snapshot)
+            }
+        }
     }
 
     /**
@@ -265,152 +164,97 @@ class DailyDataViewModel @Inject constructor(
      * 数据流: Samsung Health (手机应用) → SamsungHealthReader → UI + 后端
      *
      * @param activity 用于显示 Samsung Health 权限请求 UI 的 Activity
-     * @param force 手动刷新时传 true，跳过 30 秒节流
+     * @param force 手动刷新时传 true，跳过节流与缓存复用
      */
     fun syncFromSamsungHealth(activity: Activity, force: Boolean = false) {
-        // 自动触发（进页/回前台/定时）不需要每次都读 SDK：
-        // App 启动同步刚跑过时，30 秒内直接复用已有数据，手动刷新不受限制。
-        if (!force && System.currentTimeMillis() - _uiState.value.lastRefreshTime < MIN_SYNC_INTERVAL_MS) {
-            return
-        }
         // 防重入: 正在同步时跳过(定时器可能在同步进行中触发)。
         // 用独立标志而非 isLoading, 避免与 refreshData() 互相阻塞。
         if (isSyncingSamsungHealth) return
         isSyncingSamsungHealth = true
         viewModelScope.launch {
-            // 自动同步不再往 Life 页塞过程提示（"正在同步..."）：页面上已没有手动刷新入口，
-            // 过程提示只会让「今日健康」等栏目上下跳动。
-            _uiState.update {
-                it.copy(
-                    isLoading = true,
-                    message = null,
-                    error = null
-                )
-            }
+            try {
+                // 步骤 1: 能复用就不读 SDK。
+                // 1a) 启动同步还在跑 → 等它跑完，直接用它的结果（并发读 SDK 只会更慢）。
+                if (!force && startupHealthSyncManager.isSyncing) {
+                    val pending = startupHealthSyncManager.awaitStartupSync(STARTUP_SYNC_WAIT_MS)
+                    if (pending != null) {
+                        applySnapshot(pending.snapshot, pending.readAt)
+                        return@launch
+                    }
+                }
+                // 1b) 已有新鲜快照 → 直接渲染，不读 SDK、不重复上报。
+                if (!force) {
+                    val cache = startupHealthSyncManager.cache.value
+                    if (cache != null &&
+                        System.currentTimeMillis() - cache.readAt < MIN_SYNC_INTERVAL_MS
+                    ) {
+                        applySnapshot(cache.snapshot, cache.readAt)
+                        return@launch
+                    }
+                    // 状态里已经有刚同步过的数据（快照已被别处消费掉）时也不用再读。
+                    val lastRefresh = _uiState.value.lastRefreshTime
+                    if (lastRefresh > 0L &&
+                        System.currentTimeMillis() - lastRefresh < MIN_SYNC_INTERVAL_MS
+                    ) {
+                        return@launch
+                    }
+                }
 
-            // 步骤 1: 请求权限
-            val granted = runCatching {
-                samsungHealthReader.ensurePermissions(activity)
-            }.getOrDefault(false)
-
-            if (!granted) {
-                isSyncingSamsungHealth = false
+                // 自动同步不再往 Life 页塞过程提示（"正在同步..."）：页面上已没有手动刷新入口，
+                // 过程提示只会让「今日健康」等栏目上下跳动。
                 _uiState.update {
                     it.copy(
-                        isLoading = false,
-                        message = "需要授权才能读取三星健康数据,请在 Samsung Health 中开启权限"
+                        isLoading = true,
+                        message = null,
+                        error = null
                     )
                 }
-                return@launch
-            }
 
-            // 步骤 2: 读取数据（与 App 启动同步共用一把锁，避免并发读 SDK）
-            val snapshot = runCatching {
-                startupHealthSyncManager.withSamsungLock { samsungHealthReader.readAll() }
-            }.getOrElse { e ->
+                // 步骤 2: 请求权限（已授权时不再在主线程逐项查权限）
+                val granted = runCatching {
+                    samsungHealthReader.ensurePermissions(activity)
+                }.getOrDefault(false)
+
+                if (!granted) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            message = "需要授权才能读取三星健康数据,请在 Samsung Health 中开启权限"
+                        )
+                    }
+                    return@launch
+                }
+
+                // 步骤 3: 读取数据（与 App 启动同步共用一把锁，避免并发读 SDK）
+                val snapshot = runCatching {
+                    startupHealthSyncManager.withSamsungLock { samsungHealthReader.readAll() }
+                }.getOrElse { e ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = "读取数据失败: ${e.message}"
+                        )
+                    }
+                    return@launch
+                }
+
+                // 步骤 4: 更新 UI 状态
+                applySnapshot(snapshot, System.currentTimeMillis())
+                _uiState.update { it.copy(isLoading = false) }
+
+                // 步骤 5: 同步到后端（这份数据是本次新读的，必须上报）
+                syncSamsungHealthToBackend(snapshot)
+                startupHealthSyncManager.markSynced(snapshot)
+            } finally {
                 isSyncingSamsungHealth = false
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = "读取数据失败: ${e.message}"
-                    )
-                }
-                return@launch
             }
+        }
+    }
 
-            // 步骤 3: 更新 UI 状态
-            _uiState.update {
-                it.copy(
-                    // 步数优先用 Samsung Health 聚合值(与"今日活动"区块一致),
-                    // 聚合值为空时回退到手表实时值
-                    steps = snapshot.stepsToday?.takeIf { it > 0 } ?: it.steps,
-                    heartRate = snapshot.heartRate ?: it.heartRate,
-                    heartRateTimestamp = snapshot.heartRateTimestamp?.toEpochMilli()
-                        ?: it.heartRateTimestamp,
-                    sleepMinutes = snapshot.sleepMinutes ?: it.sleepMinutes,
-                    sleepStartTime = snapshot.sleepStartTime?.toEpochMilli()
-                        ?: it.sleepStartTime,
-                    sleepEndTime = snapshot.sleepEndTime?.toEpochMilli()
-                        ?: it.sleepEndTime,
-                    // 睡眠阶段时长
-                    sleepStageAwakeMinutes = snapshot.sleepStageMinutes?.awake ?: it.sleepStageAwakeMinutes,
-                    sleepStageLightMinutes = snapshot.sleepStageMinutes?.light ?: it.sleepStageLightMinutes,
-                    sleepStageDeepMinutes = snapshot.sleepStageMinutes?.deep ?: it.sleepStageDeepMinutes,
-                    sleepStageRemMinutes = snapshot.sleepStageMinutes?.rem ?: it.sleepStageRemMinutes,
-                    // 睡眠得分
-                    sleepScore = snapshot.sleepScore ?: it.sleepScore,
-                    healthWeightKg = snapshot.weightKg?.toDouble() ?: it.healthWeightKg,
-                    heightM = snapshot.heightM?.toDouble() ?: it.heightM,
-                    bodyFatPercent = snapshot.bodyFatPercent?.toDouble() ?: it.bodyFatPercent,
-                    skeletalMusclePercent = snapshot.skeletalMusclePercent?.toDouble() ?: it.skeletalMusclePercent,
-                    // 身体成分扩展字段
-                    muscleMass = snapshot.muscleMass?.toDouble() ?: it.muscleMass,
-                    bodyFatMass = snapshot.bodyFatMass?.toDouble() ?: it.bodyFatMass,
-                    fatFreeMass = snapshot.fatFreeMass?.toDouble() ?: it.fatFreeMass,
-                    skeletalMuscleMass = snapshot.skeletalMuscleMass?.toDouble() ?: it.skeletalMuscleMass,
-                    totalBodyWater = snapshot.totalBodyWater?.toDouble() ?: it.totalBodyWater,
-                    bloodPressureSystolic = snapshot.systolic?.toDouble()
-                        ?: it.bloodPressureSystolic,
-                    bloodPressureDiastolic = snapshot.diastolic?.toDouble()
-                        ?: it.bloodPressureDiastolic,
-                    bodyTemperature = snapshot.bodyTemperature?.toDouble()
-                        ?: it.bodyTemperature,
-                    bloodGlucose = snapshot.bloodGlucose?.toDouble() ?: it.bloodGlucose,
-                    // 扩展字段
-                    skinTemperature = snapshot.skinTemperature?.toDouble() ?: it.skinTemperature,
-                    bloodOxygen = snapshot.bloodOxygen?.toDouble() ?: it.bloodOxygen,
-                    floorsClimbed = snapshot.floorsClimbed?.toDouble() ?: it.floorsClimbed,
-                    waterIntakeMl = snapshot.waterIntakeMl?.toDouble() ?: it.waterIntakeMl,
-                    nutritionCalories = snapshot.nutritionCalories?.toDouble() ?: it.nutritionCalories,
-                    nutritionProtein = snapshot.nutritionProtein?.toDouble() ?: it.nutritionProtein,
-                    nutritionCarbs = snapshot.nutritionCarbs?.toDouble() ?: it.nutritionCarbs,
-                    nutritionFat = snapshot.nutritionFat?.toDouble() ?: it.nutritionFat,
-                    nutritionSaturatedFat = snapshot.nutritionSaturatedFat?.toDouble() ?: it.nutritionSaturatedFat,
-                    nutritionTransFat = snapshot.nutritionTransFat?.toDouble() ?: it.nutritionTransFat,
-                    nutritionDietaryFiber = snapshot.nutritionDietaryFiber?.toDouble() ?: it.nutritionDietaryFiber,
-                    nutritionSugar = snapshot.nutritionSugar?.toDouble() ?: it.nutritionSugar,
-                    nutritionCholesterol = snapshot.nutritionCholesterol?.toDouble() ?: it.nutritionCholesterol,
-                    nutritionSodium = snapshot.nutritionSodium?.toDouble() ?: it.nutritionSodium,
-                    nutritionPotassium = snapshot.nutritionPotassium?.toDouble() ?: it.nutritionPotassium,
-                    nutritionVitaminA = snapshot.nutritionVitaminA?.toDouble() ?: it.nutritionVitaminA,
-                    nutritionVitaminC = snapshot.nutritionVitaminC?.toDouble() ?: it.nutritionVitaminC,
-                    nutritionCalcium = snapshot.nutritionCalcium?.toDouble() ?: it.nutritionCalcium,
-                    nutritionIron = snapshot.nutritionIron?.toDouble() ?: it.nutritionIron,
-                    exerciseSessions = snapshot.exerciseSessions,
-                    nutritionEntries = snapshot.nutritionEntries + it.nutritionEntries.filter {
-                        entry -> entry.source.startsWith("ai_photo")
-                    },
-                    waterIntakeEntries = snapshot.waterIntakeEntries,
-                    sleepApneaSign = snapshot.sleepApneaSign ?: it.sleepApneaSign,
-                    irregularHeartRhythmStatus = snapshot.irregularHeartRhythmStatus
-                        ?: it.irregularHeartRhythmStatus,
-                    energyScore = snapshot.energyScore?.toDouble() ?: it.energyScore,
-                    stepsToday = snapshot.stepsToday ?: it.stepsToday,
-                    activeCaloriesBurned = snapshot.activeCaloriesBurned?.toDouble()
-                        ?: it.activeCaloriesBurned,
-                    totalCaloriesBurned = snapshot.totalCaloriesBurned?.toDouble()
-                        ?: it.totalCaloriesBurned,
-                    activeTimeMinutes = snapshot.activeTimeMinutes ?: it.activeTimeMinutes,
-                    totalDistanceKm = snapshot.totalDistanceKm?.toDouble() ?: it.totalDistanceKm,
-                    sleepGoalBedTime = snapshot.sleepGoalBedTime?.toString() ?: it.sleepGoalBedTime,
-                    sleepGoalWakeTime = snapshot.sleepGoalWakeTime?.toString() ?: it.sleepGoalWakeTime,
-                    stepsGoal = snapshot.stepsGoal ?: it.stepsGoal,
-                    activeCaloriesGoal = snapshot.activeCaloriesGoal ?: it.activeCaloriesGoal,
-                    activeTimeGoalMinutes = snapshot.activeTimeGoalMinutes ?: it.activeTimeGoalMinutes,
-                    waterIntakeGoalMl = snapshot.waterIntakeGoalMl?.toDouble() ?: it.waterIntakeGoalMl,
-                    nutritionGoalCalories = snapshot.nutritionGoalCalories?.toDouble()
-                        ?: it.nutritionGoalCalories,
-                    isLoading = false,
-                    // 同步成功不再提示：自动同步是常态，提示文字会把「今日健康」等栏目往下挤
-                    message = null,
-                    lastRefreshTime = System.currentTimeMillis()
-                )
-            }
-
-            // 步骤 4: 同步到后端
-            syncSamsungHealthToBackend(snapshot)
-            startupHealthSyncManager.markSynced()
-            isSyncingSamsungHealth = false
+    /** 把一份三星健康快照合并进 UI 状态。 */
+    private fun applySnapshot(snapshot: SamsungHealthSnapshot, readAt: Long) {
+        _uiState.update { state ->
+            snapshot.mergeInto(state).copy(lastRefreshTime = readAt)
         }
     }
 
@@ -426,48 +270,8 @@ class DailyDataViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadAiNutritionEntries(
-        date: String? = null
-    ): List<com.aveline.ai.mobile.data.samsung.NutritionEntry>? {
-        val response = healthRepository.getDailyNutrition(date).getOrNull() ?: return null
-        val entries = response["data"]?.jsonObject?.get("nutrition_entries")?.jsonArray
-            ?: return emptyList()
-        return entries.mapNotNull { item ->
-            val entry = runCatching { item.jsonObject }.getOrNull() ?: return@mapNotNull null
-            val source = entry.string("source")
-            if (!source.startsWith("ai_photo")) return@mapNotNull null
-            val startTime = runCatching { Instant.parse(entry.string("time")) }.getOrNull()
-                ?: return@mapNotNull null
-            com.aveline.ai.mobile.data.samsung.NutritionEntry(
-                title = entry.string("title").ifBlank { null },
-                mealType = entry.string("meal_type").ifBlank { null },
-                calories = entry.double("calories")?.toFloat(),
-                protein = entry.double("protein")?.toFloat(),
-                carbs = entry.double("carbs")?.toFloat(),
-                fat = entry.double("fat")?.toFloat(),
-                startTime = startTime,
-                saturatedFat = entry.double("saturated_fat")?.toFloat(),
-                transFat = entry.double("trans_fat")?.toFloat(),
-                monosaturatedFat = entry.double("monosaturated_fat")?.toFloat(),
-                polysaturatedFat = entry.double("polysaturated_fat")?.toFloat(),
-                dietaryFiber = entry.double("dietary_fiber")?.toFloat(),
-                sugar = entry.double("sugar")?.toFloat(),
-                cholesterol = entry.double("cholesterol")?.toFloat(),
-                sodium = entry.double("sodium")?.toFloat(),
-                potassium = entry.double("potassium")?.toFloat(),
-                vitaminA = entry.double("vitamin_a")?.toFloat(),
-                vitaminC = entry.double("vitamin_c")?.toFloat(),
-                calcium = entry.double("calcium")?.toFloat(),
-                iron = entry.double("iron")?.toFloat(),
-                source = source,
-                portion = entry.string("portion").ifBlank { null },
-                estimateConfidence = entry.string("estimate_confidence").ifBlank { null }
-            )
-        }
-    }
-
     private suspend fun refreshAiNutritionEntries() {
-        val aiEntries = loadAiNutritionEntries() ?: return
+        val aiEntries = loadAiNutritionEntries(healthRepository) ?: return
         _uiState.update { state ->
             state.copy(
                 nutritionEntries = state.nutritionEntries.filterNot {
@@ -488,67 +292,38 @@ class DailyDataViewModel @Inject constructor(
             runCatching {
                 val portrait = healthRepository.getDailyPortraitToday().getOrThrow()
                 val recent = healthRepository.getDailyRecent(limit = 12).getOrThrow()
-                val portraitData = portrait["portrait"]?.jsonObject ?: JsonObject(emptyMap())
-                val schedule = portraitData["schedule"]?.jsonObject
-                val drink = portraitData["drink"]?.jsonObject
-                val study = portraitData["study"]?.jsonObject
-                val mode = portraitData["mode"]?.jsonObject
-                val bodyMetrics = portraitData["body_metrics"]?.jsonObject
-                val sessions = study?.get("sessions")?.jsonArray.orEmptyArray().map { item ->
-                    val obj = item.jsonObject
-                    DailyStudySession(
-                        topic = obj.string("topic"),
-                        content = obj.string("content"),
-                        time = obj.string("time")
-                    )
-                }
-                val meals = portraitData["meals"]?.jsonArray.orEmptyArray().map { item ->
-                    val obj = item.jsonObject
-                    DailyMeal(
-                        type = obj.string("type"),
-                        content = obj.string("content"),
-                        time = obj.string("time")
-                    )
-                }
-                val files = recent["items"]?.jsonArray.orEmptyArray().map { item ->
-                    val obj = item.jsonObject
-                    DailyRecentFile(
-                        path = obj.string("path"),
-                        name = obj.string("name"),
-                        size = obj.int("size"),
-                        mtime = obj.int("mtime"),
-                        ext = obj.string("ext").ifBlank { null }
-                    )
-                }
+                val parsed = parseDailyPortrait(portrait, recent)
 
                 // 设备上下文: 电池/网络/亮度/音量 (本地系统 API, 不需要 HC 权限)
                 // 单独 try, 失败不阻断主流程 (设备上下文是次要信息)
                 val deviceCtx = runCatching { contextRepository.getDeviceContext() }.getOrNull()
-                val portraitDate = portrait.string("date")
-                val aiNutritionEntries = loadAiNutritionEntries(portraitDate.ifBlank { null })
+                val aiNutritionEntries = loadAiNutritionEntries(
+                    healthRepository,
+                    parsed.portraitDate.ifBlank { null }
+                )
 
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        portraitDate = portrait.string("date"),
-                        wakeup = schedule?.string("wakeup")?.ifBlank { null },
-                        sleep = schedule?.string("sleep")?.ifBlank { null },
-                        drinkTotalMl = drink?.int("total_ml") ?: 0,
-                        drinkCount = drink?.int("count") ?: 0,
-                        studyTotalMinutes = study?.int("total_minutes") ?: 0,
-                        studyCount = study?.int("count") ?: 0,
-                        studySessions = sessions,
-                        meals = meals,
+                        portraitDate = parsed.portraitDate,
+                        wakeup = parsed.wakeup,
+                        sleep = parsed.sleep,
+                        drinkTotalMl = parsed.drinkTotalMl,
+                        drinkCount = parsed.drinkCount,
+                        studyTotalMinutes = parsed.studyTotalMinutes,
+                        studyCount = parsed.studyCount,
+                        studySessions = parsed.studySessions,
+                        meals = parsed.meals,
                         nutritionEntries = aiNutritionEntries?.let { aiEntries ->
                             it.nutritionEntries.filterNot { entry ->
                                 entry.source.startsWith("ai_photo")
                             } + aiEntries
                         } ?: it.nutritionEntries,
-                        reducedModeActive = mode?.bool("reduced_mode_active") ?: false,
-                        reducedModeReason = mode?.string("reduced_mode_reason") ?: "",
-                        reducedModeExpectedEndTs = mode?.long("reduced_mode_expected_end_ts"),
-                        weightKg = bodyMetrics?.double("weight_kg"),
-                        recentFiles = files,
+                        reducedModeActive = parsed.reducedModeActive,
+                        reducedModeReason = parsed.reducedModeReason,
+                        reducedModeExpectedEndTs = parsed.reducedModeExpectedEndTs,
+                        weightKg = parsed.weightKg,
+                        recentFiles = parsed.recentFiles,
                         batteryLevel = deviceCtx?.batteryLevel,
                         isCharging = deviceCtx?.isCharging ?: false,
                         batteryStatus = deviceCtx?.batteryStatus ?: BatteryStatus.UNKNOWN,
@@ -556,7 +331,7 @@ class DailyDataViewModel @Inject constructor(
                         screenBrightness = deviceCtx?.screenBrightness,
                         volumeLevel = deviceCtx?.volumeLevel,
                         // 健康指标(心率/睡眠/体脂/身高/BMI 等)不再由 refreshData 触碰,
-                        // 全部由 syncFromSamsungHealth 填充并保留, 避免 HC 的 null 覆盖。
+                        // 全部由三星健康快照填充并保留, 避免 HC 的 null 覆盖。
                         // lastRefreshTime 也不在这里更新: 它只代表三星健康同步时间,
                         // 否则进 Life 页时会被误判成"刚同步过"而跳过。
                         error = null
@@ -576,7 +351,7 @@ class DailyDataViewModel @Inject constructor(
     /**
      * 记录喝水。
      *
-     * 修复 P0-9: 原实现按 units(250ml/单位) 上报,UI 的 200/300/500ml 按钮做 ml/250 转换时
+     * 修复 P0-9: 原实现按 units(250ml/单位)上报,UI 的 200/300/500ml 按钮做 ml/250 转换时
      * 200ml→0→coerceAtLeast(1)=1→后端记 250ml(多记 50ml),300ml→1→后端记 250ml(少记 50ml)。
      * 后端 /v1/context/drink 实际支持 amount_ml 字段(优先于 units),改为直接传毫升数,
      * 200ml→200ml, 300ml→300ml, 500ml→500ml,精确无误。
@@ -681,31 +456,7 @@ class DailyDataViewModel @Inject constructor(
     private companion object {
         /** 自动同步的最小间隔（毫秒） */
         private const val MIN_SYNC_INTERVAL_MS = 30_000L
+        /** 等启动同步结束的最长时间（毫秒）；超时后自己再读 SDK。 */
+        private const val STARTUP_SYNC_WAIT_MS = 15_000L
     }
 }
-
-private fun JsonObject.string(key: String): String {
-    return this[key]?.jsonPrimitive?.contentOrNull.orEmpty()
-}
-
-private fun JsonObject.int(key: String): Int? {
-    return this[key]?.jsonPrimitive?.intOrNull
-}
-
-private fun JsonObject.long(key: String): Long? {
-    return this[key]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
-}
-
-private fun JsonObject.double(key: String): Double? {
-    return this[key]?.jsonPrimitive?.doubleOrNull
-}
-
-private fun JsonObject.bool(key: String): Boolean? {
-    return this[key]?.jsonPrimitive?.booleanOrNull
-}
-
-private fun JsonArray?.orEmptyArray(): JsonArray {
-    return this ?: JsonArray(emptyList())
-}
-
-// putNotNull 辅助函数已移至 SamsungHealthSnapshot.kt(toSyncJson 使用)

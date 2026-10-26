@@ -39,6 +39,8 @@ const ShopPanel = React.lazy(() => import('./components/ShopPanel'));
 const PersonaPanel = React.lazy(() => import('./components/PersonaPanel'));
 const StudyPanel = React.lazy(() => import('./components/StudyPanel'));
 const DailyDataPanel = React.lazy(() => import('./components/DailyDataPanel'));
+const LifePanel = React.lazy(() => import('./components/life/LifePanel'));
+const WellbeingPanel = React.lazy(() => import('./components/wellbeing/WellbeingPanel'));
 const CirclePanel = React.lazy(() => import('./components/CirclePanel'));
 const SessionList = React.lazy(() => import('./components/SessionList').then(module => ({ default: module.SessionList })));
 
@@ -422,7 +424,7 @@ export default function Aveline() {
 
 
   const handleLogin = (password: string) => {
-    localStorage.setItem('XIAOYOU_ACCESS_TOKEN', password);
+    localStorage.setItem('AUTARKIA_ACCESS_TOKEN', password);
     setIsLoginModalOpen(false);
     setLoginError('');
     // 强制刷新页面或触发重新连接逻辑
@@ -904,7 +906,19 @@ export default function Aveline() {
                  <DailyDataPanel />
              </Suspense>
            )}
-        </div>
+
+           {activeTab === 'Life' && (
+             <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="spinner"/></div>}>
+                 <LifePanel platform="web" />
+             </Suspense>
+           )}
+
+           {activeTab === 'Wellbeing' && (
+             <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="spinner"/></div>}>
+                 <WellbeingPanel />
+             </Suspense>
+           )}
+           </div>
       </div>
       )}
 

@@ -9,6 +9,7 @@
 - 只断言「注入的桩值被正确读出 / 计算」，不断言真实内存、显存、耗时等易变数值。
 - 异步接口按仓库惯例用「同步测试函数 + ``asyncio.run``」。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -45,7 +46,7 @@ class _FakeOS:
 
     def _splitdrive(self, p):
         if self._drive and p.startswith(self._drive):
-            return (self._drive, p[len(self._drive):])
+            return (self._drive, p[len(self._drive) :])
         return ("", p)
 
     def _exists(self, p):
@@ -202,7 +203,9 @@ def test_invalidate_gpu_cache_resets_all():
 def test_memory_and_cpu_metrics_use_psutil(monkeypatch):
     """内存 / CPU 指标直接读取 psutil 返回值。"""
     mon = ResourceMonitor()
-    monkeypatch.setattr(monitor, "psutil", _fake_psutil(vm_percent=42.5, vm_available=3 * MiB, cpu=33.3))
+    monkeypatch.setattr(
+        monitor, "psutil", _fake_psutil(vm_percent=42.5, vm_available=3 * MiB, cpu=33.3)
+    )
 
     assert mon.get_memory_usage() == 42.5
     assert mon.get_available_memory_mb() == 3
@@ -301,12 +304,16 @@ def test_cpu_model_windows_winreg_raises_then_powershell(monkeypatch):
 def test_cpu_model_windows_powershell_fails_then_wmic(monkeypatch):
     """PowerShell 失败时回退到 wmic。"""
     mon = ResourceMonitor()
-    monkeypatch.setitem(sys.modules, "winreg", types.SimpleNamespace(
-        HKEY_LOCAL_MACHINE=object(),
-        OpenKey=lambda *a: (_ for _ in ()).throw(OSError("no key")),
-        QueryValueEx=lambda k, n: ("", 1),
-        CloseKey=lambda k: None,
-    ))
+    monkeypatch.setitem(
+        sys.modules,
+        "winreg",
+        types.SimpleNamespace(
+            HKEY_LOCAL_MACHINE=object(),
+            OpenKey=lambda *a: (_ for _ in ()).throw(OSError("no key")),
+            QueryValueEx=lambda k, n: ("", 1),
+            CloseKey=lambda k: None,
+        ),
+    )
 
     def check_output(args, **kwargs):
         if args[0] == "powershell":
@@ -321,12 +328,16 @@ def test_cpu_model_windows_powershell_fails_then_wmic(monkeypatch):
 def test_cpu_model_windows_all_fail_returns_unknown(monkeypatch):
     """注册表 / PowerShell / wmic 全失败时返回 Unknown CPU。"""
     mon = ResourceMonitor()
-    monkeypatch.setitem(sys.modules, "winreg", types.SimpleNamespace(
-        HKEY_LOCAL_MACHINE=object(),
-        OpenKey=lambda *a: (_ for _ in ()).throw(OSError("no key")),
-        QueryValueEx=lambda k, n: ("", 1),
-        CloseKey=lambda k: None,
-    ))
+    monkeypatch.setitem(
+        sys.modules,
+        "winreg",
+        types.SimpleNamespace(
+            HKEY_LOCAL_MACHINE=object(),
+            OpenKey=lambda *a: (_ for _ in ()).throw(OSError("no key")),
+            QueryValueEx=lambda k, n: ("", 1),
+            CloseKey=lambda k: None,
+        ),
+    )
     monkeypatch.setattr(
         monitor,
         "subprocess",
@@ -352,7 +363,9 @@ def test_cpu_model_linux_lscpu_fails_then_proc_cpuinfo(monkeypatch):
     monkeypatch.setattr(
         monitor,
         "subprocess",
-        _fake_subprocess(check_output=lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no lscpu"))),
+        _fake_subprocess(
+            check_output=lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no lscpu"))
+        ),
     )
 
     class _FakeFile:
@@ -372,7 +385,9 @@ def test_cpu_model_linux_all_fail_returns_unknown(monkeypatch):
     monkeypatch.setattr(
         monitor,
         "subprocess",
-        _fake_subprocess(check_output=lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no lscpu"))),
+        _fake_subprocess(
+            check_output=lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no lscpu"))
+        ),
     )
     monkeypatch.setattr(
         builtins, "open", lambda *a, **k: (_ for _ in ()).throw(OSError("no procfs"))
@@ -627,9 +642,7 @@ def test_fetch_gpu_process_async_nvml_error_falls_back(monkeypatch):
     mon = ResourceMonitor()
     mon._nvml_handle = object()
     # 返回真值但不可迭代 -> 触发 TypeError，被外层 except 捕获
-    mon._nvml = types.SimpleNamespace(
-        nvmlDeviceGetComputeRunningProcesses=lambda h: 1
-    )
+    mon._nvml = types.SimpleNamespace(nvmlDeviceGetComputeRunningProcesses=lambda h: 1)
     mon._nvidia_smi_path = "nvidia-smi"
 
     async def fake_run(args, *, timeout, cwd=None, env=None):
@@ -744,7 +757,9 @@ def test_get_gpu_process_usage_smi_raises(monkeypatch):
     mon._nvml_failed = True
     mon._nvidia_smi_path = "nvidia-smi"
     monkeypatch.setattr(
-        monitor, "subprocess", _fake_subprocess(run=lambda *a, **k: (_ for _ in ()).throw(OSError("boom")))
+        monitor,
+        "subprocess",
+        _fake_subprocess(run=lambda *a, **k: (_ for _ in ()).throw(OSError("boom"))),
     )
     assert mon.get_gpu_compute_process_usage() is None
 
@@ -834,7 +849,9 @@ def test_get_gpu_model_via_torch(monkeypatch):
     """torch.cuda 可用时优先用 torch 取型号。"""
     mon = ResourceMonitor()
     fake_torch = types.SimpleNamespace(
-        cuda=types.SimpleNamespace(is_available=lambda: True, get_device_name=lambda i: "Fake GPU 0")
+        cuda=types.SimpleNamespace(
+            is_available=lambda: True, get_device_name=lambda i: "Fake GPU 0"
+        )
     )
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
     assert mon.get_gpu_model() == "Fake GPU 0"
@@ -861,9 +878,7 @@ def test_get_gpu_model_torch_raises_falls_to_smi(monkeypatch):
 def test_get_gpu_model_torch_unavailable_then_smi(monkeypatch):
     """torch 不可用时跳过 torch 分支，走 nvidia-smi。"""
     mon = ResourceMonitor()
-    fake_torch = types.SimpleNamespace(
-        cuda=types.SimpleNamespace(is_available=lambda: False)
-    )
+    fake_torch = types.SimpleNamespace(cuda=types.SimpleNamespace(is_available=lambda: False))
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
     monkeypatch.setattr(
         monitor,
@@ -997,12 +1012,12 @@ def test_nvml_process_usage_fn_raises_and_falsy_procs():
 def test_nvml_process_usage_skips_invalid_entries():
     """非法 pid / 负内存 / 非整数内存都被规整或跳过。"""
     procs = [
-        types.SimpleNamespace(pid="abc", usedGpuMemory=1),        # pid 非整数 -> 跳过
-        types.SimpleNamespace(pid=0, usedGpuMemory=1),            # pid <= 0 -> 跳过
-        types.SimpleNamespace(pid=None, usedGpuMemory=1),         # pid None -> 跳过
-        types.SimpleNamespace(pid=501, usedGpuMemory="xyz"),      # 内存非整数 -> 0 -> 不写
-        types.SimpleNamespace(pid=502, usedGpuMemory=-100),       # 负内存 -> 0 -> 不写
-        types.SimpleNamespace(pid=503, usedGpuMemory=2 * MiB),    # 正常 -> 2
+        types.SimpleNamespace(pid="abc", usedGpuMemory=1),  # pid 非整数 -> 跳过
+        types.SimpleNamespace(pid=0, usedGpuMemory=1),  # pid <= 0 -> 跳过
+        types.SimpleNamespace(pid=None, usedGpuMemory=1),  # pid None -> 跳过
+        types.SimpleNamespace(pid=501, usedGpuMemory="xyz"),  # 内存非整数 -> 0 -> 不写
+        types.SimpleNamespace(pid=502, usedGpuMemory=-100),  # 负内存 -> 0 -> 不写
+        types.SimpleNamespace(pid=503, usedGpuMemory=2 * MiB),  # 正常 -> 2
     ]
     mon = ResourceMonitor()
     mon._nvml_handle = object()

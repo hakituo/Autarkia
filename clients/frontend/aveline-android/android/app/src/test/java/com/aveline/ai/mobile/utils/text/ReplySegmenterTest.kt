@@ -179,4 +179,27 @@ class ReplySegmenterTest {
         assertNull(ReplySegmenter.stripLoneParen("（低头）"))
         assertNull(ReplySegmenter.stripLoneParen("普通一句话"))
     }
+
+    @Test
+    fun `关闭动作描写开关后括号原样留在正文里`() {
+        // 设置页「动作描写」关掉后，正文里正常出现的括号不该再被改写成旁白。
+        assertSegments(
+            listOf("（笑）好呀" to ReplySegmentKind.TEXT),
+            ReplySegmenter.segment("（笑）好呀", stageDirectionEnabled = false)
+        )
+    }
+
+    @Test
+    fun `关闭动作描写开关后历史撤回标记也按正文渲染`() {
+        // 老消息在写库时括号已被剥掉，只能靠 messageType 兜底；
+        // 开关关闭后必须连这个兜底一起失效，否则用户会看到一片居中的灰字。
+        assertSegments(
+            listOf("穿上了" to ReplySegmentKind.TEXT),
+            ReplySegmenter.segment(
+                "穿上了",
+                forceStageDirection = true,
+                stageDirectionEnabled = false
+            )
+        )
+    }
 }

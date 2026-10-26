@@ -88,16 +88,16 @@ class HealthChecker:
         self.logger = logger or logging.getLogger("QQAdapter")
 
     async def preflight_check(self, *, config_file: str, napcat_ws_url: str,
-                              xiaoyou_ws_url: str, xiaoyou_http_base_url: str) -> bool:
+                              autarkia_ws_url: str, autarkia_http_base_url: str) -> bool:
         self.logger.info(f"QQ Adapter config: {config_file} (exists={os.path.exists(config_file)})")
         self.logger.info(f"NapCat WS: {napcat_ws_url}")
-        self.logger.info(f"Xiaoyou WS: {xiaoyou_ws_url}")
-        self.logger.info(f"Xiaoyou HTTP: {xiaoyou_http_base_url}")
-        if not str(xiaoyou_http_base_url or "").strip():
+        self.logger.info(f"Xiaoyou WS: {autarkia_ws_url}")
+        self.logger.info(f"Xiaoyou HTTP: {autarkia_http_base_url}")
+        if not str(autarkia_http_base_url or "").strip():
             return False
         if await self.check_backend_health():
             return True
-        if await self.check_backend_tcp(xiaoyou_http_base_url, xiaoyou_ws_url):
+        if await self.check_backend_tcp(autarkia_http_base_url, autarkia_ws_url):
             self.logger.info("Backend TCP probe OK，健康接口可能较慢、未就绪或路径不匹配")
             return True
         return False

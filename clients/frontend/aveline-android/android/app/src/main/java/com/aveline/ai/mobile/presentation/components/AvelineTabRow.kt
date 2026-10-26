@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import com.aveline.ai.mobile.presentation.theme.SelectionContent
+import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 
 /**
@@ -28,7 +28,7 @@ fun AvelineTabRow(
         selectedTabIndex = selectedTabIndex,
         modifier = modifier,
         containerColor = Color.Transparent,
-        contentColor = SelectionContent,
+        contentColor = TextPrimary,
         indicator = {},
         divider = {}
     ) {
@@ -37,7 +37,7 @@ fun AvelineTabRow(
             Tab(
                 selected = selected,
                 onClick = { onTabSelected(index) },
-                selectedContentColor = SelectionContent,
+                selectedContentColor = TextPrimary,
                 unselectedContentColor = TextSecondary.copy(alpha = 0.62f),
                 text = {
                     Text(

@@ -22,7 +22,7 @@
        真跑一次 `complete_reminder(msg_id, triggered_at=...)`，确认转发生效。
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_executor_compat_delegation_signatures
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_executor_compat_delegation_signatures
 """
 
 from __future__ import annotations

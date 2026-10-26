@@ -171,7 +171,9 @@ def test_async_empty_bytes_falls_through_to_array_path(monkeypatch, tmp_path):
     """synthesize_bytes 返回空 → 回落到 synthesize()。"""
     engine = _EngineBytes(payload=b"")
     mgr = _ready(_make(monkeypatch, tmp_path), engine)
-    sf = pytest.importorskip("soundfile", exc_type=ImportError, reason="只有 sf.write 分支需要 voice extra")
+    sf = pytest.importorskip(
+        "soundfile", exc_type=ImportError, reason="只有 sf.write 分支需要 voice extra"
+    )
     seen = []
     monkeypatch.setattr(sf, "write", lambda path, data, rate: seen.append((path, rate)))
 
@@ -198,7 +200,9 @@ def _array_synth(payload):
 def test_async_array_path_writes_via_soundfile(monkeypatch, tmp_path):
     engine = _EngineArray(payload=b"\x00\x01")
     mgr = _ready(_make(monkeypatch, tmp_path), engine)
-    sf = pytest.importorskip("soundfile", exc_type=ImportError, reason="只有 sf.write 分支需要 voice extra")
+    sf = pytest.importorskip(
+        "soundfile", exc_type=ImportError, reason="只有 sf.write 分支需要 voice extra"
+    )
     seen = []
     monkeypatch.setattr(sf, "write", lambda path, data, rate: seen.append((path, data, rate)))
 

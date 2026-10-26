@@ -31,6 +31,7 @@ from core.services.active_care.peer_chat.peer_knowledge import (
 # filter_secret_lines
 # ============================================================
 
+
 class TestFilterSecretLines:
     """保密行剔除：逐行过滤，保留其余内容。"""
 
@@ -97,6 +98,7 @@ class TestFilterSecretLines:
 # 可观察 / 内部状态分层
 # ============================================================
 
+
 class TestObservableAndPrivateDesc:
     """分层描述：可观察（活动/生病）vs 内部（精力/心情/饥饿）。"""
 
@@ -123,9 +125,7 @@ class TestObservableAndPrivateDesc:
         """活动与生病同时存在时用中文逗号拼接。"""
         from core.services.active_care.peer_chat.peer_knowledge import _observable_desc
 
-        result = _observable_desc(
-            {"life": {"current_activity": "躺着", "is_sick": True}}
-        )
+        result = _observable_desc({"life": {"current_activity": "躺着", "is_sick": True}})
 
         assert result == "在躺着，身体不太舒服"
 
@@ -173,9 +173,7 @@ class TestObservableAndPrivateDesc:
 
         assert _private_desc({"life": {"energy": 50, "mood": "开心"}}) == "心情开心"
 
-    @pytest.mark.parametrize(
-        "placeholder", ["neutral", "normal", "unknown", "none", "NEUTRAL", ""]
-    )
+    @pytest.mark.parametrize("placeholder", ["neutral", "normal", "unknown", "none", "NEUTRAL", ""])
     def test_private_mood_placeholders_skipped(self, placeholder):
         """占位心情值不产生描述。"""
         from core.services.active_care.peer_chat.peer_knowledge import _private_desc
@@ -213,9 +211,7 @@ class TestObservableAndPrivateDesc:
         """非数值字段回退到默认值而不是崩。"""
         from core.services.active_care.peer_chat.peer_knowledge import _private_desc
 
-        result = _private_desc(
-            {"life": {"energy": "bad", "hunger": "bad", "mood": ""}}
-        )
+        result = _private_desc({"life": {"energy": "bad", "hunger": "bad", "mood": ""}})
 
         assert result == ""
 
@@ -223,9 +219,7 @@ class TestObservableAndPrivateDesc:
         """多个内部状态按固定顺序拼接。"""
         from core.services.active_care.peer_chat.peer_knowledge import _private_desc
 
-        result = _private_desc(
-            {"life": {"energy": 10, "mood": "烦躁", "hunger": 20}}
-        )
+        result = _private_desc({"life": {"energy": 10, "mood": "烦躁", "hunger": 20}})
 
         assert result == "很累，心情烦躁，很饿"
 
@@ -233,6 +227,7 @@ class TestObservableAndPrivateDesc:
 # ============================================================
 # build_knowledge_buckets
 # ============================================================
+
 
 class TestBuildKnowledgeBuckets:
     """知识分桶：谁可以看到什么。"""
@@ -313,7 +308,7 @@ class TestBuildKnowledgeBuckets:
         assert result["peer"]["private_state"] == "很累"
 
     def test_known_about_peer_is_observable_only(self):
-        """"我知道对方什么"只包含可观察信息，不含对方内部状态。"""
+        """ "我知道对方什么"只包含可观察信息，不含对方内部状态。"""
         result = self._build()
 
         assert result["role"]["known_about_peer"] == "在做饭"
@@ -374,6 +369,7 @@ class TestBuildKnowledgeBuckets:
 # ============================================================
 # validate_peer_script
 # ============================================================
+
 
 class TestValidatePeerScript:
     """剧本校验：越权 / 隐私泄漏。"""

@@ -68,8 +68,8 @@ class SessionMonitor:
                     await session.stop()
                 except Exception:
                     pass
-            from clients.bots.qq.session.session import XiaoyouSession
-            new_session = XiaoyouSession(sid, self.adapter)
+            from clients.bots.qq.session.session import AutarkiaSession
+            new_session = AutarkiaSession(sid, self.adapter)
             self.adapter.sessions[sid] = new_session
             await new_session.start()
             self.logger.info(f"Monitor: Master session '{sid}' (re)started.")
@@ -108,7 +108,7 @@ class SessionMonitor:
         sid = f"private_{mid}"
         sess = self.adapter.sessions.get(sid)
         if not sess or not getattr(sess, "running", False):
-            from clients.bots.qq.session.session import XiaoyouSession
-            sess = XiaoyouSession(sid, self.adapter)
+            from clients.bots.qq.session.session import AutarkiaSession
+            sess = AutarkiaSession(sid, self.adapter)
             self.adapter.sessions[sid] = sess
             await sess.start()

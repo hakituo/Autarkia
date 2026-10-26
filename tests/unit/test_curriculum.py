@@ -73,9 +73,7 @@ def test_load_partial_curriculum_and_preserve_stable_fields(tmp_path: Path) -> N
         "physics.mechanics.kinematics",
         "physics.mechanics.newton",
     ]
-    assert blueprint.modules[1].prerequisites == (
-        "physics.mechanics.kinematics",
-    )
+    assert blueprint.modules[1].prerequisites == ("physics.mechanics.kinematics",)
     assert blueprint.modules[1].importance == 5
 
 
@@ -92,9 +90,7 @@ def test_planning_snapshot_is_read_only_and_reports_missing_prerequisite(
     assert concepts.all_concepts() == []
     assert snapshot[0].status == ConceptStatus.UNKNOWN.value
     assert snapshot[0].is_ready is True
-    assert snapshot[1].missing_prerequisite_ids == (
-        "physics.mechanics.kinematics",
-    )
+    assert snapshot[1].missing_prerequisite_ids == ("physics.mechanics.kinematics",)
     assert snapshot[1].missing_prerequisite_names == ("质点运动学",)
 
 
@@ -106,9 +102,7 @@ def test_mastered_prerequisite_unlocks_next_module(tmp_path: Path) -> None:
     prerequisite.mastery = 0.9
     concepts.save()
 
-    snapshot = CurriculumService(root=tmp_path).planning_snapshot(
-        concept_manager=concepts
-    )
+    snapshot = CurriculumService(root=tmp_path).planning_snapshot(concept_manager=concepts)
 
     by_id = {item.module.id: item for item in snapshot}
     assert by_id["physics.mechanics.newton"].is_ready is True

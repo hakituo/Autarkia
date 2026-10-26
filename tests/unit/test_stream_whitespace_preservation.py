@@ -28,4 +28,3 @@ def test_preserve_edge_whitespace_keeps_leading_space_for_mid_segment():
         preserve_edge_whitespace=True,
     )
     assert mid.startswith(" ")
-

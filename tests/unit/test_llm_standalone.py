@@ -39,8 +39,9 @@ GEN_PARAMS = {
     "top_p": 0.95,
     "top_k": 40,
     "max_tokens": _get_int_env("XIAOYOU_LLAMA_MAX_TOKENS", 128),
-    "stream": True
+    "stream": True,
 }
+
 
 def test_llm():
     print(f"Loading model from: {MODEL_PATH}")
@@ -59,7 +60,7 @@ def test_llm():
             n_ctx=n_ctx,
             n_gpu_layers=int(N_GPU_LAYERS),
             n_batch=n_batch,
-            verbose=True
+            verbose=True,
         )
         print(f"Model loaded in {time.time() - start_load:.2f} seconds.")
     except Exception as e:
@@ -69,7 +70,7 @@ def test_llm():
     print("\nStarting inference test...")
     messages = [
         {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Test. Who are you?"}
+        {"role": "user", "content": "Test. Who are you?"},
     ]
 
     print(f"Prompt: {messages}")
@@ -78,18 +79,15 @@ def test_llm():
     try:
         start_gen = time.time()
         first_token_received = False
-        
-        stream = llm.create_chat_completion(
-            messages=messages,
-            **GEN_PARAMS
-        )
+
+        stream = llm.create_chat_completion(messages=messages, **GEN_PARAMS)
 
         full_response = ""
         for chunk in stream:
             if not first_token_received:
                 print(f"\n[First token received in {time.time() - start_gen:.2f} seconds]")
                 first_token_received = True
-            
+
             if "choices" in chunk and len(chunk["choices"]) > 0:
                 delta = chunk["choices"][0].get("delta", {})
                 content = delta.get("content", "")
@@ -103,6 +101,7 @@ def test_llm():
 
     except Exception as e:
         print(f"\nInference failed: {e}")
+
 
 if __name__ == "__main__":
     test_llm()

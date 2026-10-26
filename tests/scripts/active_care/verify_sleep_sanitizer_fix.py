@@ -8,7 +8,7 @@
 3. fallback 移除"你先休息，等你醒来我们再聊。"
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_sleep_sanitizer_fix
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_sleep_sanitizer_fix
 """
 
 import random

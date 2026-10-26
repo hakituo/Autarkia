@@ -59,22 +59,30 @@ class SamsungHealthPermissions @Inject constructor(
      * 已授权时直接返回 true;未授权时弹出 Samsung Health 权限请求界面。
      * 必须在主线程调用(因涉及 UI),但内部是 suspend,可在协程中调用。
      *
+     * 性能要点:已授权的情况下**不要**在主线程查权限。
+     * `getGrantedPermissions` 要逐项比对 24 个权限,主线程调用会让 Life 页在
+     * 进入瞬间掉帧(用户看到的"生活页面卡一下")。所以先在 IO 线程用
+     * [hasPermissions] 判定,只有真的缺权限时才回到主线程做查询 + 弹窗。
+     *
      * @param activity 用于显示权限请求 UI 的 Activity
      * @return true 表示所有权限已授权;false 表示用户拒绝或请求失败
      */
-    suspend fun ensurePermissions(activity: Activity): Boolean = withContext(Dispatchers.Main) {
-        runCatching {
-            val granted = store.getGrantedPermissions(requiredPermissions)
-            if (granted.containsAll(requiredPermissions)) {
-                return@runCatching true
-            }
-            val missing = requiredPermissions - granted
-            Log.i(TAG, "缺少权限: ${missing.size} 项,请求中...")
-            val obtained = store.requestPermissions(missing, activity)
-            obtained.containsAll(missing)
-        }.onFailure { e ->
-            Log.e(TAG, "请求权限失败: ${e.message}", e)
-        }.getOrDefault(false)
+    suspend fun ensurePermissions(activity: Activity): Boolean {
+        if (hasPermissions()) return true
+        return withContext(Dispatchers.Main) {
+            runCatching {
+                val granted = store.getGrantedPermissions(requiredPermissions)
+                if (granted.containsAll(requiredPermissions)) {
+                    return@runCatching true
+                }
+                val missing = requiredPermissions - granted
+                Log.i(TAG, "缺少权限: ${missing.size} 项,请求中...")
+                val obtained = store.requestPermissions(missing, activity)
+                obtained.containsAll(missing)
+            }.onFailure { e ->
+                Log.e(TAG, "请求权限失败: ${e.message}", e)
+            }.getOrDefault(false)
+        }
     }
 
     /**

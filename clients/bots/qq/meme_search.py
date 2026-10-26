@@ -33,7 +33,11 @@ BGE_MODEL_PATH = Path(__file__).resolve().parents[3] / "models" / "BERT" / "bge-
 
 # 默认检索参数
 DEFAULT_TOP_K = 5
-DEFAULT_MIN_SIMILARITY = 0.25
+# bge 短查询与长 caption 的无关匹配普遍落在 0.5 附近，0.6 是实测的精度线：
+# 低于它的多是"抱胸"撞"抱住"这类字面撞词，宁可不发也不发错图
+DEFAULT_MIN_SIMILARITY = 0.60
+# 通过阈值后只保留与最佳候选相差不超过该值的图，避免 top-K 随机挑到明显更差的候选
+DEFAULT_RELEVANCE_MARGIN = 0.03
 
 # 单例锁
 _lock = threading.RLock()
@@ -143,6 +147,17 @@ def _encode_query(text: str) -> Optional[np.ndarray]:
         return None
 
 
+def _normalize_rel_path(value: str) -> str:
+    """把绝对/相对路径统一成索引里的相对路径（正斜杠）形式。"""
+    path = Path(value)
+    try:
+        if path.is_absolute():
+            return path.resolve().relative_to(MEMES_ROOT.resolve()).as_posix()
+    except (OSError, ValueError):
+        pass
+    return path.as_posix()
+
+
 def pick_meme_by_semantic(
     query: str,
     top_k: int = DEFAULT_TOP_K,
@@ -174,42 +189,45 @@ def pick_meme_by_semantic(
 
     # 排序取 top-K
     top_indices = np.argsort(sims)[::-1][:top_k]
+    best_sim = float(sims[top_indices[0]]) if len(top_indices) else 0.0
 
     # 过滤：相似度阈值 + 排除列表
+    exclude_rels = (
+        {_normalize_rel_path(p) for p in exclude_paths} if exclude_paths else set()
+    )
     candidates: list[tuple[float, str]] = []
     for idx in top_indices:
         sim = float(sims[idx])
         if sim < min_similarity:
             continue
         rel = _paths[idx]
-        if exclude_paths and rel in exclude_paths:
+        if rel in exclude_rels:
             continue
         candidates.append((sim, rel))
 
     if not candidates:
-        # 放宽阈值：取 top-1 看看是否达到最低要求
-        if len(top_indices) > 0:
-            best_idx = top_indices[0]
-            best_sim = float(sims[best_idx])
-            if best_sim >= min_similarity * 0.7:  # 阈值 70% 兜底
-                candidates = [(best_sim, _paths[best_idx])]
-        if not candidates:
-            logger.debug(f"语义检索无候选 (query={query!r}, max_sim={sims[top_indices[0]]:.3f})")
-            return None
+        # 低于阈值就明确不发，不再用"放宽阈值"兜底发一张勉强沾边的图
+        logger.info(
+            f"语义检索无候选，跳过发图: query={query!r}, "
+            f"max_sim={best_sim:.3f}, 阈值={min_similarity:.2f}"
+        )
+        return None
 
-    # 从 top-K 候选里随机选一张（带相似度权重，越高越可能被选中）
+    # 只在最佳候选附近的图里随机；否则加权随机仍可能挑到 0.5x 的无关图
+    cutoff = candidates[0][0] - DEFAULT_RELEVANCE_MARGIN
+    candidates = [item for item in candidates if item[0] >= cutoff]
+
+    # 从候选里随机选一张（带相似度权重，越高越可能被选中）
     import random
     weights = [max(sim, 0.01) for sim, _ in candidates]
-    chosen_rel = random.choices(
-        [rel for _, rel in candidates], weights=weights, k=1
-    )[0]
+    chosen_sim, chosen_rel = random.choices(candidates, weights=weights, k=1)[0]
     chosen_path = MEMES_ROOT / chosen_rel
     if not chosen_path.is_file():
         logger.warning(f"索引指向的图片不存在: {chosen_path}")
         return None
     logger.info(
         f"语义检索匹配: query={query!r} -> {chosen_rel} "
-        f"(top {len(candidates)} 候选，最高 sim={candidates[0][0]:.3f})"
+        f"(sim={chosen_sim:.3f}，{len(candidates)} 候选，最高 sim={candidates[0][0]:.3f})"
     )
     return chosen_path
 

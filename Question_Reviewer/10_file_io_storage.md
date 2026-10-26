@@ -36,9 +36,9 @@
     2. `覆盖场景：陈旧文件清理、近期文件保留、只清理同前缀、正常写入不受影响、async 版本、目录异常`
 
 ### QR-20260801-SOCIAL-EVENTS-PATH-BUG social_events.py 路径少算一级：社交事件被错误写入 core/companion_data/ 而非项目根 companion_data/ (2026-08-01)
-*   **问题描述**: 用户发现 D:\projects\xiaoyou 下同时存在 companion_data/dual_role 与 core/companion_data/dual_role 两个目录，且 core/companion_data/dual_role/social_events/default.json 里有 4 条较新事件，正确路径下的 default.json 有 24 条历史事件。UPDATES.md/Question_Reviewer 全无迁移记录。
+*   **问题描述**: 用户发现 D:\AI\xiaoyou-core 下同时存在 companion_data/dual_role 与 core/companion_data/dual_role 两个目录，且 core/companion_data/dual_role/social_events/default.json 里有 4 条较新事件，正确路径下的 default.json 有 24 条历史事件。UPDATES.md/Question_Reviewer 全无迁移记录。
 *   **复现步骤**:
-    1. 执行 LS D:\projects\xiaoyou\core\companion_data 与 LS D:\projects\xiaoyou\companion_data，确认两个 dual_role 目录同时存在
+    1. 执行 LS D:\AI\xiaoyou-core\core\companion_data 与 LS D:\AI\xiaoyou-core\companion_data，确认两个 dual_role 目录同时存在
     2. Read 两个 default.json，发现内容不同（脏路径 4 条较新事件，正确路径 24 条历史事件）
     3. Grep 'companion_data.*dual_role' 在 core/ 下找到 4 处引用，其中 social_events.py:21-23 用 project_root 拼 _social_events_dir
     4. Read social_events.py:590-592 发现 _project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))，少算一级
@@ -65,7 +65,7 @@
 *   **验证**:
     1. `ruff check social_events.py 与 merge_social_events_path_bug_fix.py 全部通过`
     2. `运行 merge 脚本：正确 24 条 + 错误 4 条 → 去重 27 条 → 写入最近 24 条 → 脏目录已删除`
-    3. `实例化 SocialEventEngine 检查 _social_events_dir 输出 D:\projects\xiaoyou\companion_data\dual_role\social_events（路径正确）`
+    3. `实例化 SocialEventEngine 检查 _social_events_dir 输出 D:\AI\xiaoyou-core\companion_data\dual_role\social_events（路径正确）`
 
 ### AOS-0805-04 冷启动 StateManager 同步恢复状态 & getFileInfo 主线程文件/IO 卡顿 (2026-08-05)
 *   **问题描述**: StateManager.init{} 同步执行 restoreState() 读 SharedPreferences 文件，冷启动阻塞主线程；FileUploadManager.getFileInfo 为普通函数，调用路径在点击上传按钮事件中（主线程）触发 ContentResolver.query/openInputStream 等阻塞操作，长文件名/大图会出现 200ms+ ANR 风险。

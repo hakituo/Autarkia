@@ -28,6 +28,18 @@ object DataUriImage {
         value.trimStart().startsWith("data:", ignoreCase = true)
 
     /**
+     * data URI 的 MIME 类型（如 `image/png`，小写）。
+     *
+     * @return MIME 类型；非 data URI、非 base64 形式或格式非法返回 null（与 [decode] 口径一致）
+     */
+    fun mimeTypeOf(value: String): String? {
+        if (!isDataUri(value)) return null
+        val match = DATA_URI_REGEX.matchEntire(value.trim()) ?: return null
+        if (match.groupValues[2].isEmpty()) return null
+        return match.groupValues[1].takeIf { it.isNotBlank() }?.lowercase()
+    }
+
+    /**
      * 解码 data URI 里的图片字节。
      *
      * @return 图片字节；非 data URI、非 base64 编码或数据非法时返回 null，

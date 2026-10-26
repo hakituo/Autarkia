@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
 import javax.inject.Inject
@@ -56,6 +57,9 @@ class WebSocketManager @Inject constructor(
     private val manualDisconnect = AtomicBoolean(false)
     private var heartbeatJob: Job? = null
     private var heartbeatIntervalSec = 15
+
+    /** 最近一次收到入站帧的时间（onOpen / onMessage 刷新），用于入站静默检测。 */
+    private val lastInboundAt = AtomicLong(0L)
 
     // 未连接期间发送的消息先进队列, 连接建立(onOpen)后再补发, 避免消息在 sendMessage 时被静默丢弃
     private val pendingMessages = LinkedBlockingQueue<String>()
@@ -128,9 +132,16 @@ class WebSocketManager @Inject constructor(
         manualDisconnect.set(false)
         reconnectJob?.cancel()
 
+        // 重建连接前必须先关掉旧 socket（同 URL 的 forceReconnect 也要关）。
+        // 旧实现只在 URL 变化时 close：回前台 / 设置页 / 地址确认都会留下一条
+        // "没人用的"连接 —— 心跳只走 webSocketRef、onMessage 又被归属校验丢弃，
+        // 服务端要等 60s 心跳超时才回收，期间同一用户会有 2~3 条并发连接；
+        // 残留 socket 还会拖慢广播（每条 5s 发送超时）。
+        val previous = webSocketRef.getAndSet(null)
         _connectionState.value = ConnectionState.CONNECTING
-        if (currentWs != null && currentWs != wsUrl) {
-            webSocketRef.getAndSet(null)?.close(1000, "url_changed")
+        if (previous != null) {
+            val reason = if (currentWs != null && currentWs != wsUrl) "url_changed" else "reconnect"
+            previous.close(1000, reason)
         }
         currentUrlRef.set(wsUrl)
 
@@ -148,9 +159,14 @@ class WebSocketManager @Inject constructor(
         }
         val listener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                // 归属校验: 若此 socket 已被新连接替换, 忽略旧连接的 onOpen, 防止旧回调污染新连接
-                if (webSocket !== webSocketRef.get()) return
+                // 归属校验: 若此 socket 已被新连接替换, 关掉它（不能只是 return，
+                // 否则服务端会一直保留这条已建立的连接，形成单向僵尸连接）
+                if (webSocket !== webSocketRef.get()) {
+                    webSocket.close(1000, "superseded")
+                    return
+                }
                 _connectionState.value = ConnectionState.CONNECTED
+                lastInboundAt.set(System.currentTimeMillis())
                 // 无论首连还是重连都启动心跳(用上次缓存间隔,默认30s)。
                 // 重连场景下若后端只回 reconnect_sync 不重发 connection_established,
                 // 心跳也能恢复,避免连接静默断开后无法探活。
@@ -166,8 +182,11 @@ class WebSocketManager @Inject constructor(
             override fun onMessage(webSocket: WebSocket, text: String) {
                 // 归属校验: 旧连接的回调直接忽略, 避免旧 socket 的数据污染新连接
                 if (webSocket !== webSocketRef.get()) return
+                lastInboundAt.set(System.currentTimeMillis())
                 scope.launch {
-                    _messages.emit(parseMessage(text))
+                    // 传入收到消息的 socket：服务端 ping 必须由同一条连接回 pong，
+                    // 回错连接会让那条连接永远收不到 pong，被服务端 60s 心跳超时踢掉
+                    _messages.emit(parseMessage(text, webSocket))
                 }
             }
 
@@ -258,13 +277,29 @@ class WebSocketManager @Inject constructor(
         heartbeatJob = scope.launch {
             while (isActive) {
                 delay(heartbeatIntervalSec * 1000L)
-                if (_connectionState.value == ConnectionState.CONNECTED) {
-                    val pingMsg = JSONObject().apply {
-                        put("type", "ping")
-                        put("timestamp", System.currentTimeMillis())
-                    }
-                    webSocketRef.get()?.send(pingMsg.toString())
+                if (_connectionState.value != ConnectionState.CONNECTED) continue
+
+                // 入站静默检测：服务端每 heartbeat_interval 秒主动 ping、另有秒级状态推送，
+                // 超过 3 个心跳周期没有任何入站帧，说明这条连接已"假在线"
+                // （弱网单向黑洞 / 被服务端移除）。OkHttp 只在写失败时才报错，
+                // 不主动检测的话，断线最长要等 30s 写超时才能感知。
+                // 3 倍余量防止与服务端 30s 应用层 ping 的节拍临界竞争误杀。
+                val silenceMs = System.currentTimeMillis() - lastInboundAt.get()
+                val maxSilenceMs = maxOf(heartbeatIntervalSec, 15) * 3 * 1000L
+                if (silenceMs > maxSilenceMs) {
+                    Log.w(TAG, "WebSocket 入站静默 ${silenceMs}ms，判定假在线并主动重连")
+                    webSocketRef.getAndSet(null)?.close(1000, "heartbeat_timeout")
+                    stopHeartbeat()
+                    _connectionState.value = ConnectionState.DISCONNECTED
+                    scheduleReconnect()
+                    break
                 }
+
+                val pingMsg = JSONObject().apply {
+                    put("type", "ping")
+                    put("timestamp", System.currentTimeMillis())
+                }
+                webSocketRef.get()?.send(pingMsg.toString())
             }
         }
     }
@@ -341,7 +376,7 @@ class WebSocketManager @Inject constructor(
         return if (params.isNotEmpty()) "$wsUrl?${params}" else wsUrl
     }
 
-    private fun parseMessage(text: String): WebSocketMessage {
+    private fun parseMessage(text: String, webSocket: WebSocket): WebSocketMessage {
         val json = try { JSONObject(text) } catch (e: Exception) {
             Log.w(TAG, "解析WebSocket消息失败: ${e.message ?: "未知错误"}")
             return WebSocketMessage.Unknown(text)
@@ -556,7 +591,9 @@ class WebSocketManager @Inject constructor(
                     put("type", "pong")
                     put("timestamp", json.optLong("timestamp", System.currentTimeMillis()))
                 }
-                webSocketRef.get()?.send(pongMsg.toString())
+                // 必须用收到 ping 的这条连接回 pong（不能用 webSocketRef：
+                // 重连后的旧连接会拿到新 socket，导致那条连接永远不回心跳）
+                webSocket.send(pongMsg.toString())
                 WebSocketMessage.Pong(timestamp = System.currentTimeMillis())
             }
             else -> WebSocketMessage.Unknown(text)

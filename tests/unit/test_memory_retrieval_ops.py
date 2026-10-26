@@ -110,8 +110,7 @@ class _BadMoveCache(OrderedDict):
 class _FakeEmbeddingGenerator:
     """嵌入生成器替身，行为可注入"""
 
-    def __init__(self, vector=None, generate=None, b64_to_emb=None,
-                 cosine=None, batch=None):
+    def __init__(self, vector=None, generate=None, b64_to_emb=None, cosine=None, batch=None):
         self._vector = vector if vector is not None else np.ones(EMB_DIM, dtype=np.float32)
         self._generate = generate
         self._b64_to_emb = b64_to_emb
@@ -178,7 +177,7 @@ def test_get_category_stats_missing_category_falls_back_to_uncategorized():
     """缺失/空分类统一归到 uncategorized"""
     mgr = _FakeManager()
     mgr.weighted_memories = {
-        "m1": {"id": "m1", "weight": 1.0},          # 无 category
+        "m1": {"id": "m1", "weight": 1.0},  # 无 category
         "m2": {"id": "m2", "category": "", "weight": 1.0},  # 空 category
     }
     stats = ro.get_category_stats(mgr)
@@ -310,6 +309,7 @@ def test_get_cached_query_embedding_disabled_cache():
 
 def test_get_cached_query_embedding_unified_cache_hit_and_miss():
     """统一缓存：首次 miss 写入，二次命中"""
+
     class _UC:
         def __init__(self):
             self.store = {}
@@ -425,19 +425,33 @@ def test_get_cached_memory_embedding_decode_failures():
     def _raise(b64):
         raise ValueError("bad base64")
 
-    assert ro.get_cached_memory_embedding(
-        mgr, {"id": "m1", "embedding": "x"}, _FakeEmbeddingGenerator(b64_to_emb=_raise)
-    ) is None
-    assert ro.get_cached_memory_embedding(
-        mgr, {"id": "m1", "embedding": "x"}, _FakeEmbeddingGenerator(b64_to_emb=lambda b: None)
-    ) is None
-    assert ro.get_cached_memory_embedding(
-        mgr, {"id": "m1", "embedding": "x"}, _FakeEmbeddingGenerator(b64_to_emb=lambda b: [])
-    ) is None
+    assert (
+        ro.get_cached_memory_embedding(
+            mgr, {"id": "m1", "embedding": "x"}, _FakeEmbeddingGenerator(b64_to_emb=_raise)
+        )
+        is None
+    )
+    assert (
+        ro.get_cached_memory_embedding(
+            mgr, {"id": "m1", "embedding": "x"}, _FakeEmbeddingGenerator(b64_to_emb=lambda b: None)
+        )
+        is None
+    )
+    assert (
+        ro.get_cached_memory_embedding(
+            mgr, {"id": "m1", "embedding": "x"}, _FakeEmbeddingGenerator(b64_to_emb=lambda b: [])
+        )
+        is None
+    )
     # 无 __len__ 的对象：len() 抛 TypeError，被 except 捕获
-    assert ro.get_cached_memory_embedding(
-        mgr, {"id": "m1", "embedding": "x"}, _FakeEmbeddingGenerator(b64_to_emb=lambda b: object())
-    ) is None
+    assert (
+        ro.get_cached_memory_embedding(
+            mgr,
+            {"id": "m1", "embedding": "x"},
+            _FakeEmbeddingGenerator(b64_to_emb=lambda b: object()),
+        )
+        is None
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -450,8 +464,11 @@ def test_search_memories_vector_disabled_falls_back():
     mgr._extract_keywords = lambda t: []
     logger = _FakeLogger()
     res = ro.search_memories(
-        mgr, query="hello", vector_search_enabled=False,
-        embedding_generator=_FakeEmbeddingGenerator(), logger=logger,
+        mgr,
+        query="hello",
+        vector_search_enabled=False,
+        embedding_generator=_FakeEmbeddingGenerator(),
+        logger=logger,
     )
     assert [r["id"] for r in res] == ["m1"]
     assert logger.warnings
@@ -464,8 +481,11 @@ def test_search_memories_empty_query_falls_back_without_warning():
     mgr._extract_keywords = lambda t: []
     logger = _FakeLogger()
     res = ro.search_memories(
-        mgr, query="", vector_search_enabled=True,
-        embedding_generator=_FakeEmbeddingGenerator(), logger=logger,
+        mgr,
+        query="",
+        vector_search_enabled=True,
+        embedding_generator=_FakeEmbeddingGenerator(),
+        logger=logger,
     )
     assert res == []
     assert logger.warnings == []
@@ -473,6 +493,7 @@ def test_search_memories_empty_query_falls_back_without_warning():
 
 def test_search_memories_cache_hit_short_circuits():
     """搜索缓存命中直接返回，不进入向量计算"""
+
     class _Cache:
         def get_sync(self, key):
             return [{"id": "cached"}]
@@ -483,8 +504,11 @@ def test_search_memories_cache_hit_short_circuits():
     mgr = _FakeManager(search_cache=_Cache())
     logger = _FakeLogger()
     res = ro.search_memories(
-        mgr, query="q", vector_search_enabled=True,
-        embedding_generator=_FakeEmbeddingGenerator(), logger=logger,
+        mgr,
+        query="q",
+        vector_search_enabled=True,
+        embedding_generator=_FakeEmbeddingGenerator(),
+        logger=logger,
     )
     assert res == [{"id": "cached"}]
 
@@ -509,7 +533,11 @@ def test_search_memories_vector_path_success_and_cache_write():
     }
     logger = _FakeLogger()
     res = ro.search_memories(
-        mgr, query="q", limit=5, min_similarity=0.0, category="a",
+        mgr,
+        query="q",
+        limit=5,
+        min_similarity=0.0,
+        category="a",
         vector_search_enabled=True,
         embedding_generator=_FakeEmbeddingGenerator(
             vector=vec, b64_to_emb=lambda b: None if b == "bad" else vec
@@ -531,8 +559,12 @@ def test_search_memories_skips_memories_without_embedding():
     mgr._extract_keywords = lambda t: []
     logger = _FakeLogger()
     res = ro.search_memories(
-        mgr, query="hello", vector_search_enabled=True, exclude_sensitive=True,
-        embedding_generator=_FakeEmbeddingGenerator(), logger=logger,
+        mgr,
+        query="hello",
+        vector_search_enabled=True,
+        exclude_sensitive=True,
+        embedding_generator=_FakeEmbeddingGenerator(),
+        logger=logger,
     )
     assert [r["id"] for r in res] == ["m1"]
     assert logger.infos
@@ -561,9 +593,14 @@ def test_search_memories_numpy_failure_falls_back_to_cosine():
     }
     logger = _FakeLogger()
     res = ro.search_memories(
-        mgr, query="q", min_similarity=0.0, vector_search_enabled=True,
+        mgr,
+        query="q",
+        min_similarity=0.0,
+        vector_search_enabled=True,
         embedding_generator=_FakeEmbeddingGenerator(
-            vector=vec, batch=_batch, cosine=_cosine,
+            vector=vec,
+            batch=_batch,
+            cosine=_cosine,
             b64_to_emb=lambda b: None if b == "bad" else vec,
         ),
         logger=logger,
@@ -581,7 +618,10 @@ def test_search_memories_no_candidates_falls_back():
     mgr._extract_keywords = lambda t: []
     logger = _FakeLogger()
     res = ro.search_memories(
-        mgr, query="hello", min_similarity=0.99, vector_search_enabled=True,
+        mgr,
+        query="hello",
+        min_similarity=0.99,
+        vector_search_enabled=True,
         embedding_generator=_FakeEmbeddingGenerator(vector=vec, batch=lambda q, m: [0.1]),
         logger=logger,
     )
@@ -591,6 +631,7 @@ def test_search_memories_no_candidates_falls_back():
 
 def test_search_memories_outer_exception_logs_and_falls_back():
     """生成查询嵌入抛异常时，外层兜底回退关键词并记录 error"""
+
     def _boom(text):
         raise RuntimeError("embed boom")
 
@@ -599,8 +640,11 @@ def test_search_memories_outer_exception_logs_and_falls_back():
     mgr._extract_keywords = lambda t: []
     logger = _FakeLogger()
     res = ro.search_memories(
-        mgr, query="hello", vector_search_enabled=True,
-        embedding_generator=_FakeEmbeddingGenerator(generate=_boom), logger=logger,
+        mgr,
+        query="hello",
+        vector_search_enabled=True,
+        embedding_generator=_FakeEmbeddingGenerator(generate=_boom),
+        logger=logger,
     )
     assert [r["id"] for r in res] == ["m1"]
     assert logger.errors
@@ -629,7 +673,10 @@ def test_search_memories_fallback_skips_vanished_embedding():
         "m2": _memory("m2", embedding="b2", weight=1.0),
     }
     res = ro.search_memories(
-        mgr, query="q", min_similarity=0.0, vector_search_enabled=True,
+        mgr,
+        query="q",
+        min_similarity=0.0,
+        vector_search_enabled=True,
         embedding_generator=_FakeEmbeddingGenerator(
             vector=vec, batch=_batch, b64_to_emb=_b64, cosine=lambda a, b: 0.9
         ),
@@ -676,6 +723,7 @@ def test_cleanup_top_topics_cache_trims_to_max_entries():
 
 def test_invalidate_top_topics_cache_with_topic_weight_cache():
     """接入 TopicWeightCache 时一并失效并清除用户缓存键"""
+
     class _TWC:
         def __init__(self):
             self.invalidated = 0
@@ -747,8 +795,11 @@ def test_search_by_similarity_disabled_uses_weighted_memories():
     mgr = _FakeManager()
     logger = _FakeLogger()
     res = ro.search_by_similarity(
-        mgr, query="q", vector_search_enabled=False,
-        embedding_generator=_FakeEmbeddingGenerator(), logger=logger,
+        mgr,
+        query="q",
+        vector_search_enabled=False,
+        embedding_generator=_FakeEmbeddingGenerator(),
+        logger=logger,
     )
     assert res[0]["id"] == "gm"
     assert logger.warnings
@@ -757,21 +808,28 @@ def test_search_by_similarity_disabled_uses_weighted_memories():
 def test_search_by_similarity_empty_query_returns_empty():
     """空查询返回空列表"""
     res = ro.search_by_similarity(
-        _FakeManager(), query="", vector_search_enabled=True,
-        embedding_generator=_FakeEmbeddingGenerator(), logger=_FakeLogger(),
+        _FakeManager(),
+        query="",
+        vector_search_enabled=True,
+        embedding_generator=_FakeEmbeddingGenerator(),
+        logger=_FakeLogger(),
     )
     assert res == []
 
 
 def test_search_by_similarity_query_embedding_error_returns_empty():
     """查询嵌入生成失败返回空列表并记录 error"""
+
     def _boom(text):
         raise RuntimeError("boom")
 
     logger = _FakeLogger()
     res = ro.search_by_similarity(
-        _FakeManager(), query="q", vector_search_enabled=True,
-        embedding_generator=_FakeEmbeddingGenerator(generate=_boom), logger=logger,
+        _FakeManager(),
+        query="q",
+        vector_search_enabled=True,
+        embedding_generator=_FakeEmbeddingGenerator(generate=_boom),
+        logger=logger,
     )
     assert res == []
     assert logger.errors
@@ -779,6 +837,7 @@ def test_search_by_similarity_query_embedding_error_returns_empty():
 
 def test_search_by_similarity_cpp_indexer_success():
     """存在 C++ 索引器时优先使用其结果"""
+
     class _Res:
         def __init__(self, mid):
             self.id = mid
@@ -792,8 +851,11 @@ def test_search_by_similarity_cpp_indexer_success():
     mgr = _FakeManager(vector_indexer=_Indexer())
     mgr.weighted_memories = {"m1": _memory("m1", weight=1.0)}
     res = ro.search_by_similarity(
-        mgr, query="q", vector_search_enabled=True,
-        embedding_generator=_FakeEmbeddingGenerator(), logger=_FakeLogger(),
+        mgr,
+        query="q",
+        vector_search_enabled=True,
+        embedding_generator=_FakeEmbeddingGenerator(),
+        logger=_FakeLogger(),
     )
     assert len(res) == 1
     assert res[0]["similarity_score"] == 0.8
@@ -802,6 +864,7 @@ def test_search_by_similarity_cpp_indexer_success():
 
 def test_search_by_similarity_cpp_indexer_failure_falls_back():
     """C++ 索引器抛异常时回退 Python 原生检索"""
+
     class _Indexer:
         def search(self, **kwargs):
             raise RuntimeError("cpp fail")
@@ -810,8 +873,12 @@ def test_search_by_similarity_cpp_indexer_failure_falls_back():
     mgr.weighted_memories = {"m1": _memory("m1", embedding="b64", weight=4.0)}
     logger = _FakeLogger()
     res = ro.search_by_similarity(
-        mgr, query="q", min_similarity=0.0, vector_search_enabled=True,
-        embedding_generator=_FakeEmbeddingGenerator(), logger=logger,
+        mgr,
+        query="q",
+        min_similarity=0.0,
+        vector_search_enabled=True,
+        embedding_generator=_FakeEmbeddingGenerator(),
+        logger=logger,
     )
     assert [r["id"] for r in res] == ["m1"]
     assert logger.errors
@@ -829,15 +896,22 @@ def test_search_by_similarity_python_filters():
         "m5": _memory("m5", weight=9.0, source="chat", topics=["t1"]),  # 无 embedding
     }
     res = ro.search_by_similarity(
-        mgr, query="q", min_similarity=0.0, min_weight=5.0, source="chat",
-        topics=["t1"], vector_search_enabled=True,
-        embedding_generator=_FakeEmbeddingGenerator(), logger=_FakeLogger(),
+        mgr,
+        query="q",
+        min_similarity=0.0,
+        min_weight=5.0,
+        source="chat",
+        topics=["t1"],
+        vector_search_enabled=True,
+        embedding_generator=_FakeEmbeddingGenerator(),
+        logger=_FakeLogger(),
     )
     assert [r["id"] for r in res] == ["m2"]
 
 
 def test_search_by_similarity_skips_low_similarity_and_exceptions():
     """相似度低于阈值被跳过；单条计算抛异常被吞"""
+
     def _cosine(a, b):
         if b is None:
             raise RuntimeError("boom")
@@ -846,8 +920,12 @@ def test_search_by_similarity_skips_low_similarity_and_exceptions():
     mgr = _FakeManager()
     mgr.weighted_memories = {"m1": _memory("m1", embedding="b1", weight=1.0)}
     res = ro.search_by_similarity(
-        mgr, query="q", min_similarity=0.9, vector_search_enabled=True,
-        embedding_generator=_FakeEmbeddingGenerator(cosine=_cosine), logger=_FakeLogger(),
+        mgr,
+        query="q",
+        min_similarity=0.9,
+        vector_search_enabled=True,
+        embedding_generator=_FakeEmbeddingGenerator(cosine=_cosine),
+        logger=_FakeLogger(),
     )
     assert res == []
 
@@ -857,8 +935,13 @@ def test_search_by_similarity_skips_memory_with_bad_weight():
     mgr = _FakeManager()
     mgr.weighted_memories = {"m1": _memory("m1", embedding="b1", weight="not-a-number")}
     res = ro.search_by_similarity(
-        mgr, query="q", min_similarity=0.0, min_weight=None, vector_search_enabled=True,
-        embedding_generator=_FakeEmbeddingGenerator(), logger=_FakeLogger(),
+        mgr,
+        query="q",
+        min_similarity=0.0,
+        min_weight=None,
+        vector_search_enabled=True,
+        embedding_generator=_FakeEmbeddingGenerator(),
+        logger=_FakeLogger(),
     )
     assert res == []
 
@@ -878,9 +961,18 @@ def test_hybrid_search_memories_forwards_arguments(monkeypatch):
     monkeypatch.setattr(ro, "hybrid_search", _fake_hybrid)
     mgr = _FakeManager()
     res = ro.hybrid_search_memories(
-        mgr, query="q", limit=3, min_similarity=0.2, min_weight=1.0,
-        keyword_weight=0.4, use_probability=False, emotion="joy", scope="local",
-        exclude_categories=["sensitive"], associative_top_k=2, conflict_filter=False,
+        mgr,
+        query="q",
+        limit=3,
+        min_similarity=0.2,
+        min_weight=1.0,
+        keyword_weight=0.4,
+        use_probability=False,
+        emotion="joy",
+        scope="local",
+        exclude_categories=["sensitive"],
+        associative_top_k=2,
+        conflict_filter=False,
     )
     assert res == [{"id": "r"}]
     assert mgr.ensure_calls == 1
@@ -930,10 +1022,12 @@ def test_get_preference_state_memories_with_query_filters_text():
     """有查询：按 content/title/summary/topics 文本过滤，并过滤 active_states"""
     mgr = _FakeManager()
     mgr.weighted_memories = {
-        "p1": _memory("p1", memory_type="preference", status="active",
-                      content="I like tea", weight=3.0),
-        "p2": _memory("p2", memory_type="preference", status="active",
-                      content="I like coffee", weight=3.0),
+        "p1": _memory(
+            "p1", memory_type="preference", status="active", content="I like tea", weight=3.0
+        ),
+        "p2": _memory(
+            "p2", memory_type="preference", status="active", content="I like coffee", weight=3.0
+        ),
         "s1": _memory("s1", memory_type="state", readable_title="Tea time", weight=2.0),
     }
     mgr.get_active_states = lambda: [

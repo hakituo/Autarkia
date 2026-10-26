@@ -3,15 +3,15 @@ requires = ["setuptools==68.2.2", "wheel==0.41.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "xiaoyou-core"
-description = "小优AI助手核心模块"
+name = "Autarkia"
+description = "自托管 Agent 运行时：工具调用、长期记忆、主动任务与多角色隔离"
 readme = "readme.md"
 requires-python = ">=3.10,<3.15"
 license = { text = "AGPLv3" }
 version = "2.3.0"
 
 authors = [
-  { name = "Xiaoyou Team", email = "team@xiaoyou.ai" }
+  { name = "Autarkia Team" }
 ]
 
 classifiers = [
@@ -137,7 +137,7 @@ models = [
 ]
 
 # 便利别名：本地推理全套
-local = ["xiaoyou-core[models,voice,image]"]
+local = ["Autarkia[models,voice,image]"]
 
 # 工具配置
 [tool.black]
@@ -253,5 +253,8 @@ ignore_errors = true
 exclude = '(^|[\\/])(venv_.*|venv_core|build|dist|output|models|clients|paper|cpp_modules[\\/]cpp_scheduler[\\/]build|external|legacy)([\\/]|$)'
 
 [tool.setuptools.packages.find]
+# 必须保留 include 白名单：where=["."] 无 include 时 setuptools 会遍历
+# companion_data / models / data / logs 等 GB 级运行数据目录，editable 安装会卡住数分钟。
 where = ["."]
+include = ["clients*", "config*", "core*", "memory*", "multimodal*", "routers*"]
 exclude = ["tests*", "examples*", "docs*", "paper*"]

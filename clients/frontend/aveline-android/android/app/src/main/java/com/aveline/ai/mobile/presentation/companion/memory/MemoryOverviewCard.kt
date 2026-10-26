@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.domain.models.Memory
 import com.aveline.ai.mobile.domain.models.MemoryTopics
 import com.aveline.ai.mobile.presentation.components.SectionCard
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
@@ -68,7 +68,7 @@ internal fun MemoryOverviewCard(
                 TopicChip(
                     label = "全部",
                     count = visible.size,
-                    color = Primary,
+                    color = Accent,
                     selected = selectedTopic == null,
                     onClick = { onTopicSelect(null) }
                 )

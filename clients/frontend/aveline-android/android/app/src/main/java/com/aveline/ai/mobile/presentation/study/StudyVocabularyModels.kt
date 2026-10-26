@@ -13,6 +13,8 @@ data class StudyRecord(
     val topic: String,
     val content: String,
     val time: String,
+    /** 后端显式写入的分钟数；手写记录没有该字段时为 null。 */
+    val minutes: Int? = null,
 )
 
 @Serializable

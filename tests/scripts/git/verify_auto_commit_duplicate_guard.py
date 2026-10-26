@@ -5,7 +5,7 @@ r"""验证 auto_commit_push 的重复提交保护。
 保护口径：提交说明相同 且 本次文件是上一次提交文件的子集 -> 跳过。
 
 运行：
-    D:\projects\xiaoyou\venv_core\Scripts\python.exe -m tests.scripts.git.verify_auto_commit_duplicate_guard
+    D:\AI\autarkia\venv_core\Scripts\python.exe -m tests.scripts.git.verify_auto_commit_duplicate_guard
 """
 
 from __future__ import annotations

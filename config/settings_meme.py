@@ -22,8 +22,8 @@ class MemeSearchSettings(BaseSettings):
         le=20,
     )
     min_similarity: float = Field(
-        default=0.25,
-        description="最低余弦相似度阈值，低于此值不作为候选",
+        default=0.60,
+        description="最低余弦相似度阈值，低于此值不发图（无关匹配普遍在 0.5 附近）",
         ge=0.0,
         le=1.0,
     )

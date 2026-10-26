@@ -2,6 +2,7 @@
 测试 image_models API 修复
 验证 dashboard 的 image_models 计数逻辑与 list_models 返回结构
 """
+
 import asyncio
 import sys
 from pathlib import Path

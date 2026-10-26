@@ -429,9 +429,7 @@ class TestHealthDelegation:
     def test_health_check_gpu_worker_delegates(self):
         """健康检查委托给 health_monitor。"""
         eng = _new_engine()
-        eng.health_monitor = SimpleNamespace(
-            health_check_gpu_worker=AsyncMock(return_value=False)
-        )
+        eng.health_monitor = SimpleNamespace(health_check_gpu_worker=AsyncMock(return_value=False))
 
         assert asyncio.run(eng._health_check_gpu_worker()) is False
 
@@ -482,9 +480,7 @@ class TestMaybeSwitchCppModel:
 
     def test_false_when_already_loaded(self):
         """归一化后路径相同则视为已加载。"""
-        eng = _new_engine(
-            _llm_backend="cpp", _gpu_config={"model_path": "/m/a.gguf"}
-        )
+        eng = _new_engine(_llm_backend="cpp", _gpu_config={"model_path": "/m/a.gguf"})
 
         assert asyncio.run(eng._maybe_switch_cpp_model("/m/a.gguf")) is False
 
@@ -756,9 +752,7 @@ class TestSetupGpuWorker:
 
         scheduler = SimpleNamespace(addWorker=Mock())
         eng = _new_engine(scheduler=scheduler, _gpu_llm_worker=existing)
-        eng.model_manager = SimpleNamespace(
-            llm=None, _build_cpp_llm_config=lambda cfg: cfg
-        )
+        eng.model_manager = SimpleNamespace(llm=None, _build_cpp_llm_config=lambda cfg: cfg)
 
         eng._setup_gpu_worker({"model_path": "/m/a.gguf"})
 
@@ -782,9 +776,7 @@ class TestSetupGpuWorker:
             scheduler=scheduler,
             _gpu_llm_worker=_FakeWorker("w", init_result=False),
         )
-        eng.model_manager = SimpleNamespace(
-            llm=None, _build_cpp_llm_config=lambda cfg: cfg
-        )
+        eng.model_manager = SimpleNamespace(llm=None, _build_cpp_llm_config=lambda cfg: cfg)
 
         eng._setup_gpu_worker({"model_path": "/m/a.gguf"})
 
@@ -804,9 +796,7 @@ class TestSetupGpuWorker:
             scheduler=SimpleNamespace(addWorker=Mock()),
             _gpu_llm_worker=_FakeWorker("w"),
         )
-        eng.model_manager = SimpleNamespace(
-            llm=None, _build_cpp_llm_config=lambda cfg: cfg
-        )
+        eng.model_manager = SimpleNamespace(llm=None, _build_cpp_llm_config=lambda cfg: cfg)
 
         eng._setup_gpu_worker({"model_path": "/m/a.gguf"})
 
@@ -843,9 +833,7 @@ class TestOffloadRestoreProxy:
     def test_restore_python_backend_delegates(self):
         """非 cpp 后端回迁委托 gpu_manager。"""
         eng = _new_engine(_llm_backend="python")
-        eng.gpu_manager = SimpleNamespace(
-            restore_llm_to_gpu=AsyncMock(return_value=True)
-        )
+        eng.gpu_manager = SimpleNamespace(restore_llm_to_gpu=AsyncMock(return_value=True))
 
         assert asyncio.run(eng.restore_llm_to_gpu()) is True
 
@@ -1041,9 +1029,7 @@ class TestSwitchCppLlmWorkerDevice:
 
     def test_false_when_gpu_config_not_dict(self):
         """配置不是 dict 返回 False。"""
-        eng = _new_engine(
-            _llm_backend="cpp", scheduler=SimpleNamespace(), _gpu_config=None
-        )
+        eng = _new_engine(_llm_backend="cpp", scheduler=SimpleNamespace(), _gpu_config=None)
 
         assert asyncio.run(eng._switch_cpp_llm_worker_device(0)) is False
 
@@ -1224,9 +1210,7 @@ class TestMiscDelegation:
     def test_get_biological_system_delegates(self):
         """生物系统查询委托 bio_system_manager。"""
         eng = _new_engine()
-        eng.bio_system_manager = SimpleNamespace(
-            get_biological_system=Mock(return_value="BIO")
-        )
+        eng.bio_system_manager = SimpleNamespace(get_biological_system=Mock(return_value="BIO"))
 
         assert eng.get_biological_system() == "BIO"
 
@@ -1265,12 +1249,8 @@ class TestInit:
     def test_enabled_engine_registers_llm(self, monkeypatch):
         """启用且配置指向 gguf 时注册 llm_engine。"""
         monkeypatch.setattr(cse, "is_cpp_scheduler_available", lambda: True)
-        settings = SimpleNamespace(
-            scheduler=SimpleNamespace(use_cpp=True, use_cpp_for_llm=True)
-        )
-        monkeypatch.setattr(
-            "config.integrated_config.get_settings", lambda: settings
-        )
+        settings = SimpleNamespace(scheduler=SimpleNamespace(use_cpp=True, use_cpp_for_llm=True))
+        monkeypatch.setattr("config.integrated_config.get_settings", lambda: settings)
         monkeypatch.setattr(cse, "get_config", lambda *a, **k: "/m/text.gguf")
 
         rm = _FakeResourceManager()
@@ -1306,9 +1286,7 @@ class TestInit:
     def test_enabled_engine_skips_registration_for_non_gguf(self, monkeypatch):
         """文本模型不是 gguf 时不注册。"""
         monkeypatch.setattr(cse, "is_cpp_scheduler_available", lambda: True)
-        settings = SimpleNamespace(
-            scheduler=SimpleNamespace(use_cpp=True, use_cpp_for_llm=True)
-        )
+        settings = SimpleNamespace(scheduler=SimpleNamespace(use_cpp=True, use_cpp_for_llm=True))
         monkeypatch.setattr("config.integrated_config.get_settings", lambda: settings)
         monkeypatch.setattr(cse, "get_config", lambda *a, **k: "/m/text.bin")
         rm = _FakeResourceManager()
@@ -1323,9 +1301,7 @@ class TestInit:
     def test_registration_failure_is_logged(self, monkeypatch):
         """注册抛异常时不影响构造。"""
         monkeypatch.setattr(cse, "is_cpp_scheduler_available", lambda: True)
-        settings = SimpleNamespace(
-            scheduler=SimpleNamespace(use_cpp=True, use_cpp_for_llm=True)
-        )
+        settings = SimpleNamespace(scheduler=SimpleNamespace(use_cpp=True, use_cpp_for_llm=True))
         monkeypatch.setattr("config.integrated_config.get_settings", lambda: settings)
         monkeypatch.setattr(cse, "get_config", lambda *a, **k: "/m/text.gguf")
         rm = _FakeResourceManager(register_raises=True)
@@ -1600,13 +1576,9 @@ class TestAutoStartEngine:
 
     def test_starts_engine(self, monkeypatch, module_globals):
         """启用 C++ 时按配置启动引擎并置位全局标记。"""
-        settings = SimpleNamespace(
-            scheduler=SimpleNamespace(use_cpp=True), model=SimpleNamespace()
-        )
+        settings = SimpleNamespace(scheduler=SimpleNamespace(use_cpp=True), model=SimpleNamespace())
         monkeypatch.setattr("config.integrated_config.get_settings", lambda: settings)
-        monkeypatch.setattr(
-            "core.utils.config_accessor.get_config", lambda *a, **k: 6
-        )
+        monkeypatch.setattr("core.utils.config_accessor.get_config", lambda *a, **k: 6)
         engine = SimpleNamespace(start=Mock())
 
         cse._auto_start_engine(engine)
@@ -1616,9 +1588,7 @@ class TestAutoStartEngine:
 
     def test_swallows_start_error(self, monkeypatch, module_globals):
         """启动异常被吞掉且不置位标记。"""
-        settings = SimpleNamespace(
-            scheduler=SimpleNamespace(use_cpp=True), model=SimpleNamespace()
-        )
+        settings = SimpleNamespace(scheduler=SimpleNamespace(use_cpp=True), model=SimpleNamespace())
         monkeypatch.setattr("config.integrated_config.get_settings", lambda: settings)
         monkeypatch.setattr("core.utils.config_accessor.get_config", lambda *a, **k: 4)
         engine = SimpleNamespace(start=Mock(side_effect=RuntimeError("start boom")))
@@ -1649,9 +1619,7 @@ class TestGetSchedulerStatus:
 
     def test_returns_status_when_enabled(self, monkeypatch, module_globals):
         """引擎可用时返回状态字典。"""
-        engine = SimpleNamespace(
-            enabled=True, get_status=Mock(return_value={"enabled": True})
-        )
+        engine = SimpleNamespace(enabled=True, get_status=Mock(return_value={"enabled": True}))
         monkeypatch.setattr(cse, "get_scheduler_engine", lambda: engine)
 
         assert cse.get_scheduler_status() == {"enabled": True}

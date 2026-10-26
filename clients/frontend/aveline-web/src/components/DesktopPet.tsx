@@ -56,8 +56,8 @@ type PetSettings = {
     cloud: any;
 };
 
-const PET_STATE_KEY = 'xiaoyou_pet_state_v1';
-const PET_SETTINGS_KEY = 'xiaoyou_pet_settings_v1';
+const PET_STATE_KEY = 'autarkia_pet_state_v1';
+const PET_SETTINGS_KEY = 'autarkia_pet_settings_v1';
 
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
@@ -70,6 +70,30 @@ const readJson = <T,>(key: string): T | null => {
         return null;
     }
 };
+
+// 改名兼容：xiaoyou_* 旧 localStorage 键一次性迁移为 autarkia_*（读旧写新删旧；新键已存在时仅清理旧键）
+const LEGACY_PET_KEYS: Array<[string, string]> = [
+    ['xiaoyou_pet_state_v1', PET_STATE_KEY],
+    ['xiaoyou_pet_settings_v1', PET_SETTINGS_KEY],
+];
+
+const migrateLegacyPetKeys = () => {
+    try {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        LEGACY_PET_KEYS.forEach(([legacyKey, newKey]) => {
+            const raw = window.localStorage.getItem(legacyKey);
+            if (raw === null) return;
+            if (window.localStorage.getItem(newKey) === null) {
+                window.localStorage.setItem(newKey, raw);
+            }
+            window.localStorage.removeItem(legacyKey);
+        });
+    } catch {
+        // localStorage 不可用（隐私模式等）时跳过迁移
+    }
+};
+
+migrateLegacyPetKeys();
 
 const DesktopPet: React.FC<DesktopPetProps> = ({
     emotion,

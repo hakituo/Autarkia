@@ -11,7 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -24,7 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 
 /**
@@ -59,7 +60,7 @@ internal fun MemoryViewModeSwitcher(
     ) {
         ModeSegment(
             label = "聊天树",
-            icon = Icons.Default.List,
+            icon = Icons.AutoMirrored.Filled.List,
             selected = mode == MemoryViewMode.CONVERSATION,
             modifier = Modifier.weight(1f),
             onClick = { onModeChange(MemoryViewMode.CONVERSATION) }
@@ -92,7 +93,7 @@ private fun ModeSegment(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) Primary.copy(alpha = 0.18f) else Color.Transparent)
+            .background(if (selected) Accent.copy(alpha = 0.18f) else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center
@@ -101,14 +102,14 @@ private fun ModeSegment(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (selected) Primary else TextSecondary,
+                tint = if (selected) Accent else TextSecondary,
                 modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.size(5.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
-                color = if (selected) Primary else TextSecondary,
+                color = if (selected) Accent else TextSecondary,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
             )
         }

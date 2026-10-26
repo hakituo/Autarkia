@@ -156,8 +156,8 @@ def apply_cloud_history_budget(
     if not history:
         return history
 
-    cloud_max_history_messages = 60
-    cloud_max_history_chars = 12000
+    cloud_max_history_messages = 120
+    cloud_max_history_chars = 24000
     cloud_history_quantize_messages = 20
     cloud_history_quantum_seconds = 300
     study_active_recent_window = 20

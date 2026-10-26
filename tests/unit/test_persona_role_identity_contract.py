@@ -13,8 +13,12 @@ async def test_persona_identity_preserves_legacy_role(monkeypatch):
     monkeypatch.setattr(personas, "_get_persona_manager", lambda: Mock(list_personas=lambda: rows))
     monkeypatch.setattr(personas, "_resolve_default_model", lambda _: "")
     monkeypatch.setattr(personas, "_resolve_default_voice", lambda _: "")
-    monkeypatch.setattr("core.utils.data.scope_registry.resolve_persona_slug_scope", lambda _: "role_a")
-    monkeypatch.setattr("core.utils.data.scope_registry.get_registered_role_scopes", lambda: {"role_a"})
+    monkeypatch.setattr(
+        "core.utils.data.scope_registry.resolve_persona_slug_scope", lambda _: "role_a"
+    )
+    monkeypatch.setattr(
+        "core.utils.data.scope_registry.get_registered_role_scopes", lambda: {"role_a"}
+    )
     result = await personas.list_personas()
     assert result[0]["role"] == "角色甲"
     assert result[0]["role_id"] == "role_a"
@@ -23,5 +27,7 @@ async def test_persona_identity_preserves_legacy_role(monkeypatch):
 
 def test_unknown_persona_must_not_be_assigned_default_role(monkeypatch):
     monkeypatch.setattr("core.utils.data.scope_registry.resolve_persona_slug_scope", lambda _: "")
-    monkeypatch.setattr("core.utils.data.scope_registry.get_registered_role_scopes", lambda: {"aveline"})
+    monkeypatch.setattr(
+        "core.utils.data.scope_registry.get_registered_role_scopes", lambda: {"aveline"}
+    )
     assert personas._resolve_role_identity({"filename": "unknown.json", "role": "未知"}) == {}

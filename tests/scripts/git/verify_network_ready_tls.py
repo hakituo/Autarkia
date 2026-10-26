@@ -13,7 +13,7 @@ r"""验证 auto_commit_push 的联网就绪检测不会把"TCP 通了"误判成"
 4. `tls_probe()` 本身：握手失败必须返回 False。
 
 运行：
-    D:\projects\xiaoyou\venv_core\Scripts\python.exe -m tests.scripts.git.verify_network_ready_tls
+    D:\AI\autarkia\venv_core\Scripts\python.exe -m tests.scripts.git.verify_network_ready_tls
 """
 
 from __future__ import annotations

@@ -87,9 +87,7 @@ def test_compact_state_handles_empty_ctx():
 
 def test_compact_state_skips_blank_extra_facts():
     """补充事实为空时不应产生空行。"""
-    state = build_compact_state(
-        _sample_ctx(), persona_name="Aveline", extra_facts={"到期提醒": ""}
-    )
+    state = build_compact_state(_sample_ctx(), persona_name="Aveline", extra_facts={"到期提醒": ""})
     assert "到期提醒" not in state
 
 
@@ -229,9 +227,7 @@ def test_shadow_log_skipped_under_pytest(monkeypatch):
     from core.services.active_care.decision.engine import shadow as shadow_module
 
     captured = []
-    monkeypatch.setattr(
-        shadow_module.logger, "info", lambda *args, **kwargs: captured.append(args)
-    )
+    monkeypatch.setattr(shadow_module.logger, "info", lambda *args, **kwargs: captured.append(args))
     shadow_module._log_comparison(
         shadow_module.ShadowComparison(
             chosen_action="a",
@@ -265,5 +261,3 @@ async def test_maybe_run_shadow_never_raises(monkeypatch):
         llm_ctx=_sample_ctx(), chosen_action="a", result={"action": "defer_active_care"}
     )
     assert out is None
-
-

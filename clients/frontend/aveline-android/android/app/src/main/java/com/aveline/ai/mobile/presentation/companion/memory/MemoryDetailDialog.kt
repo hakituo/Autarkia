@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.domain.models.Memory
 import com.aveline.ai.mobile.domain.models.MemoryRelation
 import com.aveline.ai.mobile.domain.models.MemoryType
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
@@ -234,13 +234,13 @@ private fun MemoryRelationSection(
                 verticalAlignment = Alignment.Top
             ) {
                 Surface(
-                    color = Primary.copy(alpha = 0.14f),
+                    color = Accent.copy(alpha = 0.14f),
                     shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
                         text = relation.relationLabel,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Primary,
+                        color = Accent,
                         modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                     )
                 }

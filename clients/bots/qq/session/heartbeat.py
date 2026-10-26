@@ -13,7 +13,7 @@ class SessionHeartbeatHandler:
     """会话心跳处理器，处理服务端 ping 并回复 pong。"""
 
     def __init__(self, session):
-        # 持有外层 XiaoyouSession 实例，用于访问 ws/session_id 等属性
+        # 持有外层 AutarkiaSession 实例，用于访问 ws/session_id 等属性
         self.session = session
 
     async def handle_server_heartbeat(self, data: dict) -> bool:

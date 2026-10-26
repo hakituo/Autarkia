@@ -81,9 +81,14 @@ fun ChatCompanionPanel(
     // 刷新必须绑定“详情真正可见”，不能只绑头像点击回调：
     // 左滑打开同样会把面板设为 visible。显式传入当前 persona，避免面板可见与
     // ChatScreen 控制上下文 LaunchedEffect 同帧更新时误刷上一个角色。
+    //
+    // 走缓存优先（仓库有 60s 缓存）：面板先用已有数据渲染，后台再悄悄刷新，
+    // 用户不需要对着转圈等一次网络。
     LaunchedEffect(visible, viewingFilename) {
         if (visible) {
             statusViewModel.refreshStatusForPersona(viewingFilename)
+            // 深链场景下聊天页没拿到 persona，记忆首屏还没拉过，这里兜底（幂等）。
+            memoryViewModel.ensureLoaded()
         }
     }
 
@@ -153,6 +158,7 @@ fun ChatCompanionPanel(
 
                 CompanionScreen(
                     statusUiState = statusUiState,
+                    clockFlow = statusViewModel.clock,
                     personaUiState = personaUiState,
                     memoryUiState = memoryUiState,
                     graphUiState = graphUiState,
@@ -162,7 +168,12 @@ fun ChatCompanionPanel(
                     modelError = roleModelError,
                     onModelSelected = chatViewModel::selectModelForCurrentRole,
                     viewingFilename = viewingFilename,
-                    onRefreshStatus = statusViewModel::refreshStatus,
+                    // 错误横幅里的“重试”是用户主动点的，强制走网络拿权威数据。
+                    onRefreshStatus = statusViewModel::forceRefreshStatus,
+                    // 滑到日程页时的静默刷新：缓存优先，不打断用户滑动。
+                    onSilentRefreshStatus = {
+                        statusViewModel.refreshStatusForPersona(viewingFilename)
+                    },
                     onWakeCompanion = statusViewModel::wakeCompanion,
                     onInterruptCompanion = statusViewModel::interruptCompanion,
                     onSkipCompanionActivity = statusViewModel::skipCompanionActivity,

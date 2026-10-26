@@ -35,6 +35,4 @@ def test_normalize_function():
 
     for input_text, expected in test_cases:
         result = _normalize_qq_face_position(input_text)
-        assert result == expected, (
-            f"输入 {input_text!r}: 期望 {expected!r}, 得到 {result!r}"
-        )
+        assert result == expected, f"输入 {input_text!r}: 期望 {expected!r}, 得到 {result!r}"

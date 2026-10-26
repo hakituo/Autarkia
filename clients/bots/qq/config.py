@@ -30,16 +30,36 @@ def _normalize_loopback(url: str) -> str:
     return u.replace("ws://localhost", "ws://127.0.0.1").replace("wss://localhost", "wss://127.0.0.1")
 
 
+# 改名兼容：xiaoyou_* 旧配置键自动迁移为 autarkia_*（覆盖 multi_qq_config.json / config*.json 所有来源）
+LEGACY_CONFIG_KEYS = {
+    "xiaoyou_ws_url": "autarkia_ws_url",
+    "xiaoyou_http_base_url": "autarkia_http_base_url",
+    "xiaoyou_access_token": "autarkia_access_token",
+}
+
+
+def migrate_legacy_keys(raw: dict) -> dict:
+    """旧版 xiaoyou_* 配置键迁移为 autarkia_*；新键已有值时仅丢弃旧键。"""
+    migrated = dict(raw or {})
+    for old_key, new_key in LEGACY_CONFIG_KEYS.items():
+        if old_key not in migrated:
+            continue
+        legacy_val = migrated.pop(old_key)
+        if not migrated.get(new_key):
+            migrated[new_key] = legacy_val
+    return migrated
+
+
 @dataclass
 class QQAdapterConfig:
     role_id: str = ""
     role_name: str = ""
     napcat_ws_url: str = "ws://127.0.0.1:3001"
     napcat_access_token: str = ""
-    xiaoyou_ws_url: str = "ws://127.0.0.1:8000/api/v1/ws"
-    xiaoyou_http_base_url: str = ""
-    xiaoyou_access_token: str = ""
-    master_qq_id: str = ""  # 从环境变量 XIAOYOU_QQ_MASTER_ID 或配置文件读取，不硬编码
+    autarkia_ws_url: str = "ws://127.0.0.1:8000/api/v1/ws"
+    autarkia_http_base_url: str = ""
+    autarkia_access_token: str = ""
+    master_qq_id: str = ""  # 从环境变量 AUTARKIA_QQ_MASTER_ID 或配置文件读取，不硬编码
     peer_qq_id: str = ""
     group_id: str = ""
     profile_filename: str = ""
@@ -129,13 +149,14 @@ class QQAdapterConfig:
 
     def __post_init__(self):
         self.napcat_ws_url = _normalize_loopback(self.napcat_ws_url)
-        self.xiaoyou_ws_url = _normalize_loopback(self.xiaoyou_ws_url)
-        if not self.xiaoyou_http_base_url:
-            self.xiaoyou_http_base_url = self._ws_to_http_base(self.xiaoyou_ws_url)
+        self.autarkia_ws_url = _normalize_loopback(self.autarkia_ws_url)
+        if not self.autarkia_http_base_url:
+            self.autarkia_http_base_url = self._ws_to_http_base(self.autarkia_ws_url)
 
     @classmethod
     def from_dict(cls, d: dict, role_id: str = "") -> "QQAdapterConfig":
         ft = cls._get_field_types()
+        d = migrate_legacy_keys(d)
         kwargs = {"role_id": str(role_id or "")}
         for f in fields(cls):
             if f.name == "role_id":
@@ -180,7 +201,7 @@ class QQAdapterConfig:
                 with open(config_file, "r", encoding="utf-8") as f:
                     raw_cfg = json.load(f)
                 if isinstance(raw_cfg, dict):
-                    cfg.update(raw_cfg)
+                    cfg.update(migrate_legacy_keys(raw_cfg))
             except Exception as e:
                 logger.error(f"读取配置失败: {e}")
 
@@ -191,7 +212,7 @@ class QQAdapterConfig:
                     with open(role_file, "r", encoding="utf-8") as f:
                         raw_role = json.load(f)
                     if isinstance(raw_role, dict):
-                        cfg.update(raw_role)
+                        cfg.update(migrate_legacy_keys(raw_role))
                 except Exception as e:
                     logger.error(f"读取角色配置失败 ({role_id}): {e}")
 
@@ -199,31 +220,31 @@ class QQAdapterConfig:
 
         env_mappings = {
             "napcat_access_token": ["NAPCAT_ACCESS_TOKEN"],
-            "xiaoyou_access_token": ["XIAOYOU_ACCESS_TOKEN"],
-            "master_qq_id": ["XIAOYOU_QQ_MASTER_ID"],
-            "profile_filename": ["XIAOYOU_QQ_PUBLIC_PERSONA_FILE"],
-            "reply_voice_only": ["XIAOYOU_QQ_REPLY_VOICE_ONLY"],
-            "qq_message_buffer_window_seconds": ["XIAOYOU_QQ_MESSAGE_BUFFER_WINDOW_SECONDS"],
-            "qq_message_buffer_max": ["XIAOYOU_QQ_MESSAGE_BUFFER_MAX"],
-            "qq_skip_backend_merge_wait": ["XIAOYOU_QQ_SKIP_BACKEND_MERGE_WAIT"],
-            "qq_stream_split": ["XIAOYOU_QQ_STREAM_SPLIT"],
-            "qq_stream_comma_split_probability": ["XIAOYOU_QQ_STREAM_COMMA_SPLIT_PROBABILITY"],
-            "qq_max_bubble_len": ["XIAOYOU_QQ_MAX_BUBBLE_LEN"],
-            "qq_min_split_len": ["XIAOYOU_QQ_MIN_SPLIT_LEN"],
-            "qq_strip_markdown": ["XIAOYOU_QQ_STRIP_MARKDOWN"],
-            "qq_stream_long_threshold": ["XIAOYOU_QQ_STREAM_LONG_THRESHOLD"],
-            "qq_typing_delay_per_char_seconds": ["XIAOYOU_QQ_TYPING_DELAY_PER_CHAR_SECONDS"],
-            "qq_typing_delay_min_seconds": ["XIAOYOU_QQ_TYPING_DELAY_MIN_SECONDS"],
-            "qq_typing_delay_max_seconds": ["XIAOYOU_QQ_TYPING_DELAY_MAX_SECONDS"],
-            "qq_typing_delay_short_text_threshold": ["XIAOYOU_QQ_TYPING_DELAY_SHORT_TEXT_THRESHOLD"],
-            "qq_typing_delay_short_text_factor": ["XIAOYOU_QQ_TYPING_DELAY_SHORT_TEXT_FACTOR"],
-            "qq_typing_delay_random_min_factor": ["XIAOYOU_QQ_TYPING_DELAY_RANDOM_MIN_FACTOR"],
-            "qq_typing_delay_random_max_factor": ["XIAOYOU_QQ_TYPING_DELAY_RANDOM_MAX_FACTOR"],
-            "qq_typing_delay_surprise_probability": ["XIAOYOU_QQ_TYPING_DELAY_SURPRISE_PROBABILITY"],
-            "qq_typing_delay_surprise_min_seconds": ["XIAOYOU_QQ_TYPING_DELAY_SURPRISE_MIN_SECONDS"],
-            "qq_typing_delay_surprise_max_seconds": ["XIAOYOU_QQ_TYPING_DELAY_SURPRISE_MAX_SECONDS"],
-            "qq_typing_delay_use_bionic_profile": ["XIAOYOU_QQ_TYPING_DELAY_USE_BIONIC_PROFILE"],
-            "qq_typing_delay_bionic_profile_ttl_seconds": ["XIAOYOU_QQ_TYPING_DELAY_BIONIC_PROFILE_TTL_SECONDS"],
+            "autarkia_access_token": ["AUTARKIA_ACCESS_TOKEN", "XIAOYOU_ACCESS_TOKEN"],
+            "master_qq_id": ["AUTARKIA_QQ_MASTER_ID", "XIAOYOU_QQ_MASTER_ID"],
+            "profile_filename": ["AUTARKIA_QQ_PUBLIC_PERSONA_FILE", "XIAOYOU_QQ_PUBLIC_PERSONA_FILE"],
+            "reply_voice_only": ["AUTARKIA_QQ_REPLY_VOICE_ONLY", "XIAOYOU_QQ_REPLY_VOICE_ONLY"],
+            "qq_message_buffer_window_seconds": ["AUTARKIA_QQ_MESSAGE_BUFFER_WINDOW_SECONDS", "XIAOYOU_QQ_MESSAGE_BUFFER_WINDOW_SECONDS"],
+            "qq_message_buffer_max": ["AUTARKIA_QQ_MESSAGE_BUFFER_MAX", "XIAOYOU_QQ_MESSAGE_BUFFER_MAX"],
+            "qq_skip_backend_merge_wait": ["AUTARKIA_QQ_SKIP_BACKEND_MERGE_WAIT", "XIAOYOU_QQ_SKIP_BACKEND_MERGE_WAIT"],
+            "qq_stream_split": ["AUTARKIA_QQ_STREAM_SPLIT", "XIAOYOU_QQ_STREAM_SPLIT"],
+            "qq_stream_comma_split_probability": ["AUTARKIA_QQ_STREAM_COMMA_SPLIT_PROBABILITY", "XIAOYOU_QQ_STREAM_COMMA_SPLIT_PROBABILITY"],
+            "qq_max_bubble_len": ["AUTARKIA_QQ_MAX_BUBBLE_LEN", "XIAOYOU_QQ_MAX_BUBBLE_LEN"],
+            "qq_min_split_len": ["AUTARKIA_QQ_MIN_SPLIT_LEN", "XIAOYOU_QQ_MIN_SPLIT_LEN"],
+            "qq_strip_markdown": ["AUTARKIA_QQ_STRIP_MARKDOWN", "XIAOYOU_QQ_STRIP_MARKDOWN"],
+            "qq_stream_long_threshold": ["AUTARKIA_QQ_STREAM_LONG_THRESHOLD", "XIAOYOU_QQ_STREAM_LONG_THRESHOLD"],
+            "qq_typing_delay_per_char_seconds": ["AUTARKIA_QQ_TYPING_DELAY_PER_CHAR_SECONDS", "XIAOYOU_QQ_TYPING_DELAY_PER_CHAR_SECONDS"],
+            "qq_typing_delay_min_seconds": ["AUTARKIA_QQ_TYPING_DELAY_MIN_SECONDS", "XIAOYOU_QQ_TYPING_DELAY_MIN_SECONDS"],
+            "qq_typing_delay_max_seconds": ["AUTARKIA_QQ_TYPING_DELAY_MAX_SECONDS", "XIAOYOU_QQ_TYPING_DELAY_MAX_SECONDS"],
+            "qq_typing_delay_short_text_threshold": ["AUTARKIA_QQ_TYPING_DELAY_SHORT_TEXT_THRESHOLD", "XIAOYOU_QQ_TYPING_DELAY_SHORT_TEXT_THRESHOLD"],
+            "qq_typing_delay_short_text_factor": ["AUTARKIA_QQ_TYPING_DELAY_SHORT_TEXT_FACTOR", "XIAOYOU_QQ_TYPING_DELAY_SHORT_TEXT_FACTOR"],
+            "qq_typing_delay_random_min_factor": ["AUTARKIA_QQ_TYPING_DELAY_RANDOM_MIN_FACTOR", "XIAOYOU_QQ_TYPING_DELAY_RANDOM_MIN_FACTOR"],
+            "qq_typing_delay_random_max_factor": ["AUTARKIA_QQ_TYPING_DELAY_RANDOM_MAX_FACTOR", "XIAOYOU_QQ_TYPING_DELAY_RANDOM_MAX_FACTOR"],
+            "qq_typing_delay_surprise_probability": ["AUTARKIA_QQ_TYPING_DELAY_SURPRISE_PROBABILITY", "XIAOYOU_QQ_TYPING_DELAY_SURPRISE_PROBABILITY"],
+            "qq_typing_delay_surprise_min_seconds": ["AUTARKIA_QQ_TYPING_DELAY_SURPRISE_MIN_SECONDS", "XIAOYOU_QQ_TYPING_DELAY_SURPRISE_MIN_SECONDS"],
+            "qq_typing_delay_surprise_max_seconds": ["AUTARKIA_QQ_TYPING_DELAY_SURPRISE_MAX_SECONDS", "XIAOYOU_QQ_TYPING_DELAY_SURPRISE_MAX_SECONDS"],
+            "qq_typing_delay_use_bionic_profile": ["AUTARKIA_QQ_TYPING_DELAY_USE_BIONIC_PROFILE", "XIAOYOU_QQ_TYPING_DELAY_USE_BIONIC_PROFILE"],
+            "qq_typing_delay_bionic_profile_ttl_seconds": ["AUTARKIA_QQ_TYPING_DELAY_BIONIC_PROFILE_TTL_SECONDS", "XIAOYOU_QQ_TYPING_DELAY_BIONIC_PROFILE_TTL_SECONDS"],
             "openclaw_enabled": ["OPENCLAW_ENABLED"],
             "openclaw_http_base_url": ["OPENCLAW_HTTP_BASE_URL"],
             "openclaw_api_key": ["OPENCLAW_API_KEY"],
@@ -231,9 +252,9 @@ class QQAdapterConfig:
             "openclaw_timeout_seconds": ["OPENCLAW_TIMEOUT_SECONDS"],
             "openclaw_retry_attempts": ["OPENCLAW_RETRY_ATTEMPTS"],
             "openclaw_retry_base_delay_seconds": ["OPENCLAW_RETRY_BASE_DELAY_SECONDS"],
-            "remote_screenshot_enabled": ["XIAOYOU_QQ_REMOTE_SCREENSHOT_ENABLED"],
-            "remote_screenshot_cooldown_seconds": ["XIAOYOU_QQ_REMOTE_SCREENSHOT_COOLDOWN_SECONDS"],
-            "remote_file_ops_enabled": ["XIAOYOU_QQ_REMOTE_FILE_OPS_ENABLED"],
+            "remote_screenshot_enabled": ["AUTARKIA_QQ_REMOTE_SCREENSHOT_ENABLED", "XIAOYOU_QQ_REMOTE_SCREENSHOT_ENABLED"],
+            "remote_screenshot_cooldown_seconds": ["AUTARKIA_QQ_REMOTE_SCREENSHOT_COOLDOWN_SECONDS", "XIAOYOU_QQ_REMOTE_SCREENSHOT_COOLDOWN_SECONDS"],
+            "remote_file_ops_enabled": ["AUTARKIA_QQ_REMOTE_FILE_OPS_ENABLED", "XIAOYOU_QQ_REMOTE_FILE_OPS_ENABLED"],
         }
         for cfg_key, env_names in env_mappings.items():
             for env_name in env_names:
@@ -246,8 +267,8 @@ class QQAdapterConfig:
             fallback = str(cfg.pop("access_token") or "").strip()
             if not cfg.get("napcat_access_token"):
                 cfg["napcat_access_token"] = fallback
-            if not cfg.get("xiaoyou_access_token"):
-                cfg["xiaoyou_access_token"] = fallback
+            if not cfg.get("autarkia_access_token"):
+                cfg["autarkia_access_token"] = fallback
 
         if "public_persona_file" in cfg:
             cfg.pop("public_persona_file", None)

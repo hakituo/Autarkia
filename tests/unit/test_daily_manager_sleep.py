@@ -39,11 +39,11 @@ def manager(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     "sleep_time, wakeup_time, expected",
     [
-        ("22:00", "07:00", "9h"),          # 整点小时
-        ("23:30", "07:15", "7h45m"),       # 时 + 分
-        ("01:00", "09:00", "8h"),          # 凌晨睡、上午起（跨天）
-        ("22:00", "23:00", "1h"),          # 恰好 1h 下限
-        ("06:00", "22:00", "16h"),         # 恰好 16h 上限
+        ("22:00", "07:00", "9h"),  # 整点小时
+        ("23:30", "07:15", "7h45m"),  # 时 + 分
+        ("01:00", "09:00", "8h"),  # 凌晨睡、上午起（跨天）
+        ("22:00", "23:00", "1h"),  # 恰好 1h 下限
+        ("06:00", "22:00", "16h"),  # 恰好 16h 上限
     ],
 )
 def test_calc_sleep_duration_valid(manager, sleep_time, wakeup_time, expected):
@@ -53,9 +53,9 @@ def test_calc_sleep_duration_valid(manager, sleep_time, wakeup_time, expected):
 @pytest.mark.parametrize(
     "sleep_time, wakeup_time",
     [
-        ("22:00", "22:30"),   # 30 分钟 < 1h
-        ("22:00", "22:00"),   # 0 分钟
-        ("20:00", "18:00"),   # 跨天 22h > 16h
+        ("22:00", "22:30"),  # 30 分钟 < 1h
+        ("22:00", "22:00"),  # 0 分钟
+        ("20:00", "18:00"),  # 跨天 22h > 16h
     ],
 )
 def test_calc_sleep_duration_out_of_range_returns_none(manager, sleep_time, wakeup_time):
@@ -121,7 +121,10 @@ def test_record_wakeup_keeps_more_reliable_existing(manager):
 def test_record_wakeup_keeps_existing_chat_value(manager):
     # 同优先级、同属聊天来源、值不同 → 保持原值，防止多轮对话漂移
     manager._save_record(
-        {"date": "2026-04-07", "sleep_cycle": {"wakeup": "06:30", "wakeup_source": "chat_inferred"}},
+        {
+            "date": "2026-04-07",
+            "sleep_cycle": {"wakeup": "06:30", "wakeup_source": "chat_inferred"},
+        },
         "2026-04-07",
     )
     msg = manager.record_wakeup("08:00", source="chat_inferred")
@@ -130,7 +133,10 @@ def test_record_wakeup_keeps_existing_chat_value(manager):
 
 def test_record_wakeup_same_chat_value_records(manager):
     manager._save_record(
-        {"date": "2026-04-07", "sleep_cycle": {"wakeup": "06:30", "wakeup_source": "chat_inferred"}},
+        {
+            "date": "2026-04-07",
+            "sleep_cycle": {"wakeup": "06:30", "wakeup_source": "chat_inferred"},
+        },
         "2026-04-07",
     )
     msg = manager.record_wakeup("06:30", source="chat_inferred")
@@ -140,7 +146,10 @@ def test_record_wakeup_same_chat_value_records(manager):
 def test_record_wakeup_equal_non_chat_priority_records(manager):
     # 非聊天来源同优先级不触发「保持原值」，直接覆盖
     manager._save_record(
-        {"date": "2026-04-07", "sleep_cycle": {"wakeup": "06:30", "wakeup_source": "samsung_health"}},
+        {
+            "date": "2026-04-07",
+            "sleep_cycle": {"wakeup": "06:30", "wakeup_source": "samsung_health"},
+        },
         "2026-04-07",
     )
     msg = manager.record_wakeup("07:00", source="samsung_health")
@@ -158,7 +167,10 @@ def test_record_wakeup_force_overrides_priority(manager):
 
 def test_record_wakeup_updates_duration_when_sleep_known(manager):
     manager._save_record(
-        {"date": "2026-04-07", "sleep_cycle": {"sleep": "23:00", "sleep_source": "chat_explicit_time"}},
+        {
+            "date": "2026-04-07",
+            "sleep_cycle": {"sleep": "23:00", "sleep_source": "chat_explicit_time"},
+        },
         "2026-04-07",
     )
     manager.record_wakeup("07:00")
@@ -204,7 +216,10 @@ def test_record_sleep_keeps_more_reliable_existing(manager):
 
 def test_record_sleep_rejects_suspicious_daytime_overwrite(manager):
     manager._save_record(
-        {"date": "2026-04-07", "sleep_cycle": {"sleep": "22:00", "sleep_source": "chat_explicit_time"}},
+        {
+            "date": "2026-04-07",
+            "sleep_cycle": {"sleep": "22:00", "sleep_source": "chat_explicit_time"},
+        },
         "2026-04-07",
     )
     msg = manager.record_sleep("07:00", target_date="2026-04-07")
@@ -213,7 +228,10 @@ def test_record_sleep_rejects_suspicious_daytime_overwrite(manager):
 
 def test_record_sleep_overwrites_with_new_night_value(manager):
     manager._save_record(
-        {"date": "2026-04-07", "sleep_cycle": {"sleep": "22:00", "sleep_source": "chat_explicit_time"}},
+        {
+            "date": "2026-04-07",
+            "sleep_cycle": {"sleep": "22:00", "sleep_source": "chat_explicit_time"},
+        },
         "2026-04-07",
     )
     msg = manager.record_sleep("23:30", target_date="2026-04-07")
@@ -222,7 +240,10 @@ def test_record_sleep_overwrites_with_new_night_value(manager):
 
 def test_record_sleep_handles_unparsable_existing(manager):
     manager._save_record(
-        {"date": "2026-04-07", "sleep_cycle": {"sleep": "late", "sleep_source": "chat_explicit_time"}},
+        {
+            "date": "2026-04-07",
+            "sleep_cycle": {"sleep": "late", "sleep_source": "chat_explicit_time"},
+        },
         "2026-04-07",
     )
     msg = manager.record_sleep("22:00", target_date="2026-04-07")
@@ -231,7 +252,10 @@ def test_record_sleep_handles_unparsable_existing(manager):
 
 def test_record_sleep_same_value_rewrites(manager):
     manager._save_record(
-        {"date": "2026-04-07", "sleep_cycle": {"sleep": "22:00", "sleep_source": "chat_explicit_time"}},
+        {
+            "date": "2026-04-07",
+            "sleep_cycle": {"sleep": "22:00", "sleep_source": "chat_explicit_time"},
+        },
         "2026-04-07",
     )
     msg = manager.record_sleep("22:00", target_date="2026-04-07")

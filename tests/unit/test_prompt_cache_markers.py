@@ -46,9 +46,7 @@ def test_anthropic_on_openrouter_uses_top_level():
 
 
 def test_anthropic_accepts_cloud_prefixed_model_path():
-    strategy = resolve_cache_strategy(
-        OPENROUTER, "cloud:openrouter:anthropic/claude-opus-4.6"
-    )
+    strategy = resolve_cache_strategy(OPENROUTER, "cloud:openrouter:anthropic/claude-opus-4.6")
     assert strategy.style == STYLE_TOP_LEVEL
 
 
@@ -67,8 +65,13 @@ def test_qwen_whitelist_only():
 
 def test_auto_cached_providers_get_nothing():
     """DeepSeek / Grok / Moonshot 上游自动缓存，塞标记反而可能被当成未知字段"""
-    for model in ("deepseek/deepseek-v4-flash", "x-ai/grok-4.20", "moonshotai/kimi-k2.6",
-                  "openai/gpt-5.6", "minimax/minimax-m3:free"):
+    for model in (
+        "deepseek/deepseek-v4-flash",
+        "x-ai/grok-4.20",
+        "moonshotai/kimi-k2.6",
+        "openai/gpt-5.6",
+        "minimax/minimax-m3:free",
+    ):
         assert resolve_cache_strategy(OPENROUTER, model).style == STYLE_NONE, model
 
 
@@ -76,7 +79,10 @@ def test_direct_providers_are_untouched():
     """直连厂商不走 OpenRouter 规则，即使模型名带 anthropic/ 前缀也不能误加"""
     assert resolve_cache_strategy(DEEPSEEK, "anthropic/claude-opus-4.6").style == STYLE_NONE
     assert resolve_cache_strategy(None, "anthropic/claude-opus-4.6").style == STYLE_NONE
-    assert resolve_cache_strategy("https://open.bigmodel.cn/api/paas/v4", "glm-5.1").style == STYLE_NONE
+    assert (
+        resolve_cache_strategy("https://open.bigmodel.cn/api/paas/v4", "glm-5.1").style
+        == STYLE_NONE
+    )
 
 
 def test_direct_anthropic_api_supported():
@@ -124,8 +130,7 @@ def test_breakpoints_respect_ttl():
 
 def test_breakpoint_count_is_capped():
     long_history = [{"role": "system", "content": "人设"}] + [
-        {"role": "user" if i % 2 == 0 else "assistant", "content": f"第{i}轮"}
-        for i in range(10)
+        {"role": "user" if i % 2 == 0 else "assistant", "content": f"第{i}轮"} for i in range(10)
     ]
     assert len(pick_breakpoint_indices(long_history)) <= 2
 
@@ -146,8 +151,13 @@ def test_empty_and_tool_only_messages_are_skipped():
 def test_existing_block_content_is_preserved():
     messages = [
         {"role": "system", "content": [{"type": "text", "text": "人设"}]},
-        {"role": "user", "content": [{"type": "text", "text": "看图"},
-                                     {"type": "image_url", "image_url": {"url": "data:image/png;base64,x"}}]},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "看图"},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,x"}},
+            ],
+        },
         {"role": "user", "content": "说点什么"},
     ]
     marked = mark_cache_breakpoints(messages)

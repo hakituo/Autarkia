@@ -16,7 +16,7 @@
 4. 设备实测睡眠行（2026-09-18 新增）：跨天带两端日期，无数据时整行不出现。
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.prompt.verify_user_portrait_ownership
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.prompt.verify_user_portrait_ownership
 """
 
 from unittest.mock import MagicMock, patch

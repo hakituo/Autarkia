@@ -32,9 +32,9 @@ class CadenceGuardUnansweredCase(unittest.TestCase):
     def test_unanswered_suppresses_curious_question(self):
         guard = CadenceGuard()
         state = {
-            "last_proactive_at": _now() - 300,   # 5 分钟前发过
+            "last_proactive_at": _now() - 300,  # 5 分钟前发过
             "last_proactive_type": "curious_question",
-            "last_proactive_replied": False,      # 用户没回
+            "last_proactive_replied": False,  # 用户没回
         }
         verdict = guard.evaluate(
             now=_now(),
@@ -49,7 +49,7 @@ class CadenceGuardUnansweredCase(unittest.TestCase):
         state = {
             "last_proactive_at": _now() - 300,
             "last_proactive_type": "curious_question",
-            "last_proactive_replied": True,       # 用户回了
+            "last_proactive_replied": True,  # 用户回了
         }
         # 回复后不再因"未回复"抑制，但仍受全局冷却限制
         verdict = guard.evaluate(
@@ -66,7 +66,7 @@ class CadenceGuardSameTopicCase(unittest.TestCase):
 
     def _state_after_meal_45min_ago(self) -> dict:
         return {
-            "last_proactive_at": _now() - 45 * 60,   # 45 分钟前（全局冷却已过）
+            "last_proactive_at": _now() - 45 * 60,  # 45 分钟前（全局冷却已过）
             "last_proactive_type": "share_thought",
             "last_proactive_replied": True,
             "last_sent_topic": "curious_question:food",  # 上一条是吃饭话题
@@ -97,7 +97,7 @@ class CadenceGuardSameTopicCase(unittest.TestCase):
         """15 分钟内刚发过主动消息：全局冷却挡在第 2 层。"""
         guard = CadenceGuard()
         state = {
-            "last_proactive_at": _now() - 15 * 60,   # 15 分钟前
+            "last_proactive_at": _now() - 15 * 60,  # 15 分钟前
             "last_proactive_type": "curious_question",
             "last_proactive_replied": True,
         }
@@ -267,6 +267,7 @@ class SleepSafeMorningCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from core.services.active_care.prompt import prompt_builder
+
         cls.builder = prompt_builder
 
     def test_sleep_session_active_uses_sleep_safe_template(self):
@@ -445,9 +446,7 @@ class StateReportPrefixGateCase(unittest.TestCase):
 
     def test_activity_return_not_style_exempt_for_prefix_question(self):
         """活动回归只豁免长度，不豁免'报备状态 + 追问'（模板本就要求不提问）。"""
-        result = self.validator.validate(
-            "在做饭。你要不要一起？", "activity_return_proactive"
-        )
+        result = self.validator.validate("在做饭。你要不要一起？", "activity_return_proactive")
         self.assertFalse(result.allowed)
         self.assertEqual(result.reason, "padded_status_report")
 
@@ -459,9 +458,7 @@ class StateReportPrefixGateCase(unittest.TestCase):
 
     def test_activity_return_plain_farewell_passes(self):
         """复刻 10/11：无疑问的普通离场告别放行（不复述问题由模板与频控管）。"""
-        result = self.validator.validate(
-            "我继续做饭了，你上班去。", "activity_return_proactive"
-        )
+        result = self.validator.validate("我继续做饭了，你上班去。", "activity_return_proactive")
         self.assertTrue(result.allowed)
 
 

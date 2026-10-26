@@ -27,8 +27,14 @@ class _BatchIndexer:
 
     def addRecords(self, ids, embeddings, weights, timestamps, sources, topics_list):
         self.batch_calls.append(
-            (list(ids), list(embeddings), list(weights), list(timestamps),
-             list(sources), list(topics_list))
+            (
+                list(ids),
+                list(embeddings),
+                list(weights),
+                list(timestamps),
+                list(sources),
+                list(topics_list),
+            )
         )
         return len(ids) if self.written is None else self.written
 

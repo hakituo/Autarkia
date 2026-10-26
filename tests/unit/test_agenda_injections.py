@@ -35,11 +35,13 @@ def _isolate(agenda_sandbox):
 @pytest.mark.asyncio
 async def test_picks_highest_priority_and_stops(fake_agenda_ladder):
     """多条命中时只取优先级最高的那条，且不再继续探测。"""
-    calls, _commits = fake_agenda_ladder(hits={
-        "tomorrow_tone": "【今日总基调】x",
-        "today_plan": "【今日学习生活计划】x",
-        "meal_care": "【饮食提醒】x",
-    })
+    calls, _commits = fake_agenda_ladder(
+        hits={
+            "tomorrow_tone": "【今日总基调】x",
+            "today_plan": "【今日学习生活计划】x",
+            "meal_care": "【饮食提醒】x",
+        }
+    )
     name, text, _commit = await ai.pick_agenda_injection(agent=None, user_id="u1")
 
     assert name == "tomorrow_tone"
@@ -61,10 +63,12 @@ async def test_returns_empty_when_nothing_hits(fake_agenda_ladder):
 @pytest.mark.asyncio
 async def test_commit_only_runs_for_the_winner(fake_agenda_ladder):
     """提交回调只有胜出那条会被调用 —— 落选者不能被消费。"""
-    _calls, commits = fake_agenda_ladder(hits={
-        "daily_study_task": "【每日总结】x",
-        "tomorrow_tone": "【今日总基调】x",
-    })
+    _calls, commits = fake_agenda_ladder(
+        hits={
+            "daily_study_task": "【每日总结】x",
+            "tomorrow_tone": "【今日总基调】x",
+        }
+    )
     name, _text, commit = await ai.pick_agenda_injection(agent=None, user_id="u1")
 
     assert name == "daily_study_task"

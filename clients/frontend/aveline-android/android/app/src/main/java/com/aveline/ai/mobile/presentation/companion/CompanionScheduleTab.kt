@@ -28,7 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.domain.models.CharacterDailySlot
-import com.aveline.ai.mobile.presentation.status.StatusUiState
+import com.aveline.ai.mobile.presentation.status.ui.StatusUiState
 import com.aveline.ai.mobile.presentation.theme.LifeHealth
 import com.aveline.ai.mobile.presentation.theme.SelectionSurface
 import com.aveline.ai.mobile.presentation.theme.TextPrimary

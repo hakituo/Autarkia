@@ -10,11 +10,9 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
@@ -77,10 +74,18 @@ fun ChatMessageList(
     horizontalContentGestureState: HorizontalContentGestureState,
     actions: ChatMessageActions,
     forceFollowLatestRequest: Int = 0,
+    /**
+     * 软键盘是否可见。由聊天页根层（整页 imePadding 之外）传入。
+     * 列表自己读 insets 拿不到"键盘正在弹出"这件事与页面布局的先后关系，
+     * 只有根层那一份才是与本次键盘动画同步的。
+     */
+    imeVisible: Boolean = false,
     hasOlderMessages: Boolean = false,
     onLoadOlderMessages: () -> Unit = {},
     /** 点图片/表情包/视频时回调，由外层打开全屏查看器；为 null 时媒体不可点 */
     onMediaClick: ((MediaPreview) -> Unit)? = null,
+    /** 设置页「动作描写」开关；false 时历史上标成 retraction 的消息也按普通气泡显示。 */
+    stageDirectionEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     // 等待回复时插入的那条空白 AI 占位不参与列表布局。
@@ -124,7 +129,9 @@ fun ChatMessageList(
         horizontalContentGestureState = horizontalContentGestureState,
         actions = actions,
         forceFollowLatestRequest = forceFollowLatestRequest,
+        imeVisible = imeVisible,
         onMediaClick = onMediaClick,
+        stageDirectionEnabled = stageDirectionEnabled,
         modifier = modifier
     )
 }
@@ -140,7 +147,10 @@ private fun LoadedMessageList(
     horizontalContentGestureState: HorizontalContentGestureState,
     actions: ChatMessageActions,
     forceFollowLatestRequest: Int,
+    imeVisible: Boolean,
     onMediaClick: ((MediaPreview) -> Unit)?,
+    /** 设置页「动作描写」开关；false 时历史上标成 retraction 的消息也按普通气泡显示。 */
+    stageDirectionEnabled: Boolean,
     modifier: Modifier
 ) {
     val latestItemIndex = messages.lastIndex
@@ -150,8 +160,6 @@ private fun LoadedMessageList(
 
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val density = LocalDensity.current
-    val imeVisible = WindowInsets.ime.getBottom(density) > 0
 
     var previousTailMessageId by remember(sessionId) {
         mutableStateOf(messages.lastOrNull()?.id)
@@ -257,11 +265,25 @@ private fun LoadedMessageList(
 
     var listViewportHeightPx by remember(sessionId) { mutableIntStateOf(0) }
     var previousListHeightPx by remember(sessionId) { mutableIntStateOf(0) }
+
+    // 键盘真正可见的那一刻无条件贴住最新消息（QQ/微信行为）。
+    // 旧实现只在 followLatest 为 true 时跟随：用户翻着历史点输入框时 followLatest 是 false，
+    // 键盘就只把页面压矮、末尾几条被裁掉，看起来像"键盘直接盖在聊天上"。
+    LaunchedEffect(sessionId, imeVisible) {
+        if (!imeVisible) return@LaunchedEffect
+        followLatest = true
+        scrollToLatest()
+    }
+
     LaunchedEffect(listViewportHeightPx) {
         val previous = previousListHeightPx
         previousListHeightPx = listViewportHeightPx
-        if (previous > 0 && listViewportHeightPx != previous && followLatest) {
-            scrollToLatest()
+        // 键盘弹出/收起会把 viewport 高度逐帧报上来（IME 动画约 300ms）。
+        // 键盘可见期间不看 followLatest：每一帧都要重新贴底，
+        // 否则只会按旧的最大滚动量钳制，动画结束后末尾几条仍然被切掉。
+        if (previous > 0 && listViewportHeightPx != previous) {
+            if (imeVisible) followLatest = true
+            if (followLatest) scrollToLatest()
         }
     }
 
@@ -303,7 +325,9 @@ private fun LoadedMessageList(
         ) { index ->
             val message = messages[index]
             val previousMessage = messages.getOrNull(index - 1)
-            val isRetraction = !message.isUser && message.messageType == "retraction"
+            // 开关关闭时不认历史 retraction 标记：老消息的括号在写库时已被剥掉，
+            // 这里只能让它以普通气泡显示，否则用户会觉得「关了开关还是一片居中的灰字」。
+            val isRetraction = stageDirectionEnabled && !message.isUser && message.messageType == "retraction"
             val isSystemNarration = !message.isUser && !isRetraction && (
                 message.text == "新话题已开启。" || message.text.contains("系统就绪")
             )
@@ -348,7 +372,8 @@ private fun LoadedMessageList(
                                     revealedActionsMessageId =
                                         if (revealedActionsMessageId == message.id) null else message.id
                                 },
-                                onMediaClick = onMediaClick
+                                onMediaClick = onMediaClick,
+                                stageDirectionEnabled = stageDirectionEnabled
                             )
 
                             // 操作栏点击消息后才展开，默认不占位。

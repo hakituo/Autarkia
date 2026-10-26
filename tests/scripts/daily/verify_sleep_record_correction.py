@@ -10,7 +10,7 @@
 3. 新增 UpdateSleepRecordTool 工具供 AI 调用
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.daily.verify_sleep_record_correction
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.daily.verify_sleep_record_correction
 """
 
 import asyncio

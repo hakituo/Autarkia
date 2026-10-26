@@ -82,7 +82,10 @@ class HybridLLMModule(LLMModule):
         """重新加载混合模块配置"""
         logger.info("Reloading HybridLLMModule...")
         from config.integrated_config import get_settings
-        from config.model_config import get_default_chat_model
+        from config.model_config import (
+            get_default_chat_model,
+            get_provider_default_model,
+        )
 
         settings = get_settings()
 
@@ -98,7 +101,11 @@ class HybridLLMModule(LLMModule):
             if default_chat_model and ":" in default_chat_model:
                 self.default_model_name = default_chat_model.split(":")[-1]
             else:
-                self.default_model_name = "deepseek-v4-flash"
+                # 配置缺失时也走 YAML 的 provider_default_models，不写死型号
+                self.default_model_name = (
+                    get_provider_default_model(self.default_provider, "")
+                    or str(settings.model.name or "")
+                )
         allow_preload = bool(getattr(settings.model, "llm_preload_on_startup", True))
         self.preload_local = (self.default_provider == "local") and allow_preload
 

@@ -14,6 +14,8 @@ import com.aveline.ai.mobile.data.local.database.entity.MessageTreeMessage
 import com.aveline.ai.mobile.data.remote.api.AvelineApiService
 import com.aveline.ai.mobile.data.remote.api.SseParser
 import com.aveline.ai.mobile.data.remote.api.StreamEvent
+import com.aveline.ai.mobile.data.remote.api.errorFromHttpResponse
+import com.aveline.ai.mobile.data.remote.api.errorFromThrowable
 import com.aveline.ai.mobile.data.remote.dto.HistoryMessageDto
 import com.aveline.ai.mobile.data.remote.dto.MessageBranchMetadata
 import com.aveline.ai.mobile.data.remote.dto.MessageRequest
@@ -201,7 +203,7 @@ class ChatRepositoryImpl @Inject constructor(
                 }
                 trySend(StreamEvent.Done(messageId = msg.id, emotion = msg.emotion))
             }.onFailure { e ->
-                trySend(StreamEvent.Error("请求失败: ${e.message}"))
+                trySend(errorFromThrowable(e, "请求失败"))
             }
             close()
             return@callbackFlow
@@ -222,12 +224,15 @@ class ChatRepositoryImpl @Inject constructor(
             val response = streamingApiService.sendMessageStreaming(request)
 
             if (!response.isSuccessful) {
-                trySend(StreamEvent.Error("HTTP ${response.code()}: ${response.message()}"))
+                // 后端 422/500/503 的具体原因都在 errorBody 里（error_code / detail / message），
+                // 只拿 reason phrase 的话用户永远只能看到一个 "Unprocessable Entity"。
+                val errorBody = runCatching { response.errorBody()?.string() }.getOrNull()
+                trySend(errorFromHttpResponse(response.code(), response.message(), errorBody))
                 return@callbackFlow
             }
 
             val body = response.body() ?: run {
-                trySend(StreamEvent.Error("响应体为空"))
+                trySend(StreamEvent.Error("响应体为空", httpStatus = response.code()))
                 return@callbackFlow
             }
             responseBody = body
@@ -239,7 +244,7 @@ class ChatRepositoryImpl @Inject constructor(
                     source.readUtf8Line() ?: break  // 流自然结束
                 } catch (e: Exception) {
                     if (isActive) {
-                        trySend(StreamEvent.Error("读取流失败: ${e.message}"))
+                        trySend(errorFromThrowable(e, "读取流失败"))
                     }
                     break
                 }
@@ -254,7 +259,7 @@ class ChatRepositoryImpl @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e(TAG, "流式请求失败", e)
-            trySend(StreamEvent.Error("请求失败: ${e.message}"))
+            trySend(errorFromThrowable(e, "请求失败"))
         } finally {
             // 确保关闭 ResponseBody 释放连接
             try { responseBody?.close() } catch (_: Exception) {}

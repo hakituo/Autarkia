@@ -89,12 +89,12 @@
 
 *   **问题描述**: 在 Windows 环境下，使用 CMake/MSBuild 编译带 CUDA 支持的 C++ 调度器时，`nvcc` 报错 `fatal : A single input file is required for a non-link phase`。
 *   **原因分析**:
-    *   **路径空格限制**: NVIDIA CUDA 编译器 (`nvcc`) 在 Windows 上对包含空格的路径（如 `D:\projects\xiaoyou`）处理非常脆弱。即使在 CMake 中进行了引号转义，底层 MSBuild 调用 `nvcc` 时仍可能解析失败。
+    *   **路径空格限制**: NVIDIA CUDA 编译器 (`nvcc`) 在 Windows 上对包含空格的路径（如 `D:\AI\xiaoyou-core`）处理非常脆弱。即使在 CMake 中进行了引号转义，底层 MSBuild 调用 `nvcc` 时仍可能解析失败。
     *   **Toolset 丢失**: 如果 CUDA 安装路径未正确注册到 VS 的 `BuildCustomizations`，CMake 会报 `No CUDA toolset found`。
 *   **尝试过的解决方案**:
     1.  **指定 Toolset**: 在 CMake 命令行中增加 `-DCUDAToolkit_ROOT="..."` 并显式指定 `Visual Studio 17 2022` 生成器。
     2.  **短路径绕过**: 尝试使用 Windows 8.3 短路径名（如 `XIAOYO~1`），但 `nvcc` 内部仍可能展开为长路径。
-    3.  **虚拟磁盘 (subst)**: 使用 `subst Z: "D:\projects\xiaoyou"` 将项目映射到不含空格的 `Z:\` 盘。
+    3.  **虚拟磁盘 (subst)**: 使用 `subst Z: "D:\AI\xiaoyou-core"` 将项目映射到不含空格的 `Z:\` 盘。
 *   **最终结论**:
     *   **核心痛点**: Windows 下 CUDA 编译环境对路径极其敏感。
     *   **最佳实践**: 始终将 C++/CUDA 项目放置在不含空格和中文字符的简单路径下（如 `C:\Projects\xiaoyou`）。

@@ -13,7 +13,6 @@ from unittest.mock import AsyncMock
 import pytest
 
 
-
 # ==================== 单角色模式的 payload 归属补齐 ====================
 #
 # 回归背景：单 persona 模式下 proactive_checker 走 `else: _execute_decision_flow(now)`，
@@ -84,9 +83,7 @@ def _extra_payload(aveline_service):
 @pytest.mark.asyncio
 async def test_single_persona_payload_profile_filename_filled_from_scope():
     """单角色模式（profile_filename 为空）也要把归属字段补进 payload。"""
-    dispatcher, service, _ = _dispatcher_stub(
-        runtime_scope="aveline", resolved="core_aveline.json"
-    )
+    dispatcher, service, _ = _dispatcher_stub(runtime_scope="aveline", resolved="core_aveline.json")
 
     assert await _dispatch(dispatcher, service) is True
 
@@ -98,9 +95,7 @@ async def test_single_persona_payload_profile_filename_filled_from_scope():
 @pytest.mark.asyncio
 async def test_single_persona_payload_skips_unresolvable_scope():
     """反查不到（隔离 scope / 未登记角色）时 payload 不加字段，绝不猜角色。"""
-    dispatcher, service, _ = _dispatcher_stub(
-        runtime_scope="persona_deadbeefdeadbeef", resolved=""
-    )
+    dispatcher, service, _ = _dispatcher_stub(runtime_scope="persona_deadbeefdeadbeef", resolved="")
 
     assert await _dispatch(dispatcher, service) is True
 
@@ -141,9 +136,7 @@ async def test_payload_fallback_does_not_leak_into_stale_check():
     否则会连带把 per-persona 计数 key 从 "" 换成真实 scope，
     把 non_response 计数迁到另一个 state 文件（属行为变更）。
     """
-    dispatcher, service, _ = _dispatcher_stub(
-        runtime_scope="aveline", resolved="core_aveline.json"
-    )
+    dispatcher, service, _ = _dispatcher_stub(runtime_scope="aveline", resolved="core_aveline.json")
     seen = {}
 
     def _capture(**kwargs):

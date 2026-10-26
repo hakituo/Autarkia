@@ -5,6 +5,7 @@
 2. 历史清洗只给「与当前渠道不同」的记录打后缀，且重复清洗不叠加；
 3. 聊天记录检索工具的格式化结果带来源后缀。
 """
+
 from __future__ import annotations
 
 import pytest
@@ -185,9 +186,7 @@ def test_清洗在_qq_渠道下不给_qq_历史打后缀():
         sanitize_history_messages,
     )
 
-    cleaned = sanitize_history_messages(
-        [_event("user", "QQ 上说的", "qq")], current_platform="qq"
-    )
+    cleaned = sanitize_history_messages([_event("user", "QQ 上说的", "qq")], current_platform="qq")
     assert "（来自" not in cleaned[0]["content"]
 
 

@@ -31,10 +31,13 @@ from scripts.sync.learning_data.items import (
     MERGE_LIFE_STATE,
     MERGE_MEMORY,
     MERGE_TEXT_RICHER,
+    MERGE_VOCAB,
+    MERGE_WORD_LIST,
 )
 from scripts.sync.learning_data.life_state_merge import union_life_state
 from scripts.sync.learning_data.memory_merge import union_memory_json
 from scripts.sync.learning_data.text_merge import union_text_richer
+from scripts.sync.learning_data.vocab_merge import union_vocab_progress, union_word_list
 
 #: 记录里可能承载时间的字段，按常见程度排列（聊天用 timestamp，
 #: 设备流水用 server_timestamp / last_updated，操作流水用 time）
@@ -62,6 +65,10 @@ def union_bytes(mode: str, left: bytes, right: bytes) -> Optional[bytes]:
         return union_dated_state(left, right)
     if mode == MERGE_LIFE_STATE:
         return union_life_state(left, right)
+    if mode == MERGE_VOCAB:
+        return union_vocab_progress(left, right)
+    if mode == MERGE_WORD_LIST:
+        return union_word_list(left, right)
     return None
 
 

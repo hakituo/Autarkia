@@ -32,7 +32,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from memory.core.distillation import trim_short_term_memory  # noqa: E402
 
 # 与 app.yaml 的 short_term_capacity 保持一致
-MAX_SHORT_TERM = 60
+MAX_SHORT_TERM = 120
 COMPANION_DATA = PROJECT_ROOT / "companion_data"
 
 

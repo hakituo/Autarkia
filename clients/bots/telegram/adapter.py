@@ -44,9 +44,9 @@ from clients.bots.telegram.settings import (
     STRIP_MARKDOWN,
     TELEGRAM_BOT_TOKEN,
     TELEGRAM_PROXY_URL,
-    XIAOYOU_ACCESS_TOKEN,
-    XIAOYOU_HTTP_BASE_URL,
-    XIAOYOU_WS_URL,
+    AUTARKIA_ACCESS_TOKEN,
+    AUTARKIA_HTTP_BASE_URL,
+    AUTARKIA_WS_URL,
     logger,
 )
 
@@ -73,9 +73,9 @@ class TelegramAdapter(MediaSenderMixin, CommandHandlersMixin):
         self.last_error: Exception | None = None
 
         # 后端连接配置
-        self.xiaoyou_http_base_url = XIAOYOU_HTTP_BASE_URL
-        self.xiaoyou_ws_url = XIAOYOU_WS_URL
-        self.xiaoyou_access_token = XIAOYOU_ACCESS_TOKEN
+        self.autarkia_http_base_url = AUTARKIA_HTTP_BASE_URL
+        self.autarkia_ws_url = AUTARKIA_WS_URL
+        self.autarkia_access_token = AUTARKIA_ACCESS_TOKEN
         self.profile_filename = PROFILE_FILENAME
 
         # 功能开关
@@ -87,8 +87,8 @@ class TelegramAdapter(MediaSenderMixin, CommandHandlersMixin):
 
         # HTTP 客户端（复用会话）
         self.http_client = HttpClient(
-            base_url=XIAOYOU_HTTP_BASE_URL,
-            access_token=XIAOYOU_ACCESS_TOKEN,
+            base_url=AUTARKIA_HTTP_BASE_URL,
+            access_token=AUTARKIA_ACCESS_TOKEN,
             timeout=float(HTTP_TIMEOUT_SECONDS),
             logger=logger,
         )
@@ -390,7 +390,7 @@ class TelegramAdapter(MediaSenderMixin, CommandHandlersMixin):
         logger.info("正在启动 Telegram Adapter...")
         try:
             ok = await self.health_checker.prelight_check(
-                self.xiaoyou_http_base_url, self.xiaoyou_ws_url
+                self.autarkia_http_base_url, self.autarkia_ws_url
             )
             if not ok:
                 logger.warning("后端健康检查未通过，仍尝试启动")

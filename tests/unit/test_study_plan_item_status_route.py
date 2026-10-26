@@ -97,9 +97,7 @@ class TestPlanItemStatusRoute(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(resp["status"], "success")
         self.assertEqual(journal.get_plan_date, "2026-09-11")
-        self.assertEqual(
-            journal.mark_calls, [("2026-09-11", "p_core", "completed")]
-        )
+        self.assertEqual(journal.mark_calls, [("2026-09-11", "p_core", "completed")])
         self.assertEqual(resp["data"]["status"], "completed")
         self.assertEqual(resp["data"]["plan"], "- [x] 19:00 核心学习块\n")
 
@@ -191,9 +189,7 @@ class TestPlanItemStatusRoute(unittest.IsolatedAsyncioTestCase):
     def test_match_item_by_title_only_when_unique(self):
         """无固定时间的"灵活"项只给名称也应能命中。"""
         plan = _plan(PlanItem(id="p_flex", time=None, title="巩固昨日重点：general"))
-        matched = _match_plan_item(
-            plan, "", _normalize_plan_title("巩固昨日重点：general")
-        )
+        matched = _match_plan_item(plan, "", _normalize_plan_title("巩固昨日重点：general"))
         self.assertIsNotNone(matched)
         self.assertEqual(matched.id, "p_flex")
 
@@ -218,9 +214,7 @@ class TestVocabPlanAutoMarkDate(unittest.IsolatedAsyncioTestCase):
         journal = _FakeJournal(plan)
         service = SimpleNamespace(get_today_review_status=lambda: {"completed": True})
 
-        with patch(
-            "core.services.journal.service.get_journal_service", return_value=journal
-        ):
+        with patch("core.services.journal.service.get_journal_service", return_value=journal):
             got = await vocab_router._mark_vocab_plan_completed_if_done(service)  # noqa: SLF001
 
         self.assertTrue(got)

@@ -117,10 +117,10 @@ DEFAULT_PERSONA_FILE = default_persona_file()
 
 DEFAULT_CONFIG = {
     "napcat_ws_url": "ws://127.0.0.1:3001",
-    "xiaoyou_ws_url": "ws://127.0.0.1:8000/api/v1/ws",
+    "autarkia_ws_url": "ws://127.0.0.1:8000/api/v1/ws",
     "access_token": "",
     "napcat_access_token": "",
-    "xiaoyou_access_token": "",
+    "autarkia_access_token": "",
     "master_qq_id": "",
     "public_persona_file": "",
     "reply_voice_only": False,
@@ -166,6 +166,35 @@ DEFAULT_CONFIG = {
     "max_concurrent_messages": 6,
 }
 
+# 改名兼容：xiaoyou_* 旧配置键 / XIAOYOU_* 旧环境变量在读取时自动迁移为 autarkia_* / AUTARKIA_*
+LEGACY_CONFIG_KEYS = {
+    "xiaoyou_ws_url": "autarkia_ws_url",
+    "xiaoyou_http_base_url": "autarkia_http_base_url",
+    "xiaoyou_access_token": "autarkia_access_token",
+}
+
+
+def migrate_legacy_keys(raw: dict) -> dict:
+    """旧版 xiaoyou_* 配置键迁移为 autarkia_*；新键已有值时仅丢弃旧键。"""
+    migrated = dict(raw or {})
+    for old_key, new_key in LEGACY_CONFIG_KEYS.items():
+        if old_key not in migrated:
+            continue
+        legacy_val = migrated.pop(old_key)
+        if not migrated.get(new_key):
+            migrated[new_key] = legacy_val
+    return migrated
+
+
+def _env_first(*names: str) -> str | None:
+    """按序读取环境变量，兼容改名前的 XIAOYOU_* 旧变量名。"""
+    for name in names:
+        val = os.getenv(name)
+        if val is not None:
+            return val
+    return None
+
+
 CONFIG_FILE = os.path.join(BASE_DIR, "..", "config", "config.json")
 config = dict(DEFAULT_CONFIG)
 if os.path.exists(CONFIG_FILE):
@@ -173,12 +202,12 @@ if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             raw_cfg = json.load(f)
         if isinstance(raw_cfg, dict):
-            config.update(raw_cfg)
+            config.update(migrate_legacy_keys(raw_cfg))
     except Exception as e:
         logger.error(f"读取配置失败: {e}")
 
 NAPCAT_WS_URL = config.get("napcat_ws_url", "ws://127.0.0.1:3001")
-XIAOYOU_WS_URL = config.get("xiaoyou_ws_url", "ws://127.0.0.1:6789")
+AUTARKIA_WS_URL = config.get("autarkia_ws_url", "ws://127.0.0.1:6789")
 
 
 def _normalize_loopback(url: str) -> str:
@@ -189,7 +218,7 @@ def _normalize_loopback(url: str) -> str:
 
 
 NAPCAT_WS_URL = _normalize_loopback(NAPCAT_WS_URL)
-XIAOYOU_WS_URL = _normalize_loopback(XIAOYOU_WS_URL)
+AUTARKIA_WS_URL = _normalize_loopback(AUTARKIA_WS_URL)
 ENABLE_QQ_FACE_INJECTION = bool(config.get("enable_qq_face_injection", True))
 ENABLE_QQ_VISION = bool(config.get("enable_qq_vision", True))
 ENABLE_QQ_VOICE = bool(config.get("enable_qq_voice", True))
@@ -214,94 +243,94 @@ NAPCAT_ACCESS_TOKEN = str(
     or config.get("access_token")
     or ""
 ).strip()
-XIAOYOU_ACCESS_TOKEN = str(
-    os.getenv("XIAOYOU_ACCESS_TOKEN")
-    or config.get("xiaoyou_access_token")
+AUTARKIA_ACCESS_TOKEN = str(
+    _env_first("AUTARKIA_ACCESS_TOKEN", "XIAOYOU_ACCESS_TOKEN")
+    or config.get("autarkia_access_token")
     or config.get("access_token")
     or ""
 ).strip()
 
-MASTER_QQ_ID = str(os.getenv("XIAOYOU_QQ_MASTER_ID") or config.get("master_qq_id") or "").strip()
+MASTER_QQ_ID = str(_env_first("AUTARKIA_QQ_MASTER_ID", "XIAOYOU_QQ_MASTER_ID") or config.get("master_qq_id") or "").strip()
 PUBLIC_PERSONA_FILE = (
-    str(os.getenv("XIAOYOU_QQ_PUBLIC_PERSONA_FILE") or config.get("public_persona_file") or "").strip()
+    str(_env_first("AUTARKIA_QQ_PUBLIC_PERSONA_FILE", "XIAOYOU_QQ_PUBLIC_PERSONA_FILE") or config.get("public_persona_file") or "").strip()
     or DEFAULT_PERSONA_FILE
 )
 
-REPLY_VOICE_ONLY = _parse_bool(os.getenv("XIAOYOU_QQ_REPLY_VOICE_ONLY") or config.get("reply_voice_only"))
-QQ_STREAM_SPLIT = _parse_bool(os.getenv("XIAOYOU_QQ_STREAM_SPLIT") or config.get("qq_stream_split"))
+REPLY_VOICE_ONLY = _parse_bool(_env_first("AUTARKIA_QQ_REPLY_VOICE_ONLY", "XIAOYOU_QQ_REPLY_VOICE_ONLY") or config.get("reply_voice_only"))
+QQ_STREAM_SPLIT = _parse_bool(_env_first("AUTARKIA_QQ_STREAM_SPLIT", "XIAOYOU_QQ_STREAM_SPLIT") or config.get("qq_stream_split"))
 QQ_STREAM_COMMA_SPLIT_PROBABILITY = float(
-    os.getenv("XIAOYOU_QQ_STREAM_COMMA_SPLIT_PROBABILITY")
+    _env_first("AUTARKIA_QQ_STREAM_COMMA_SPLIT_PROBABILITY", "XIAOYOU_QQ_STREAM_COMMA_SPLIT_PROBABILITY")
     or config.get("qq_stream_comma_split_probability")
     or 0.4
 )
 QQ_MAX_BUBBLE_LEN = int(
-    os.getenv("XIAOYOU_QQ_MAX_BUBBLE_LEN")
+    _env_first("AUTARKIA_QQ_MAX_BUBBLE_LEN", "XIAOYOU_QQ_MAX_BUBBLE_LEN")
     or config.get("qq_max_bubble_len")
     or 150
 )
 QQ_MIN_SPLIT_LEN = int(
-    os.getenv("XIAOYOU_QQ_MIN_SPLIT_LEN")
+    _env_first("AUTARKIA_QQ_MIN_SPLIT_LEN", "XIAOYOU_QQ_MIN_SPLIT_LEN")
     or config.get("qq_min_split_len")
     or 40
 )
-QQ_STRIP_MARKDOWN = _parse_bool(os.getenv("XIAOYOU_QQ_STRIP_MARKDOWN") or config.get("qq_strip_markdown"))
-QQ_STREAM_LONG_THRESHOLD = int(os.getenv("XIAOYOU_QQ_STREAM_LONG_THRESHOLD") or config.get("qq_stream_long_threshold") or 240)
+QQ_STRIP_MARKDOWN = _parse_bool(_env_first("AUTARKIA_QQ_STRIP_MARKDOWN", "XIAOYOU_QQ_STRIP_MARKDOWN") or config.get("qq_strip_markdown"))
+QQ_STREAM_LONG_THRESHOLD = int(_env_first("AUTARKIA_QQ_STREAM_LONG_THRESHOLD", "XIAOYOU_QQ_STREAM_LONG_THRESHOLD") or config.get("qq_stream_long_threshold") or 240)
 QQ_TYPING_DELAY_PER_CHAR_SECONDS = float(
-    os.getenv("XIAOYOU_QQ_TYPING_DELAY_PER_CHAR_SECONDS")
+    _env_first("AUTARKIA_QQ_TYPING_DELAY_PER_CHAR_SECONDS", "XIAOYOU_QQ_TYPING_DELAY_PER_CHAR_SECONDS")
     or config.get("qq_typing_delay_per_char_seconds")
     or 0.18
 )
 QQ_TYPING_DELAY_MIN_SECONDS = float(
-    os.getenv("XIAOYOU_QQ_TYPING_DELAY_MIN_SECONDS")
+    _env_first("AUTARKIA_QQ_TYPING_DELAY_MIN_SECONDS", "XIAOYOU_QQ_TYPING_DELAY_MIN_SECONDS")
     or config.get("qq_typing_delay_min_seconds")
     or 1.6
 )
 QQ_TYPING_DELAY_MAX_SECONDS = float(
-    os.getenv("XIAOYOU_QQ_TYPING_DELAY_MAX_SECONDS")
+    _env_first("AUTARKIA_QQ_TYPING_DELAY_MAX_SECONDS", "XIAOYOU_QQ_TYPING_DELAY_MAX_SECONDS")
     or config.get("qq_typing_delay_max_seconds")
     or 7.5
 )
 QQ_TYPING_DELAY_SHORT_TEXT_THRESHOLD = int(
-    os.getenv("XIAOYOU_QQ_TYPING_DELAY_SHORT_TEXT_THRESHOLD")
+    _env_first("AUTARKIA_QQ_TYPING_DELAY_SHORT_TEXT_THRESHOLD", "XIAOYOU_QQ_TYPING_DELAY_SHORT_TEXT_THRESHOLD")
     or config.get("qq_typing_delay_short_text_threshold")
     or 4
 )
 QQ_TYPING_DELAY_SHORT_TEXT_FACTOR = float(
-    os.getenv("XIAOYOU_QQ_TYPING_DELAY_SHORT_TEXT_FACTOR")
+    _env_first("AUTARKIA_QQ_TYPING_DELAY_SHORT_TEXT_FACTOR", "XIAOYOU_QQ_TYPING_DELAY_SHORT_TEXT_FACTOR")
     or config.get("qq_typing_delay_short_text_factor")
     or 0.85
 )
 QQ_TYPING_DELAY_RANDOM_MIN_FACTOR = float(
-    os.getenv("XIAOYOU_QQ_TYPING_DELAY_RANDOM_MIN_FACTOR")
+    _env_first("AUTARKIA_QQ_TYPING_DELAY_RANDOM_MIN_FACTOR", "XIAOYOU_QQ_TYPING_DELAY_RANDOM_MIN_FACTOR")
     or config.get("qq_typing_delay_random_min_factor")
     or 0.9
 )
 QQ_TYPING_DELAY_RANDOM_MAX_FACTOR = float(
-    os.getenv("XIAOYOU_QQ_TYPING_DELAY_RANDOM_MAX_FACTOR")
+    _env_first("AUTARKIA_QQ_TYPING_DELAY_RANDOM_MAX_FACTOR", "XIAOYOU_QQ_TYPING_DELAY_RANDOM_MAX_FACTOR")
     or config.get("qq_typing_delay_random_max_factor")
     or 1.35
 )
 QQ_TYPING_DELAY_SURPRISE_PROBABILITY = float(
-    os.getenv("XIAOYOU_QQ_TYPING_DELAY_SURPRISE_PROBABILITY")
+    _env_first("AUTARKIA_QQ_TYPING_DELAY_SURPRISE_PROBABILITY", "XIAOYOU_QQ_TYPING_DELAY_SURPRISE_PROBABILITY")
     or config.get("qq_typing_delay_surprise_probability")
     or 0.0
 )
 QQ_TYPING_DELAY_SURPRISE_MIN_SECONDS = float(
-    os.getenv("XIAOYOU_QQ_TYPING_DELAY_SURPRISE_MIN_SECONDS")
+    _env_first("AUTARKIA_QQ_TYPING_DELAY_SURPRISE_MIN_SECONDS", "XIAOYOU_QQ_TYPING_DELAY_SURPRISE_MIN_SECONDS")
     or config.get("qq_typing_delay_surprise_min_seconds")
     or 1
 )
 QQ_TYPING_DELAY_SURPRISE_MAX_SECONDS = float(
-    os.getenv("XIAOYOU_QQ_TYPING_DELAY_SURPRISE_MAX_SECONDS")
+    _env_first("AUTARKIA_QQ_TYPING_DELAY_SURPRISE_MAX_SECONDS", "XIAOYOU_QQ_TYPING_DELAY_SURPRISE_MAX_SECONDS")
     or config.get("qq_typing_delay_surprise_max_seconds")
     or 3
 )
 QQ_TYPING_DELAY_USE_BIONIC_PROFILE = _parse_bool(
-    os.getenv("XIAOYOU_QQ_TYPING_DELAY_USE_BIONIC_PROFILE")
+    _env_first("AUTARKIA_QQ_TYPING_DELAY_USE_BIONIC_PROFILE", "XIAOYOU_QQ_TYPING_DELAY_USE_BIONIC_PROFILE")
     or config.get("qq_typing_delay_use_bionic_profile")
 )
 QQ_TYPING_DELAY_BIONIC_PROFILE_TTL_SECONDS = int(
-    os.getenv("XIAOYOU_QQ_TYPING_DELAY_BIONIC_PROFILE_TTL_SECONDS")
+    _env_first("AUTARKIA_QQ_TYPING_DELAY_BIONIC_PROFILE_TTL_SECONDS", "XIAOYOU_QQ_TYPING_DELAY_BIONIC_PROFILE_TTL_SECONDS")
     or config.get("qq_typing_delay_bionic_profile_ttl_seconds")
     or 180
 )
@@ -337,7 +366,7 @@ def _ws_to_http_base(ws_url: str) -> str:
         return "http://127.0.0.1:8000"
 
 
-XIAOYOU_HTTP_BASE_URL = str(config.get("xiaoyou_http_base_url") or "").strip() or _ws_to_http_base(XIAOYOU_WS_URL)
+AUTARKIA_HTTP_BASE_URL = str(config.get("autarkia_http_base_url") or "").strip() or _ws_to_http_base(AUTARKIA_WS_URL)
 HTTP_TIMEOUT_SECONDS = float(config.get("http_timeout_seconds") or 60)
 VISION_TIMEOUT_SECONDS = float(config.get("vision_timeout_seconds") or 180)
 STT_TIMEOUT_SECONDS = float(config.get("stt_timeout_seconds") or 60)
@@ -361,16 +390,16 @@ OPENCLAW_RETRY_BASE_DELAY_SECONDS = float(
     or 0.8
 )
 REMOTE_SCREENSHOT_ENABLED = _parse_bool(
-    os.getenv("XIAOYOU_QQ_REMOTE_SCREENSHOT_ENABLED")
+    _env_first("AUTARKIA_QQ_REMOTE_SCREENSHOT_ENABLED", "XIAOYOU_QQ_REMOTE_SCREENSHOT_ENABLED")
     or config.get("remote_screenshot_enabled")
 )
 REMOTE_SCREENSHOT_COOLDOWN_SECONDS = float(
-    os.getenv("XIAOYOU_QQ_REMOTE_SCREENSHOT_COOLDOWN_SECONDS")
+    _env_first("AUTARKIA_QQ_REMOTE_SCREENSHOT_COOLDOWN_SECONDS", "XIAOYOU_QQ_REMOTE_SCREENSHOT_COOLDOWN_SECONDS")
     or config.get("remote_screenshot_cooldown_seconds")
     or 8
 )
 REMOTE_FILE_OPS_ENABLED = _parse_bool(
-    os.getenv("XIAOYOU_QQ_REMOTE_FILE_OPS_ENABLED")
+    _env_first("AUTARKIA_QQ_REMOTE_FILE_OPS_ENABLED", "XIAOYOU_QQ_REMOTE_FILE_OPS_ENABLED")
     or config.get("remote_file_ops_enabled")
 )
 

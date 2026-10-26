@@ -14,7 +14,7 @@ r"""
 - 同一 persona 下旧数据按时间戳合并（不丢消息）
 
 使用方法：
-  cd D:\projects\xiaoyou
+  cd D:\AI\autarkia
   python scripts/tools/migrate_to_shared_conversation.py --dry-run   # 预演，不实际改动
   python scripts/tools/migrate_to_shared_conversation.py             # 实际迁移
   python scripts/tools/migrate_to_shared_conversation.py --rollback  # 回滚（如果出问题）

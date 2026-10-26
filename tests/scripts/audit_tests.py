@@ -363,7 +363,7 @@ def audit_hardcoded_project_paths() -> list[str]:
     issues = []
     patterns = [
         re.compile(r"[dD]:[\\/]+AI[\\/]+xiaoyou-core", re.IGNORECASE),
-        re.compile(r"[dD]:[\\/]+AI[\\/]+xiaoyou-public", re.IGNORECASE),
+        re.compile(r"[dD]:[\\/]+AI[\\/]+Autarkia-public", re.IGNORECASE),
     ]
     for p in _walk_py_files(TESTS_DIR):
         if not p.name.startswith("test_"):

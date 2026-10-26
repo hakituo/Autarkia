@@ -3,7 +3,7 @@
 """
 错误日志记录模块
 专门记录系统错误，不经过 BERT 分析，不落盘到用户可见的历史记录
-存储在 logs/YYYY/M/D/error.log，与 server.log 和 xiaoyou_main.log 并列
+存储在 logs/YYYY/M/D/error.log，与 server.log 和 autarkia_main.log 并列
 """
 
 from core.utils.logger import get_logger

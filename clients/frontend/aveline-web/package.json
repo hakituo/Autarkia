@@ -25,7 +25,7 @@
     ],
     "extraResources": [
       {
-        "from": "../../../dist/XiaoyouCore",
+        "from": "../../../dist/Autarkia",
         "to": "backend",
         "filter": [
           "**/*",

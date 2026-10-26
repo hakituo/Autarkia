@@ -1,0 +1,133 @@
+{
+  "schema": 1,
+  "libs_roots": {
+    "linux": "/home/user/Autarkia-Libs",
+    "windows": "D:\\AI\\Autarkia-Libs"
+  },
+  "windows_mount": "/mnt/win_p4",
+  "libs": [
+    {
+      "name": "Autarkia-Cadence",
+      "path": "Autarkia-Cadence",
+      "published": true,
+      "pypi": true,
+      "mappings": [
+        {"lib": "src/autarkia_cadence/guard.py", "main": ["core/services/active_care/cadence/cadence_guard.py"]},
+        {"lib": "src/autarkia_cadence/topic_groups.py", "main": ["core/services/active_care/cadence/topic_groups.py"]},
+        {"lib": "src/autarkia_cadence/topics.py", "main": ["core/services/active_care/decision/topic_classifier.py", "core/services/active_care/prompt/topic_diversity.py", "core/services/active_care/shared/keywords.py"]},
+        {"lib": "src/autarkia_cadence/scheduling.py", "main": ["core/services/active_care/scheduling/scheduler_logic.py", "core/services/active_care/shared/scheduling_utils.py", "core/services/active_care/checker/checker_throttle.py"]},
+        {"lib": "src/autarkia_cadence/windows.py", "main": ["core/utils/time/time_utils.py", "core/services/active_care/scheduling/scheduler_logic.py"]},
+        {"lib": "src/autarkia_cadence/schedule_config.py", "main": ["core/services/active_care/scheduling/schedule_config_loader.py"]},
+        {"lib": "src/autarkia_cadence/sleep.py", "main": ["core/services/active_care/core/sleep_policy.py", "core/services/active_care/shared/sleep_thresholds.py"]},
+        {"lib": "src/autarkia_cadence/silence.py", "main": ["core/services/active_care/checker/checker_time_gate.py", "core/services/active_care/decision/action_builder.py", "core/services/active_care/decision/decision_context.py"]},
+        {"lib": "src/autarkia_cadence/tuning.py", "main": ["core/services/active_care/shared/tuning.py", "core/services/active_care/shared/sleep_thresholds.py"]}
+      ]
+    },
+    {
+      "name": "Autarkia-Io",
+      "path": "Autarkia-Io",
+      "published": true,
+      "pypi": true,
+      "mappings": [
+        {"lib": "src/autarkia_io/atomic.py", "main": ["core/utils/atomic_io.py"]},
+        {"lib": "src/autarkia_io/jsontools.py", "main": ["core/utils/json_utils.py"]}
+      ]
+    },
+    {
+      "name": "Autarkia-Msgqueue",
+      "path": "Autarkia-Msgqueue",
+      "published": true,
+      "pypi": true,
+      "mappings": [
+        {"lib": "src/autarkia_msgqueue/queue.py", "main": ["core/interfaces/websocket/offline_queue.py"]},
+        {"lib": "src/autarkia_msgqueue/replay_guard.py", "main": ["clients/bots/qq/session/replay_guard.py"]}
+      ]
+    },
+    {
+      "name": "Autarkia-Textkit",
+      "path": "Autarkia-Textkit",
+      "published": true,
+      "pypi": true,
+      "mappings": [
+        {"lib": "src/autarkia_textkit/rules.py", "main": ["core/utils/text_segmenter_rules.py"]},
+        {"lib": "src/autarkia_textkit/emoji.py", "main": ["core/utils/text_segmenter_emoji.py"]},
+        {"lib": "src/autarkia_textkit/clean.py", "main": ["core/utils/text_segmenter_clean.py"]},
+        {"lib": "src/autarkia_textkit/numbered.py", "main": ["core/utils/text_segmenter_numbered.py"]},
+        {"lib": "src/autarkia_textkit/merge.py", "main": ["core/utils/text_segmenter_merge.py"]},
+        {"lib": "src/autarkia_textkit/force.py", "main": ["core/utils/text_segmenter_force.py"]},
+        {"lib": "src/autarkia_textkit/segmenter.py", "main": ["core/utils/text_segmenter_core.py"]},
+        {"lib": "src/autarkia_textkit/similarity.py", "main": ["core/utils/text_similarity.py"]},
+        {"lib": "src/autarkia_textkit/__init__.py", "main": ["core/utils/text_segmenter.py"]}
+      ]
+    },
+    {
+      "name": "Autarkia-tool",
+      "path": "Autarkia-tool",
+      "published": true,
+      "pypi": true,
+      "mappings": [
+        {"lib": "src/autarkia/tools/base.py", "main": ["core/tools/base.py"]},
+        {"lib": "src/autarkia/tools/metadata.py", "main": ["core/tools/tool_metadata.py"]},
+        {"lib": "src/autarkia/tools/policy.py", "main": ["core/tools/tool_policy.py"]},
+        {"lib": "src/autarkia/tools/registry.py", "main": ["core/tools/registry.py"]},
+        {"lib": "src/autarkia/tools/execution.py", "main": ["core/tools/execution.py"]},
+        {"lib": "src/autarkia/tools/visibility.py", "main": ["core/tools/tool_visibility.py"]}
+      ]
+    },
+    {
+      "name": "Autarkia-Concurrency",
+      "path": "unpublished/Autarkia-Concurrency",
+      "published": false,
+      "pypi": false,
+      "mappings": [
+        {"lib": "src/autarkia_concurrency/locks.py", "main": ["core/utils/concurrency/async_locks.py"]},
+        {"lib": "src/autarkia_concurrency/singleton.py", "main": ["core/utils/concurrency/singleton.py"]},
+        {"lib": "src/autarkia_concurrency/tasks.py", "main": ["core/utils/concurrency/async_tasks.py"]},
+        {"lib": "src/autarkia_concurrency/resource_lock.py", "main": ["core/utils/concurrency/resource_lock.py"]},
+        {"lib": "src/autarkia_concurrency/subprocess.py", "main": ["core/utils/concurrency/async_subprocess.py"]},
+        {"lib": "src/autarkia_concurrency/saga.py", "main": ["core/utils/concurrency/saga_manager.py", "core/contracts/states.py"]}
+      ]
+    },
+    {
+      "name": "Autarkia-Emotion",
+      "path": "unpublished/Autarkia-Emotion",
+      "published": false,
+      "pypi": false,
+      "mappings": [
+        {"lib": "src/autarkia_emotion/models.py", "main": ["core/emotion/models.py"]},
+        {"lib": "src/autarkia_emotion/constants.py", "main": ["core/emotion/constants.py", "core/services/data_ops/bert_definitions.py"]},
+        {"lib": "src/autarkia_emotion/detector.py", "main": ["core/emotion/detector_smart.py", "core/emotion/detector_v2.py"]},
+        {"lib": "src/autarkia_emotion/calculator.py", "main": ["core/emotion/calculator.py"]},
+        {"lib": "src/autarkia_emotion/store.py", "main": ["core/emotion/store.py"]},
+        {"lib": "src/autarkia_emotion/manager.py", "main": ["core/emotion/manager.py"]}
+      ]
+    },
+    {
+      "name": "Autarkia-Personas",
+      "path": "unpublished/Autarkia-Personas",
+      "published": false,
+      "pypi": false,
+      "mappings": [
+        {"lib": "src/autarkia_personas/models.py", "main": ["core/services/dual_role/personas.py"]},
+        {"lib": "src/autarkia_personas/registry.py", "main": ["core/services/dual_role/personas.py"]}
+      ]
+    },
+    {
+      "name": "Autarkia-Vocab",
+      "path": "unpublished/Autarkia-Vocab",
+      "published": false,
+      "pypi": false,
+      "mappings": [
+        {"lib": "src/autarkia_vocab/srs.py", "main": ["core/tools/study/english/fsrs_scheduler.py"]},
+        {"lib": "src/autarkia_vocab/progress.py", "main": ["core/tools/study/english/fsrs_scheduler.py", "core/tools/study/english/vocabulary_manager.py"]},
+        {"lib": "src/autarkia_vocab/wordbook.py", "main": ["core/tools/study/english/loader.py"]},
+        {"lib": "src/autarkia_vocab/daily_log.py", "main": ["core/tools/study/english/daily_word_log.py", "core/tools/study/english/daily_word_log_review.py", "core/tools/study/english/daily_word_log_marks.py", "core/tools/study/english/daily_word_log_words.py"]},
+        {"lib": "src/autarkia_vocab/queue.py", "main": ["core/tools/study/english/daily_word_log_queue.py", "core/tools/study/english/quiz.py"]},
+        {"lib": "src/autarkia_vocab/unfamiliar.py", "main": ["core/tools/study/english/unfamiliar_word_book.py"]},
+        {"lib": "src/autarkia_vocab/stats.py", "main": ["core/tools/study/english/stats.py"]},
+        {"lib": "src/autarkia_vocab/quiz.py", "main": ["core/tools/study/english/quiz.py"]},
+        {"lib": "src/autarkia_vocab/engine.py", "main": ["core/tools/study/english/vocabulary_manager.py"]}
+      ]
+    }
+  ]
+}

@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,7 +23,9 @@ import com.aveline.ai.mobile.presentation.components.AvelineTabRow
 import com.aveline.ai.mobile.presentation.memory.MemoryGraphUiState
 import com.aveline.ai.mobile.presentation.memory.MemoryUiState
 import com.aveline.ai.mobile.presentation.persona.PersonaUiState
-import com.aveline.ai.mobile.presentation.status.StatusUiState
+import com.aveline.ai.mobile.presentation.status.ui.StatusUiState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -33,6 +37,7 @@ import kotlinx.coroutines.launch
  * 通过 NestedScroll 把未消费位移交给外层，不在本页面注册全屏 pointerInput。
  *
  * @param statusUiState 状态页 UI 状态
+ * @param clockFlow 当前时钟流（单独传，只在状态卡片内部订阅，避免每秒整棵面板重组）
  * @param personaUiState 人设页 UI 状态
  * @param memoryUiState 记忆页 UI 状态
  * @param availableModels 模型页可用模型列表
@@ -63,6 +68,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun CompanionScreen(
     statusUiState: StatusUiState,
+    clockFlow: StateFlow<String>,
     personaUiState: PersonaUiState,
     memoryUiState: MemoryUiState,
     graphUiState: MemoryGraphUiState,
@@ -77,6 +83,7 @@ fun CompanionScreen(
     /** 恢复跟随角色默认音色：(persona filename)。 */
     onResetVoice: (String) -> Unit = {},
     onRefreshStatus: () -> Unit,
+    onSilentRefreshStatus: () -> Unit = {},
     onWakeCompanion: () -> Unit,
     onInterruptCompanion: () -> Unit,
     onSkipCompanionActivity: () -> Unit,
@@ -99,34 +106,35 @@ fun CompanionScreen(
     onGraphRetry: () -> Unit
 ) {
     // 五个 tab：日程紧邻状态，始终展示当前聊天角色当天的计划。
-    val tabs = listOf("状态", "日程", "模型", "人设", "记忆")
+    val tabs = remember { listOf("状态", "日程", "模型", "人设", "记忆") }
     val pagerState = rememberPagerState(initialPage = 0) { tabs.size }
     val scope = rememberCoroutineScope()
 
     // 一次手势只能做一层导航：从其他页右滑只交给 Pager。
     // 必须先松手稳定在"状态"，下一次新右滑才允许外层详情面板退出。
-    LaunchedEffect(pagerState.isScrollInProgress, pagerState.settledPage) {
-        if (!pagerState.isScrollInProgress) {
-            onDismissGestureEnabledChange(pagerState.settledPage == 0)
-            if (pagerState.settledPage == 1) onRefreshStatus()
-        }
+    //
+    // 只以 settledPage 为 key：滑动过程中"是否正在滑动"这个状态会反复翻转，
+    // 把 effect 打断重启；松手瞬间才确定停在哪一页，此时才触发一次静默刷新，
+    // 避免滑动过程中反复发请求导致掉帧。
+    LaunchedEffect(pagerState.settledPage) {
+        onDismissGestureEnabledChange(pagerState.settledPage == 0)
+        if (pagerState.settledPage == 1) onSilentRefreshStatus()
     }
 
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        AvelineTabRow(
-            titles = tabs,
-            selectedTabIndex = pagerState.currentPage,
-            onTabSelected = { index ->
-                scope.launch { pagerState.animateScrollToPage(index) }
-            },
-            modifier = Modifier.fillMaxWidth()
+        CompanionTabRow(
+            tabs = tabs,
+            pagerState = pagerState,
+            scope = scope
         )
 
         // Tab 内容区域:使用 HorizontalPager 实现左右滑动切换
         HorizontalPager(
             state = pagerState,
+            // 预组合相邻页：滑动时不必临时组合重内容，避免滑动中掉帧
+            beyondViewportPageCount = 1,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
@@ -138,6 +146,7 @@ fun CompanionScreen(
                 when (page) {
                     0 -> CompanionStatusTab(
                         uiState = statusUiState,
+                        clockFlow = clockFlow,
                         onRefresh = onRefreshStatus,
                         onWake = onWakeCompanion,
                         onInterrupt = onInterruptCompanion,
@@ -181,4 +190,27 @@ fun CompanionScreen(
             }
         }
     }
+}
+
+/**
+ * Tab 栏。
+ *
+ * `pagerState.currentPage` 只在**这一层**读取：滑动经过页面中点时它会变一次，
+ * 如果在上面的 [CompanionScreen] 里读，整屏（Pager + 五个页面的内容）都会跟着重组，
+ * 长列表页（模型选择）会因此明显掉帧。
+ */
+@Composable
+private fun CompanionTabRow(
+    tabs: List<String>,
+    pagerState: PagerState,
+    scope: CoroutineScope
+) {
+    AvelineTabRow(
+        titles = tabs,
+        selectedTabIndex = pagerState.currentPage,
+        onTabSelected = { index ->
+            scope.launch { pagerState.animateScrollToPage(index) }
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
 }

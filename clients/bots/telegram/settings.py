@@ -83,9 +83,9 @@ try:
     ENABLE_TELEGRAM_VOICE = _tg_settings.enable_voice
     ENABLE_TELEGRAM_VISION = _tg_settings.enable_vision
     STRIP_MARKDOWN = _tg_settings.strip_markdown
-    XIAOYOU_HTTP_BASE_URL = _tg_settings.http_base_url
-    XIAOYOU_WS_URL = _tg_settings.ws_url
-    XIAOYOU_ACCESS_TOKEN = _tg_settings.access_token
+    AUTARKIA_HTTP_BASE_URL = _tg_settings.http_base_url
+    AUTARKIA_WS_URL = _tg_settings.ws_url
+    AUTARKIA_ACCESS_TOKEN = _tg_settings.access_token
     HTTP_TIMEOUT_SECONDS = _tg_settings.http_timeout_seconds
     SESSION_TIMEOUT_MINUTES = _tg_settings.session_timeout_minutes
     MASTER_USER_ID = _tg_settings.master_user_id
@@ -99,9 +99,16 @@ except Exception as e:
     ENABLE_TELEGRAM_VOICE = _parse_bool(os.getenv("ENABLE_TELEGRAM_VOICE", "true"))
     ENABLE_TELEGRAM_VISION = _parse_bool(os.getenv("ENABLE_TELEGRAM_VISION", "true"))
     STRIP_MARKDOWN = _parse_bool(os.getenv("TELEGRAM_STRIP_MARKDOWN", "false"))
-    XIAOYOU_HTTP_BASE_URL = os.getenv("XIAOYOU_HTTP_BASE_URL", "http://localhost:8000")
-    XIAOYOU_WS_URL = os.getenv("XIAOYOU_WS_URL", "ws://localhost:8000/api/v1/ws")
-    XIAOYOU_ACCESS_TOKEN = os.getenv("XIAOYOU_ACCESS_TOKEN", "")
+    # 改名兼容：AUTARKIA_* 新变量名优先，旧 XIAOYOU_* 继续生效
+    AUTARKIA_HTTP_BASE_URL = (
+        os.getenv("AUTARKIA_HTTP_BASE_URL") or os.getenv("XIAOYOU_HTTP_BASE_URL") or "http://localhost:8000"
+    )
+    AUTARKIA_WS_URL = (
+        os.getenv("AUTARKIA_WS_URL") or os.getenv("XIAOYOU_WS_URL") or "ws://localhost:8000/api/v1/ws"
+    )
+    AUTARKIA_ACCESS_TOKEN = (
+        os.getenv("AUTARKIA_ACCESS_TOKEN") or os.getenv("XIAOYOU_ACCESS_TOKEN") or ""
+    )
     HTTP_TIMEOUT_SECONDS = int(os.getenv("TELEGRAM_HTTP_TIMEOUT", "60"))
     SESSION_TIMEOUT_MINUTES = int(os.getenv("TELEGRAM_SESSION_TIMEOUT", "30"))
     MASTER_USER_ID = str(os.getenv("TELEGRAM_MASTER_USER_ID", "")).strip()

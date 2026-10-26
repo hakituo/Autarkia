@@ -17,7 +17,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 
 /**
@@ -44,7 +43,7 @@ fun StageDirectionRow(
         StageDirectionDivider()
         Text(
             text = text,
-            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
+            style = MaterialTheme.typography.labelSmall,
             color = TextTertiary,
             textAlign = TextAlign.Center,
             // weight(fill = false)：长动作描写在可用宽度内折行，而不是把两侧横线挤出屏幕

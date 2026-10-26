@@ -38,6 +38,7 @@ async def stream_generate_response(
     api_key_env: Optional[str] = None,
     platform: Optional[str] = None,
     history_override: Optional[list[Dict[str, str]]] = None,
+    message_id: Optional[str] = None,
 ):
     """
     Stream response generation
@@ -204,6 +205,7 @@ async def stream_generate_response(
             api_key=resolved_api_key,
             platform=platform,
             history_override=history_override,
+            message_id=message_id,
         ):
             if not first_visible_token_received:
                 is_visible_token = False
@@ -276,6 +278,7 @@ async def generate_response(
     user_name: Optional[str] = None,
     length_preference: Optional[str] = None,
     platform: Optional[str] = None,
+    message_id: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any]]:
     """Main entry point for generating responses (Non-streaming)"""
 
@@ -318,6 +321,7 @@ async def generate_response(
             temperature=temperature,
             user_name=user_name,
             platform=platform,
+            message_id=message_id,
         ):
             # Check for errors from the agent/LLM
             if "error" in chunk:

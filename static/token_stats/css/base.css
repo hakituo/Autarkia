@@ -1,0 +1,67 @@
+/* 基础层：设计变量、重置与滚动条 */
+
+:root {
+  --bg: #0b0f14;
+  --panel: #121820;
+  --panel-2: #171f29;
+  --border: #232c38;
+  --border-soft: #1b232e;
+  --text: #e8eef6;
+  --muted: #8b98a9;
+  --muted-2: #64707f;
+  --accent: #4c9aff;
+  --hit: #34c759;
+  --miss: #ff9f43;
+  --out: #a78bfa;
+  --danger: #ff5d5d;
+  /* 成本四段：输入 / 命中读 / 写入 / 输出。写入单独一档，青色才不会和未命中撞色 */
+  --cost-in: #4c9aff;
+  --cost-read: #34c759;
+  --cost-write: #22c3d6;
+  --cost-out: #a78bfa;
+  /* 金额高亮色取自 web 前端的呼吸灯主色 */
+  --money: #f2ce77;
+  --radius: 12px;
+  /* 卡片半透明底色：让底层光斑隐隐透出来。
+     不配 backdrop-filter——卡片有十几张，每张的取样区都要随背景动画重算，是这个页面卡顿的主因。 */
+  --panel-glass: rgba(18, 24, 32, .82);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: radial-gradient(1200px 600px at 20% -10%, #142033 0%, var(--bg) 55%);
+  color: var(--text);
+  font: 13px/1.55 -apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+
+/* 自定义滚动条：系统默认滚动条又宽又灰，在深色看板里非常突兀 */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, .03);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #3d5169, #253040);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #4c9aff, #2c6fc4);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* Firefox 不支持 ::-webkit-scrollbar，退回标准属性 */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3d5169 transparent;
+  }
+}

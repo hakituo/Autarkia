@@ -3,6 +3,7 @@
     <source media="(prefers-color-scheme: dark)" srcset="autarkia-dark.svg">
     <img src="autarkia.svg" alt="Autarkia" width="480">
   </picture>
+  <h1 align="center">Autarkia</h1>
   <p><strong>自托管 Agent 运行时：工具调用、长期记忆、主动任务与多角色隔离</strong></p>
   <p>
     <a href="https://github.com/hakituo/Autarkia/actions/workflows/core-ci.yml"><img alt="Core CI" src="https://github.com/hakituo/Autarkia/actions/workflows/core-ci.yml/badge.svg"></a>

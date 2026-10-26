@@ -125,7 +125,11 @@ def test_nested_role_map_in_daily_state():
         {
             "date": "2026-10-16",
             "plans": {
-                "aveline": {"role_id": "aveline", "date": "2026-10-16", "generated_at": _LINUX_LAST_TS},
+                "aveline": {
+                    "role_id": "aveline",
+                    "date": "2026-10-16",
+                    "generated_at": _LINUX_LAST_TS,
+                },
                 "ling": {"role_id": "ling", "date": "2026-10-16", "generated_at": _WAKE_TS},
             },
         }
@@ -135,7 +139,11 @@ def test_nested_role_map_in_daily_state():
             "date": "2026-10-16",
             "plans": {
                 "aveline": {"role_id": "aveline", "date": "2026-10-16", "generated_at": _WAKE_TS},
-                "ling": {"role_id": "ling", "date": "2026-10-16", "generated_at": _LINUX_LAST_TS + 30},
+                "ling": {
+                    "role_id": "ling",
+                    "date": "2026-10-16",
+                    "generated_at": _LINUX_LAST_TS + 30,
+                },
             },
         }
     )

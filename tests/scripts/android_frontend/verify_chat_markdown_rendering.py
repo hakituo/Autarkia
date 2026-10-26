@@ -53,7 +53,8 @@ def main() -> None:
     horizontal_gesture = HORIZONTAL_GESTURE.read_text(encoding="utf-8")
     app_build = APP_BUILD.read_text(encoding="utf-8")
 
-    require(bubble, "NotesMarkdownRenderer(text = segment)", "AI Markdown 渲染")
+    require(bubble, "NotesMarkdownRenderer(", "AI Markdown 渲染")
+    require(bubble, "bodyStyle = AvelineTextStyles.message", "聊天正文使用 16sp bodyLarge")
     require(bubble, "MessageType.AI -> Color.Transparent", "AI 无气泡正文样式")
     require(bubble, "else Modifier.fillMaxWidth()", "AI 正文完整宽度")
 

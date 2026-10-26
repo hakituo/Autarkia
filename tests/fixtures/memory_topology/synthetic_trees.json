@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "description": "合成消息树 fixtures：只含虚构内容，用于验证世界线可见性、拓扑确定性与 provenance。真实标注不得入库。",
+  "cases": [
+    {
+      "id": "sibling_isolation",
+      "description": "共享祖先 + 两个兄弟分支；anchor 在 B 时 C 及 C 的派生笔记不可见",
+      "conversation_id": "shared__scope__aveline",
+      "events": [
+        {"event_id": "e-root", "client_node_id": "n-root", "role": "user", "content": "我们周末去爬山吧", "timestamp": 100.0, "turn_id": "t-root", "event_type": "chat_message"},
+        {"event_id": "e-a", "client_node_id": "n-a", "parent_node_id": "n-root", "role": "assistant", "content": "好啊，几点出发", "timestamp": 110.0, "turn_id": "t-a", "event_type": "chat_reply"},
+        {"event_id": "e-b", "client_node_id": "n-b", "parent_node_id": "n-a", "role": "user", "content": "八点，带点吃的", "timestamp": 200.0, "turn_id": "t-b", "event_type": "chat_message"},
+        {"event_id": "e-b2", "client_node_id": "n-b2", "parent_node_id": "n-b", "role": "assistant", "content": "那我带三明治", "timestamp": 210.0, "turn_id": "t-b2", "event_type": "chat_reply"},
+        {"event_id": "e-c", "client_node_id": "n-c", "parent_node_id": "n-a", "role": "user", "content": "算了，改成看电影", "timestamp": 300.0, "turn_id": "t-c", "event_type": "chat_message"},
+        {"event_id": "e-c2", "client_node_id": "n-c2", "parent_node_id": "n-c", "role": "assistant", "content": "好，那看七点场", "timestamp": 310.0, "turn_id": "t-c2", "event_type": "chat_reply"}
+      ],
+      "notes": [
+        {"note_id": "note-main", "visibility": "tree_local", "namespace": "aveline", "source_event_ids": ["e-b", "e-b2"]},
+        {"note_id": "note-sibling", "visibility": "tree_local", "namespace": "aveline", "source_event_ids": ["e-c", "e-c2"]}
+      ],
+      "expect": {
+        "topology_status": "complete",
+        "order_independent": true,
+        "visible_event_ids": {
+          "n-b2": ["e-root", "e-a", "e-b", "e-b2"]
+        },
+        "note_visible": {"n-b2": {"note-main": true, "note-sibling": false}}
+      }
+    },
+    {
+      "id": "child_before_parent",
+      "description": "子节点先到：pending 后按拓扑重放，结果与顺序无关",
+      "conversation_id": "shared__scope__aveline",
+      "events": [
+        {"event_id": "e2", "client_node_id": "n2", "parent_node_id": "n1", "role": "assistant", "content": "第二句", "timestamp": 120.0, "turn_id": "t2", "event_type": "chat_reply"},
+        {"event_id": "e1", "client_node_id": "n1", "parent_node_id": "n0", "role": "user", "content": "第一句", "timestamp": 100.0, "turn_id": "t1", "event_type": "chat_message"},
+        {"event_id": "e0", "client_node_id": "n0", "role": "user", "content": "开场", "timestamp": 90.0, "turn_id": "t0", "event_type": "chat_message"}
+      ],
+      "expect": {
+        "topology_status": "complete",
+        "order_independent": true,
+        "visible_event_ids": {"n2": ["e0", "e1", "e2"]}
+      }
+    },
+    {
+      "id": "missing_parent",
+      "description": "parent 未到达：判 partial、进 pending，不得伪造新根",
+      "conversation_id": "shared__scope__aveline",
+      "events": [
+        {"event_id": "e-orphan", "client_node_id": "n-orphan", "parent_node_id": "n-missing", "role": "user", "content": "父节点丢了", "timestamp": 100.0, "turn_id": "t1", "event_type": "chat_message"}
+      ],
+      "expect": {
+        "topology_status": "partial",
+        "pending_nodes": ["n-orphan"],
+        "visible_event_ids": {}
+      }
+    },
+    {
+      "id": "duplicate_delivery",
+      "description": "同一幂等键重投两次：只算一个事件",
+      "conversation_id": "shared__scope__aveline",
+      "events": [
+        {"event_id": "e-dup", "idempotency_key": "dup-key-1", "client_node_id": "n1", "role": "user", "content": "只发一次", "timestamp": 100.0, "turn_id": "t1", "event_type": "chat_message"},
+        {"event_id": "e-dup-copy", "idempotency_key": "dup-key-1", "client_node_id": "n1", "role": "user", "content": "只发一次", "timestamp": 100.5, "turn_id": "t1", "event_type": "chat_message"}
+      ],
+      "expect": {
+        "topology_status": "complete",
+        "event_count_in_tree": 1
+      }
+    },
+    {
+      "id": "media_placeholder_keeps_chain",
+      "description": "媒体占位不参与提炼，但仍保留父链",
+      "conversation_id": "shared__scope__aveline",
+      "events": [
+        {"event_id": "e0", "client_node_id": "n0", "role": "user", "content": "看这个", "timestamp": 100.0, "turn_id": "t0", "event_type": "chat_message"},
+        {"event_id": "e1", "client_node_id": "n1", "parent_node_id": "n0", "role": "user", "content": "[图片]", "timestamp": 110.0, "turn_id": "t1", "event_type": "chat_message"},
+        {"event_id": "e2", "client_node_id": "n2", "parent_node_id": "n1", "role": "assistant", "content": "拍得不错", "timestamp": 120.0, "turn_id": "t2", "event_type": "chat_reply"}
+      ],
+      "expect": {
+        "topology_status": "complete",
+        "visible_event_ids": {"n2": ["e0", "e1", "e2"]},
+        "content_eligible": {"e1": false, "e2": true}
+      }
+    },
+    {
+      "id": "multi_platform_same_continuity",
+      "description": "同一角色的两个平台会话：continuity 相同，但各自是独立 tree，anchor 分别生效",
+      "conversation_id": "shared__persona__aveline",
+      "events": [
+        {"event_id": "p-a1", "client_node_id": "pa1", "role": "user", "content": "App 上说的", "timestamp": 100.0, "turn_id": "ta1", "event_type": "chat_message", "conversation_id": "shared__persona__aveline"},
+        {"event_id": "q-b1", "client_node_id": "qb1", "role": "user", "content": "QQ 上说的", "timestamp": 200.0, "turn_id": "tb1", "event_type": "chat_message", "conversation_id": "web_role_q1"}
+      ],
+      "expect": {
+        "topology_status": "complete",
+        "continuity_equal": ["p-a1", "q-b1"],
+        "conversation_count": 2
+      }
+    },
+    {
+      "id": "unknown_legacy_event",
+      "description": "缺客户端节点 ID 的旧事件：strict 不可见，compat 才放行",
+      "conversation_id": "shared__scope__aveline",
+      "events": [
+        {"event_id": "legacy-1", "role": "user", "content": "旧记录", "timestamp": 50.0, "event_type": "chat_message"}
+      ],
+      "expect": {
+        "topology_status": "unknown",
+        "strict_visible": false,
+        "compat_visible": true
+      }
+    }
+  ]
+}

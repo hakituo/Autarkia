@@ -42,7 +42,7 @@ def _load_provider_defaults():
         "model_deepseek": (PROVIDER_DEFAULT_MODELS.get("deepseek") or ["deepseek-v4-flash"])[0],
         "model_siliconflow": (PROVIDER_DEFAULT_MODELS.get("siliconflow") or ["Pro/moonshotai/Kimi-K2.6"])[0],
         "model_dashscope": (PROVIDER_DEFAULT_MODELS.get("dashscope") or ["qwen3-max-2025-09-23"])[0],
-        "model_minimax": (PROVIDER_DEFAULT_MODELS.get("minimax") or ["MiniMax-M3"])[0],
+        "model_minimax": (PROVIDER_DEFAULT_MODELS.get("minimax") or ["MiniMax-M3.1-Flash"])[0],
         "model_ark": (PROVIDER_DEFAULT_MODELS.get("ark") or ["doubao-seed-2-0-lite-260215"])[0],
         "model_zhipu": (PROVIDER_DEFAULT_MODELS.get("zhipu") or ["glm-4.5-air"])[0],
         "ark_base_url": PROVIDER_BASE_URLS.get("ark") or "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
@@ -178,9 +178,9 @@ def _do_initialize_llm_module() -> None:
         from .openai_compat import ArkClient
         return _inject_vision_config(ArkClient(api_key=api_key, base_url=base_url, model=model_name))
 
-    def _make_minimax(api_key, model_name):
+    def _make_minimax(api_key, model_name, base_url=None):
         from .openai_compat import MiniMaxClient
-        return _inject_vision_config(MiniMaxClient(api_key=api_key, base_url=None, model=model_name))
+        return _inject_vision_config(MiniMaxClient(api_key=api_key, base_url=base_url, model=model_name))
 
     def _make_zhipu(api_key, model_name, thinking_enabled, web_search_enabled):
         from .openai_compat import ZhiPuClient
@@ -363,7 +363,7 @@ def _do_initialize_llm_module() -> None:
                             lazy_providers[client_key] = lambda _k=api_key, _m=model_name: _make_dashscope(_k, _m)
                         elif prov == "minimax":
                             model_name = key_config.models[0] if key_config.models else _DEFAULT_MODEL_MINIMAX
-                            lazy_providers[client_key] = lambda _k=api_key, _m=model_name: _make_minimax(_k, _m)
+                            lazy_providers[client_key] = lambda _k=api_key, _b=base_url, _m=model_name: _make_minimax(_k, _m, _b)
                         elif prov == "ark":
                             model_name = key_config.models[0] if key_config.models else _DEFAULT_MODEL_ARK
                             lazy_providers[client_key] = lambda _k=api_key, _b=base_url, _m=model_name: _make_ark(_k, _b, _m)

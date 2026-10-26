@@ -103,3 +103,87 @@ class PeerContextGatherer:
             "bio_state": bio_state,
             "peer_bio_state": peer_bio_state,
         }
+
+    async def gather_multi(
+        self,
+        participants: list,
+        cfg: Dict[str, Any],
+        *,
+        role_id: str = "",
+    ) -> Dict[str, Any]:
+        """多人版本：逐角色拉主人私聊素材 + 生理状态。
+
+        信息权限不变：每个角色与主人的私聊只归该角色自己知道，仍然走
+        ``filter_secret_lines`` 剔除含保密信号的整行。
+        """
+        from clients.bots.qq.peer_chat import PeerChatManager
+        from core.services.active_care.peer_chat.peer_knowledge import filter_secret_lines
+
+        members = [str(p).strip().lower() for p in participants if str(p).strip()]
+        by_role = cfg.get("by_role") or {}
+        initiator = str(role_id or cfg.get("role_id") or "").strip().lower()
+
+        master_history_by_role: Dict[str, str] = {}
+        recent_master_sections = []
+        try:
+            from clients.bots.qq.utils import build_persona_conversation_id
+
+            seen_conversation_ids = set()
+            for rid in members:
+                role_cfg = by_role.get(rid) or {}
+                persona_fn = str(role_cfg.get("profile_filename") or "").strip()
+                speaker_name = str(role_cfg.get("role_name") or rid).strip()
+                if not persona_fn:
+                    continue
+                conversation_id = build_persona_conversation_id("shared", persona_fn)
+                if not conversation_id or conversation_id in seen_conversation_ids:
+                    continue
+                seen_conversation_ids.add(conversation_id)
+                section = await PeerChatManager.get_recent_master_history(
+                    self._context,
+                    conversation_id,
+                    limit=8,
+                    speaker_name=speaker_name,
+                )
+                if section:
+                    master_history_by_role[rid] = filter_secret_lines(section)
+                    recent_master_sections.append(section)
+        except Exception as e:
+            if is_debug_enabled("peer_script"):
+                logger.info(f"获取主人聊天记录失败: {e}")
+
+        recent_peer_scripts = ""
+        try:
+            recent_peer_scripts = await PeerChatManager.get_recent_peer_scripts(
+                self._context, initiator or (members[0] if members else ""), limit=5
+            )
+        except Exception as e:
+            if is_debug_enabled("peer_script"):
+                logger.info(f"获取互聊剧本记录失败: {e}")
+
+        from core.utils.time_utils import get_current_time
+
+        time_str = get_current_time().strftime("%Y-%m-%d %H:%M")
+
+        bio_state_by_role: Dict[str, Any] = {}
+        try:
+            from core.services.life_simulation import get_life_simulation_service
+
+            life_sim = get_life_simulation_service()
+            if life_sim:
+                for rid in members:
+                    bio_state_by_role[rid] = life_sim.get_bio_state(rid)
+        except Exception:
+            pass
+
+        peers = [rid for rid in members if rid != initiator]
+        return {
+            "recent_master_history": "\n\n".join(recent_master_sections),
+            "master_history_by_role": master_history_by_role,
+            "recent_peer_scripts": recent_peer_scripts,
+            "time_str": time_str,
+            "bio_state": bio_state_by_role.get(initiator),
+            "peer_bio_state": bio_state_by_role.get(peers[0]) if peers else None,
+            "bio_state_by_role": bio_state_by_role,
+            "participants": members,
+        }

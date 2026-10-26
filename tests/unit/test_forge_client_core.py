@@ -235,9 +235,7 @@ def test_log_unavailable_none_ts(client, clock):
 
 def test_get_current_model_filename_ok(client, fake_requests):
     """200 且含 sd_model_checkpoint → 返回该值。"""
-    fr = fake_requests(
-        get_results=[FakeResponse(200, {"sd_model_checkpoint": "A.safetensors"})]
-    )
+    fr = fake_requests(get_results=[FakeResponse(200, {"sd_model_checkpoint": "A.safetensors"})])
     assert client._get_current_model_filename() == "A.safetensors"
     assert fr.get_calls[0][0].endswith("/sdapi/v1/options")
     assert fr.get_calls[0][1]["timeout"] == 5
@@ -412,9 +410,7 @@ def test_wait_for_model_loaded_found(client, clock, monkeypatch):
 
 def test_wait_for_model_loaded_timeout(client, clock, monkeypatch):
     """始终不命中 → 轮询到 deadline 后 False（受控时钟推进）。"""
-    monkeypatch.setattr(
-        client, "_get_current_model_filename", lambda: "other.safetensors"
-    )
+    monkeypatch.setattr(client, "_get_current_model_filename", lambda: "other.safetensors")
     assert client.wait_for_model_loaded("target", timeout=3, poll_interval=1) is False
     assert clock.sleeps == [1, 1, 1]
 
@@ -463,9 +459,7 @@ def test_get_models_cached_hit(client, clock, monkeypatch):
     client._models_cache = [{"t": 1}]
     client._models_cache_ts = clock.now
     called = []
-    monkeypatch.setattr(
-        client, "get_models", lambda: called.append(1) or ["fresh"]
-    )
+    monkeypatch.setattr(client, "get_models", lambda: called.append(1) or ["fresh"])
     assert client._get_models_cached() == [{"t": 1}]
     assert called == []
 

@@ -25,6 +25,7 @@ import com.aveline.ai.mobile.services.FileUploadManager
 import com.aveline.ai.mobile.services.TTSEngine
 import com.aveline.ai.mobile.services.UploadKind
 import com.aveline.ai.mobile.services.VoiceInputManager
+import com.aveline.ai.mobile.services.media.LocalMediaStore
 import com.aveline.ai.mobile.utils.ImageUrlResolver
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -76,7 +77,14 @@ class ChatViewModel @Inject constructor(
      *
      * 带默认值：单测直接构造 ViewModel 时不传也能跑，Hilt 注入时照常给同一个单例。
      */
-    private val draftStore: ChatDraftStore = ChatDraftStore(context)
+    private val draftStore: ChatDraftStore = ChatDraftStore(context),
+    /**
+     * 聊天媒体本地仓库（Hilt 单例）。
+     *
+     * 带默认值：单测直接构造 ViewModel 时不用传；Hilt 注入时照常提供单例。
+     * 交给 WS 收流与 SSE 发送两条链路：表情包/图片收到即落盘，冷启动直接读本地。
+     */
+    private val localMediaStore: LocalMediaStore? = null
 ) : ViewModel() {
 
     companion object {
@@ -126,7 +134,10 @@ class ChatViewModel @Inject constructor(
             chatRepository = chatRepository,
             generateMessageId = { generateMessageId() },
             getCurrentSessionId = { _uiState.value.currentSession?.id },
-            flushIntervalMs = FLUSH_INTERVAL_MS
+            flushIntervalMs = FLUSH_INTERVAL_MS,
+            // 每次 delta 都读一次已落盘的值：用户在设置页关掉开关后，
+            // 正在进行的流式回复也不该再产出 retraction 气泡。
+            isStageDirectionEnabled = { appPreferences.stageDirectionEnabled }
         )
     }
 
@@ -155,7 +166,9 @@ class ChatViewModel @Inject constructor(
         personaLocalMetaRepository = personaLocalMetaRepository,
         generateMessageId = { generateMessageId() },
         getSessionId = { _uiState.value.currentSession?.id },
-        resolveProfileFilenameForSession = { sessionController.profileFilenameForSession(it) }
+        resolveProfileFilenameForSession = { sessionController.profileFilenameForSession(it) },
+        localMediaStore = localMediaStore,
+        isStageDirectionEnabled = { appPreferences.stageDirectionEnabled }
     )
 
     private val ttsController = ChatTtsController(
@@ -188,7 +201,8 @@ class ChatViewModel @Inject constructor(
         flushManager = flushManager,
         mapEmotion = { mapEmotion(it) },
         resolveRoleModelRoute = { roleModelController.requestModelRoute() },
-        replyNotifier = replyNotifier
+        replyNotifier = replyNotifier,
+        localMediaStore = localMediaStore
     )
 
     private val uploadHelper = ChatUploadHelper(
@@ -224,7 +238,8 @@ class ChatViewModel @Inject constructor(
         isOwnedSession = { sessionId ->
             !sessionController.hasRoleContext() ||
                 sessionController.isSessionOfCurrentRole(sessionId)
-        }
+        },
+        localMediaStore = localMediaStore
     )
 
     // ==================== 角色 / persona / 模型状态 ====================

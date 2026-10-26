@@ -40,7 +40,7 @@
   - 运行时数据按月快照备份（面向 git 之外、丢了不可再生的数据）
   - `auto_backup.py`：把 `companion_data` / `output` / `data` / 学习库 / 隐私配置收进仓库外的备份根，
     同一月份重复运行是增量刷新（size + mtime 相同即跳过），只保留最近 N 个 `YYYY-MM` 快照目录
-  - 默认 dry-run、`--apply` 才落盘；备份根用 `--dest`（或 `XIAOYOU_BACKUP_ROOT`）、学习库用 `--study-root` 指定
+  - 默认 dry-run、`--apply` 才落盘；备份根用 `--dest`（或 `AUTARKIA_BACKUP_ROOT`，旧名 `XIAOYOU_BACKUP_ROOT` 兼容）、学习库用 `--study-root` 指定
   - 建议在程序停止时运行；恢复 = 把快照目录里的数据目录拷回原位置，无合并逻辑
 - `scripts/tools/`
   - 通用维护 / 一次性脚本统一存放：内存分析与优化、训练数据生成、数据迁移、日记与计划重生成、C++ 构建、角色数据校验等
@@ -69,7 +69,7 @@
 ```powershell
 venv_core\Scripts\python.exe scripts\doc_records\update_project_records.py `
   --payload-file scripts\doc_records\payload_update_doc_rules.json `
-  --project-root D:\projects\xiaoyou
+  --project-root D:\AI\autarkia
 ```
 
 `question_reviewers` 数组里的 entry 可选 `category` 字段（如 `01_active_care`）指定分类文件名，缺省时按标题关键词自动归类。

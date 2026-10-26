@@ -74,8 +74,20 @@ def test_is_order_independent_and_idempotent():
 
 def test_top_level_source_date_takes_priority():
     """_review_source_state.json 的 source_date 在顶层。"""
-    stale = _b({"review_date": "2026/10/16", "source_date": "2026/10/03", "selected_at": "2026-10-16 00:53:24"})
-    fresh = _b({"review_date": "2026/10/16", "source_date": "2026/10/15", "selected_at": "2026-10-16 00:53:24"})
+    stale = _b(
+        {
+            "review_date": "2026/10/16",
+            "source_date": "2026/10/03",
+            "selected_at": "2026-10-16 00:53:24",
+        }
+    )
+    fresh = _b(
+        {
+            "review_date": "2026/10/16",
+            "source_date": "2026/10/15",
+            "selected_at": "2026-10-16 00:53:24",
+        }
+    )
 
     assert union_dated_state(stale, fresh) == fresh
 

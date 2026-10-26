@@ -119,6 +119,6 @@ if __name__ == "__main__":
         check_websocket()
     else:
         print("\nCould not connect to HTTP server. Is the application running?")
-        print("Please start XiaoyouCore.exe first, then run this script.")
+        print("Please start Autarkia.exe first, then run this script.")
 
     print("\n=== Diagnosis Complete ===")

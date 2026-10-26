@@ -37,9 +37,7 @@ class _StubHost:
         self.triggered: List[Dict[str, Any]] = []
 
     async def write_diary_entry(self, entry_type, title, thought=""):
-        self.diary.append(
-            {"entry_type": entry_type, "title": title, "thought": thought}
-        )
+        self.diary.append({"entry_type": entry_type, "title": title, "thought": thought})
 
     async def trigger_message(self, **kwargs):
         self.triggered.append(kwargs)
@@ -121,9 +119,7 @@ def _patch_services(
     """把 hooks 里所有延迟导入的外部服务替换为替身。"""
     import core.core_engine.service_singletons as singletons
 
-    monkeypatch.setattr(
-        singletons, "get_aveline_service", lambda: aveline or _StubAvelineService()
-    )
+    monkeypatch.setattr(singletons, "get_aveline_service", lambda: aveline or _StubAvelineService())
 
     import core.services.auto_heal.heal_service as heal_mod
 
@@ -144,14 +140,13 @@ def _patch_services(
     if metrics is not None:
         import core.services.active_care.peer_chat.peer_chat_metrics as metrics_mod
 
-        monkeypatch.setattr(
-            metrics_mod, "get_peer_chat_metrics", lambda: metrics
-        )
+        monkeypatch.setattr(metrics_mod, "get_peer_chat_metrics", lambda: metrics)
 
 
 # ============================================================
 # run_peer_post_hooks
 # ============================================================
+
 
 class TestRunPeerPostHooks:
     """后处理主流程。"""
@@ -389,6 +384,7 @@ class _StubMetrics:
 # _maybe_trigger_peer_chat_patrol
 # ============================================================
 
+
 class TestMaybeTriggerPatrol:
     """互聊后代码巡检。"""
 
@@ -465,9 +461,7 @@ class TestMaybeTriggerPatrol:
 
     async def test_no_report_when_results_empty(self, monkeypatch):
         """巡检无新结果时不写记忆。"""
-        heal = _StubHealService(
-            stats={"error_stats": {"total_anomalies": 1}}, results=[]
-        )
+        heal = _StubHealService(stats={"error_stats": {"total_anomalies": 1}}, results=[])
         memory = _StubMemoryManager()
         _patch_services(monkeypatch, heal=heal, memory=memory)
 
@@ -503,15 +497,11 @@ class TestMaybeTriggerPatrol:
         await hooks_mod._maybe_trigger_peer_chat_patrol("aveline", "Aveline")
         assert any("巡检触发失败" in str(args) for _, args in logged)
 
-    async def test_report_write_failure_logs_when_debug_enabled(
-        self, monkeypatch
-    ):
+    async def test_report_write_failure_logs_when_debug_enabled(self, monkeypatch):
         """debug.peer_script 打开时，巡检报告写入记忆失败要落日志。"""
         heal = _StubHealService(
             stats={"error_stats": {"total_anomalies": 1}},
-            results=[
-                {"severity": "high", "title": "空指针风险", "auto_fixable": True}
-            ],
+            results=[{"severity": "high", "title": "空指针风险", "auto_fixable": True}],
         )
         # 记忆写入必失败 → 命中 _write_patrol_report_to_memory 的 except
         _patch_services(monkeypatch, heal=heal, memory=_StubMemoryManager(fail=True))
@@ -535,6 +525,7 @@ class TestMaybeTriggerPatrol:
 # ============================================================
 # build_patrol_persona
 # ============================================================
+
 
 class TestBuildPatrolPersona:
     """巡检角色上下文构建。"""
@@ -621,9 +612,7 @@ class TestBuildPatrolPersona:
                         "context": "上下文",
                         "personality_traits": ["a", "b", "c", "d", "e", "f", "g"],
                     },
-                    "language_style": {
-                        "syntax_constraints": ["s1", "s2", "s3", "s4"]
-                    },
+                    "language_style": {"syntax_constraints": ["s1", "s2", "s3", "s4"]},
                 }
 
         import core.character.managers.persona_manager as pm_mod
@@ -671,6 +660,7 @@ class TestBuildPatrolPersona:
 # _write_patrol_report_to_memory
 # ============================================================
 
+
 class TestWritePatrolReportToMemory:
     """巡检报告写记忆。"""
 
@@ -699,8 +689,7 @@ class TestWritePatrolReportToMemory:
         _patch_services(monkeypatch, memory=memory)
 
         results = [
-            {"severity": "low", "title": f"问题{i}", "auto_fixable": False}
-            for i in range(8)
+            {"severity": "low", "title": f"问题{i}", "auto_fixable": False} for i in range(8)
         ]
         await hooks_mod._write_patrol_report_to_memory("Aveline", results)
 

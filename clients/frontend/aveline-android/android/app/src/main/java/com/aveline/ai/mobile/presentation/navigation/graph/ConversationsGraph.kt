@@ -22,7 +22,12 @@ import com.aveline.ai.mobile.presentation.navigation.conversationsPopEnter
 import com.aveline.ai.mobile.presentation.navigation.fadeEnter
 import com.aveline.ai.mobile.presentation.navigation.fadeExit
 
-/** 会话列表（主页，QQ 风格：每个角色一行）。 */
+/**
+ * 会话列表（主页，QQ 风格：每个角色一行）。
+ *
+ * 平板与手机统一用可滑动的导航侧栏（右滑拉出、左滑收起），
+ * 主内容始终是会话列表：侧栏收起时用户仍能在这里选角色进聊天。
+ */
 internal fun NavGraphBuilder.conversationsScreen(navController: NavHostController) {
     composable(
         route = Routes.CONVERSATIONS,
@@ -32,12 +37,12 @@ internal fun NavGraphBuilder.conversationsScreen(navController: NavHostControlle
         popEnterTransition = conversationsPopEnter,
         popExitTransition = fadeExit
     ) {
-        val viewModel: ConversationListViewModel = hiltViewModel()
-        val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-        val avatarStorage: PersonaAvatarStorage =
-            hiltViewModel<ConversationAvatarStorageHolder>().avatarStorage
-
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
+            val viewModel: ConversationListViewModel = hiltViewModel()
+            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            val avatarStorage: PersonaAvatarStorage =
+                hiltViewModel<ConversationAvatarStorageHolder>().avatarStorage
+
             ConversationListScreen(
                 uiState = uiState,
                 // 仅在列表为空时以"重新加载"按钮出现（非常驻）：启动瞬间后端未就绪时
@@ -65,7 +70,7 @@ internal fun NavGraphBuilder.conversationsScreen(navController: NavHostControlle
 }
 
 /**
- * 打开聊天页。
+ * 打开聊天页（窄窗口）。
  *
  * 连点保护：`navigate()` 同步压栈，第二次点击到达时栈顶已经是 Chat。
  * 不拦的话会 push 出两个完全相同的聊天页（要按两次返回才回到列表）。
@@ -79,12 +84,19 @@ private fun navigateToChat(
     val currentRoute = navController.currentBackStackEntry?.destination?.route
     if (currentRoute?.startsWith("${Routes.CHAT}?") == true) return
 
+    navController.navigate(buildChatRoute(role, profileFilename, displayName))
+}
+
+/**
+ * 拼聊天页路由。
+ *
+ * 昵称可能含空格，URLEncoder 会编成 '+'，而 Navigation 只解 %XX，故统一用 %20；
+ * role / filename 也一起编码，避免角色名里的特殊字符把参数截断。
+ */
+internal fun buildChatRoute(role: String, profileFilename: String, displayName: String): String {
     val encodedRole = java.net.URLEncoder.encode(role, "UTF-8")
     val encodedFilename = java.net.URLEncoder.encode(profileFilename, "UTF-8")
-    // 昵称可能含空格，URLEncoder 会编成 '+'，而 Navigation 只解 %XX，故统一用 %20。
     val encodedName = java.net.URLEncoder.encode(displayName, "UTF-8").replace("+", "%20")
-    navController.navigate(
-        "${Routes.CHAT}?text=&role=$encodedRole&filename=$encodedFilename" +
-            "&${NavArgs.DISPLAY_NAME}=$encodedName"
-    )
+    return "${Routes.CHAT}?text=&role=$encodedRole&filename=$encodedFilename" +
+        "&${NavArgs.DISPLAY_NAME}=$encodedName"
 }

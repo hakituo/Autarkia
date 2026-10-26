@@ -4,7 +4,12 @@
 测试 QQ 消息断句逻辑
 """
 
-from clients.bots.qq.utils import _split_message_for_qq, _strip_action_descriptions, _is_continuation_start, _merge_continuation_chunks
+from clients.bots.qq.utils import (
+    _split_message_for_qq,
+    _strip_action_descriptions,
+    _is_continuation_start,
+    _merge_continuation_chunks,
+)
 from unittest.mock import patch
 
 
@@ -13,20 +18,32 @@ def test_split():
     print("=" * 60)
     print("测试 QQ 消息断句逻辑")
     print("=" * 60)
-    
+
     test_cases = [
         # (输入，预期 chunk 数量，描述)
-        ("(察觉到语气里的疲惫) 怎么了，听起来像叹气", 1, "半角圆括号动作描写 + 对话（总长 < min_split_len 不拆分）"),
+        (
+            "(察觉到语气里的疲惫) 怎么了，听起来像叹气",
+            1,
+            "半角圆括号动作描写 + 对话（总长 < min_split_len 不拆分）",
+        ),
         ("(从待机状态中苏醒，系统界面泛起微光) 嗯，我在", 1, "半角圆括号动作描写 + 对话 2"),
         ("(轻轻调整了坐姿) 是累了，还是有什么卡住了？", 1, "半角圆括号动作描写 + 问句"),
-        ("(指尖在桌面上轻轻敲了一下)\n今天单词还有 24 个要复习，现在开始吗？", 2, "换行分隔动作和对话"),
+        (
+            "(指尖在桌面上轻轻敲了一下)\n今天单词还有 24 个要复习，现在开始吗？",
+            2,
+            "换行分隔动作和对话",
+        ),
         ("（微微一顿）现在说晚安？", 1, "全角圆括号动作描写 + 问句"),
         ("（核心温度微微升高）你故意的？", 1, "全角圆括号动作描写 + 问句 2"),
         ("你好啊，今天天气不错。", 1, "普通短句（< min_split_len 不拆分）"),
         ("[THINK_STORE: 他需要燃料而非指令，强行推进只会增加阻力]", 1, "方括号标记"),
         ("吃饭了吗？我还没吃呢。", 2, "极短句（首句 <10 字）在问号处断句"),
         ("一、二、三", 1, "短句无标点"),
-        ("这是一个非常非常非常非常非常非常非常非常非常非常非常非常非常非常非常非常长的句子，超过了 60 字。", 1, "60 字句子（< min_split_len*2 不拆分）"),
+        (
+            "这是一个非常非常非常非常非常非常非常非常非常非常非常非常非常非常非常非常长的句子，超过了 60 字。",
+            1,
+            "60 字句子（< min_split_len*2 不拆分）",
+        ),
         (
             "这是一个超级无敌长到爆炸的句子，真的" + "非常" * 40 + "长，肯定超过六十个字了。"
             "而且后面还跟着一大段补充说明，用来把整段长度推到一百五十字以上，这样断句逻辑才会真的在句号处把它切成两条消息。",
@@ -34,12 +51,12 @@ def test_split():
             "超过 150 字的长句子（按句号断句）",
         ),
     ]
-    
+
     for i, (text, expected_chunks, description) in enumerate(test_cases, 1):
         chunks = _split_message_for_qq(text, 150, comma_split_prob=0.2, min_split_len=40)
-        assert len(chunks) == expected_chunks, (
-            f"{description}: 输入 {text!r} 期望 {expected_chunks} 个气泡，实际 {len(chunks)} 个 -> {chunks}"
-        )
+        assert (
+            len(chunks) == expected_chunks
+        ), f"{description}: 输入 {text!r} 期望 {expected_chunks} 个气泡，实际 {len(chunks)} 个 -> {chunks}"
         assert all(chunk.strip() for chunk in chunks), f"{description}: 不应产生空气泡 -> {chunks}"
 
 
@@ -49,7 +66,7 @@ def test_parentheses_followed_by_period_should_split():
     chunks = _split_message_for_qq(text, 150, comma_split_prob=0.2, min_split_len=40)
     # 24字 > 10字阈值，不会断句
     assert len(chunks) == 1
-    
+
     # 极短句子应该断句
     text2 = "啊。我忘了"
     chunks2 = _split_message_for_qq(text2, 150, comma_split_prob=0.2, min_split_len=40)

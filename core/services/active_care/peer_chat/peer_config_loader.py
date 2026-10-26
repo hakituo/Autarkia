@@ -25,7 +25,7 @@ class PeerConfigLoader:
         role_cfg = get_multi_qq_role_config(role_id)
         peer_cfg = get_multi_qq_role_config(peer_role_id)
 
-        master_qq_id = _os.getenv("XIAOYOU_QQ_MASTER_ID", "").strip()
+        master_qq_id = _os.getenv("AUTARKIA_QQ_MASTER_ID", "").strip()
 
         # 角色 QQ 号:N 角色通用读法
         role_qq_id = self._resolve_role_qq(role_id, role_cfg)
@@ -49,6 +49,57 @@ class PeerConfigLoader:
             "peer_name": peer_name,
         }
 
+    def load_multi(
+        self,
+        participants: list,
+        *,
+        role_id: str = "",
+    ) -> Dict[str, Any]:
+        """加载多角色互聊配置（任意 2-3 人）。
+
+        与 ``load`` 的差异：
+        - 不再要求 master_qq_id 非空（本地通道不需要 QQ）；
+        - 返回 ``by_role`` 映射，QQ 通道按角色取 persona/qq_id；
+        - 保留 ``role_id`` 的发起方字段，兼容旧调用方读取方式。
+
+        Returns:
+            {
+              "master_qq_id": str,
+              "by_role": {role_id: {"role_id","role_name","profile_filename","qq_id"}},
+              "role_id": 发起者,
+              "role_name": 发起者中文名,
+              "peer_role_id": 第一个其他参与者（向后兼容）,
+              "peer_name": 对应中文名,
+            }
+        """
+        members = [str(p).strip().lower() for p in participants if str(p).strip()]
+        initiator = str(role_id or (members[0] if members else "")).strip().lower()
+        master_qq_id = _os.getenv("AUTARKIA_QQ_MASTER_ID", "").strip()
+
+        # 局部导入：与 load 一致，避免 config 包循环导入
+        from config.settings_adapters import get_multi_qq_role_config
+
+        by_role: Dict[str, Dict[str, str]] = {}
+        for rid in members:
+            cfg_obj = get_multi_qq_role_config(rid)
+            by_role[rid] = {
+                "role_id": rid,
+                "role_name": self._resolve_role_name(rid, cfg_obj),
+                "profile_filename": self._resolve_profile_filename(rid, cfg_obj),
+                "qq_id": self._resolve_role_qq(rid, cfg_obj),
+            }
+
+        peers = [rid for rid in members if rid != initiator]
+        peer_role_id = peers[0] if peers else ""
+        return {
+            "master_qq_id": master_qq_id,
+            "by_role": by_role,
+            "role_id": initiator,
+            "role_name": by_role.get(initiator, {}).get("role_name", initiator),
+            "peer_role_id": peer_role_id,
+            "peer_name": by_role.get(peer_role_id, {}).get("role_name", peer_role_id),
+        }
+
     def _resolve_role_qq(self, rid: str, cfg_obj) -> str:
         """从 config 或 env var 解析角色 QQ 号(N 角色通用)"""
         if cfg_obj is not None:
@@ -57,15 +108,15 @@ class PeerConfigLoader:
                 return val
         # 向后兼容:aveline/ling 用旧 env var 名
         if rid == "aveline":
-            val = _os.getenv("XIAOYOU_QQ_BOT_NUMBER", "").strip()
+            val = _os.getenv("AUTARKIA_QQ_BOT_NUMBER", "").strip()
             if val:
                 return val
         elif rid == "ling":
-            val = _os.getenv("XIAOYOU_QQ_BOT_NUMBER_LING", "").strip()
+            val = _os.getenv("AUTARKIA_QQ_BOT_NUMBER_LING", "").strip()
             if val:
                 return val
-        # N 角色通用:XIAOYOU_QQ_BOT_NUMBER_{ROLE_ID_UPPER}
-        return _os.getenv(f"XIAOYOU_QQ_BOT_NUMBER_{rid.upper()}", "").strip()
+        # N 角色通用:AUTARKIA_QQ_BOT_NUMBER_{ROLE_ID_UPPER}
+        return _os.getenv(f"AUTARKIA_QQ_BOT_NUMBER_{rid.upper()}", "").strip()
 
     @staticmethod
     def _resolve_profile_filename(rid: str, cfg_obj) -> str:

@@ -80,9 +80,7 @@ class TestLoadDelegation:
 
         monkeypatch.setattr(async_persistence, "_async_safe_json_load", _fake_load)
         sentinel = {"fallback": True}
-        result = asyncio.run(
-            async_persistence.async_safe_json_load("x.json", "gbk", sentinel)
-        )
+        result = asyncio.run(async_persistence.async_safe_json_load("x.json", "gbk", sentinel))
         assert result is sentinel
         assert calls == [("gbk", sentinel)]
 
@@ -105,14 +103,9 @@ class TestRealRoundTrip:
 
     def test_load_missing_file_returns_default(self, tmp_path):
         missing = tmp_path / "does_not_exist.json"
-        assert (
-            asyncio.run(
-                async_persistence.async_safe_json_load(
-                    missing, default={"fallback": True}
-                )
-            )
-            == {"fallback": True}
-        )
+        assert asyncio.run(
+            async_persistence.async_safe_json_load(missing, default={"fallback": True})
+        ) == {"fallback": True}
 
     def test_load_missing_file_without_default_returns_none(self, tmp_path):
         missing = tmp_path / "does_not_exist.json"
@@ -122,9 +115,7 @@ class TestRealRoundTrip:
         broken = tmp_path / "broken.json"
         broken.write_text("{not valid json", encoding="utf-8")
         assert (
-            asyncio.run(
-                async_persistence.async_safe_json_load(broken, default="fallback")
-            )
+            asyncio.run(async_persistence.async_safe_json_load(broken, default="fallback"))
             == "fallback"
         )
 

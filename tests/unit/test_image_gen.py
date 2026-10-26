@@ -11,10 +11,11 @@ pytestmark = [pytest.mark.integration, pytest.mark.gpu]
 if os.getenv("XIAOYOU_RUN_IMAGE_TESTS") != "1":
     pytest.skip("需要设置 XIAOYOU_RUN_IMAGE_TESTS=1 才运行图像生成测试", allow_module_level=True)
 
+
 def test_image_gen():
     url = "http://127.0.0.1:7860"
     print(f"Testing Forge API at {url}...")
-    
+
     # 1. Check Options (Connectivity)
     try:
         resp = requests.get(f"{url}/sdapi/v1/options", timeout=5)
@@ -50,21 +51,21 @@ def test_image_gen():
         "height": 512,
         "cfg_scale": 7,
         "sampler_name": "Euler a",
-        "batch_size": 1
+        "batch_size": 1,
     }
-    
+
     try:
         resp = requests.post(f"{url}/sdapi/v1/txt2img", json=payload, timeout=60)
         if resp.status_code == 200:
             r = resp.json()
-            if 'images' in r and len(r['images']) > 0:
+            if "images" in r and len(r["images"]) > 0:
                 print("Image generation SUCCESS!")
                 # Save it
                 out_path = os.path.join(os.path.dirname(__file__), "_artifacts")
                 os.makedirs(out_path, exist_ok=True)
                 file_path = os.path.join(out_path, "test_gen.png")
                 with open(file_path, "wb") as f:
-                    f.write(base64.b64decode(r['images'][0]))
+                    f.write(base64.b64decode(r["images"][0]))
                 print(f"Saved to {file_path}")
             else:
                 print("Image generation returned NO IMAGES.")
@@ -74,6 +75,7 @@ def test_image_gen():
             print(resp.text)
     except Exception as e:
         print(f"Generation error: {e}")
+
 
 if __name__ == "__main__":
     test_image_gen()

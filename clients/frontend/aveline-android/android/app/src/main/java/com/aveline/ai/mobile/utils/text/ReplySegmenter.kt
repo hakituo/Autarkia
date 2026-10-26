@@ -54,10 +54,21 @@ object ReplySegmenter {
      * @param text 消息原文（可以含时间戳、句末句号，内部会先清洗）
      * @param forceStageDirection 该消息在库里就标成了撤回/旁白（`messageType == "retraction"`）。
      *   此时整条都当成舞台提示 —— 历史数据里这类文本的括号早已被剥掉，按文本判不出来。
+     * @param stageDirectionEnabled 用户是否开启「动作描写旁白」。
+     *   false 时完全不识别括号：清洗与断句照旧，但每一块都按正文返回，括号原样留在文本里。
+     *   这是设置页开关的落点——正文里正常出现的括号不会再被误判成动作。
      */
-    fun segment(text: String, forceStageDirection: Boolean = false): List<ReplySegment> {
+    fun segment(
+        text: String,
+        forceStageDirection: Boolean = false,
+        stageDirectionEnabled: Boolean = true
+    ): List<ReplySegment> {
         val blocks = TextSegmenter.displayBlocks(text)
         if (blocks.isEmpty()) return emptyList()
+
+        if (!stageDirectionEnabled) {
+            return blocks.map { ReplySegment(it.text, ReplySegmentKind.TEXT) }
+        }
 
         if (forceStageDirection) {
             val joined = blocks.joinToString("\n") { it.text }

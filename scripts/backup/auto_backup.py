@@ -26,8 +26,8 @@ companion_data / output / data / Study 拷回原位置，files/ 按其中保留�
 用法::
 
     python scripts/backup/auto_backup.py                      # dry-run 出计划
-    python scripts/backup/auto_backup.py --dest G:/xiaoyou-backup --apply
-    python scripts/daily/daily.py backup --dest G:/xiaoyou-backup --apply
+    python scripts/backup/auto_backup.py --dest G:/Autarkia-backup --apply
+    python scripts/daily/daily.py backup --dest G:/Autarkia-backup --apply
 """
 
 from __future__ import annotations
@@ -54,10 +54,12 @@ from scripts.backup.snapshot import (  # noqa: E402
     prune_snapshots,
 )
 
-#: 备份根默认值：命令行 --dest > 该环境变量 > <仓库父目录>/xiaoyou-backup
-DEST_ENV = "XIAOYOU_BACKUP_ROOT"
+#: 备份根默认值：命令行 --dest > 环境变量（新名优先、旧名兼容）> <仓库父目录>/Autarkia-backup
+DEST_ENV = "AUTARKIA_BACKUP_ROOT"
+DEST_ENV_LEGACY = "XIAOYOU_BACKUP_ROOT"
 #: 学习库根覆盖（默认 <仓库父目录>/Study，与跨平台镜像表的默认一致）
-STUDY_ENV = "XIAOYOU_STUDY_ROOT"
+STUDY_ENV = "AUTARKIA_STUDY_ROOT"
+STUDY_ENV_LEGACY = "XIAOYOU_STUDY_ROOT"
 
 #: 默认保留的快照月份数
 DEFAULT_KEEP = 6
@@ -116,14 +118,19 @@ def run_backup(
     return stats
 
 
+def env_first(primary: str, legacy: str) -> str:
+    """读环境变量：新名优先，回退旧名，都没设时返回空串。"""
+    return (os.environ.get(primary) or os.environ.get(legacy) or "").strip()
+
+
 def _default_dest() -> str:
-    """备份根默认值：环境变量优先，否则放仓库父目录旁的 xiaoyou-backup。"""
-    return os.environ.get(DEST_ENV) or str(_REPO_ROOT.parent / "xiaoyou-backup")
+    """备份根默认值：环境变量优先，否则放仓库父目录旁的 Autarkia-backup。"""
+    return env_first(DEST_ENV, DEST_ENV_LEGACY) or str(_REPO_ROOT.parent / "Autarkia-backup")
 
 
 def _default_study_root() -> Path:
     """学习库默认位置：与跨平台镜像表一致（仓库父目录下的 Study）。"""
-    return Path(os.environ.get(STUDY_ENV) or (_REPO_ROOT.parent / "Study"))
+    return Path(env_first(STUDY_ENV, STUDY_ENV_LEGACY) or (_REPO_ROOT.parent / "Study"))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -135,7 +142,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dest",
         default=_default_dest(),
-        help="备份根目录（默认 %(default)s，可用环境变量 XIAOYOU_BACKUP_ROOT 覆盖）",
+        help="备份根目录（默认 %(default)s，可用环境变量 AUTARKIA_BACKUP_ROOT 覆盖）",
     )
     parser.add_argument(
         "--keep",

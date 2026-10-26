@@ -131,7 +131,7 @@ internal class BackendNotificationPresenter(
 
     /**
      * 构建通知 largeIcon：本地头像优先（方形居中裁剪），
-     * 没有头像时用主题色（Primary 天蓝）画显示名首字，与聊天页首字兜底风格一致。
+     * 没有头像时用主题色（Accent 鼠尾草绿）画显示名首字，与聊天页首字兜底风格一致。
      * 构建失败返回 null（通知退化为默认样式）。
      */
     suspend fun buildLargeIcon(profileFilename: String, displayName: String): Bitmap? {
@@ -177,9 +177,9 @@ internal class BackendNotificationPresenter(
     }
 
     companion object {
-        // 首字兜底头像的配色：与 theme/Color.kt 的 Primary / Background 同值，
-        // 通知头像与 App 自身配色保持一致（深色字压在品牌天蓝上）。
-        private const val PRIMARY_COLOR = 0xFF0EA5E9.toInt()
-        private const val BACKGROUND_COLOR = 0xFF05060A.toInt()
+        // 首字兜底头像的配色：与 theme/Color.kt 的 Accent / Background 同值，
+        // 通知头像与 App 自身配色保持一致（深色字压在品牌鼠尾草绿上）。
+        private const val PRIMARY_COLOR = 0xFFB9D4C6.toInt()
+        private const val BACKGROUND_COLOR = 0xFF0C0C0D.toInt()
     }
 }

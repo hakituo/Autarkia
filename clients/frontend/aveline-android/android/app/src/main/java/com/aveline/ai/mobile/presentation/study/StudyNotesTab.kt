@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,8 +49,8 @@ import com.aveline.ai.mobile.presentation.components.LatexMath
 import com.aveline.ai.mobile.presentation.components.MarkdownInlineText
 import com.aveline.ai.mobile.presentation.components.SectionCard
 import com.aveline.ai.mobile.presentation.components.claimHorizontalContentGesture
-import com.aveline.ai.mobile.presentation.theme.EmotionGreen
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
+import com.aveline.ai.mobile.presentation.theme.TextBody
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
@@ -116,7 +117,7 @@ fun StudyNotesTab(
                             ) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.width(18.dp).height(18.dp),
-                                    color = Primary,
+                                    color = Accent,
                                     strokeWidth = 2.dp,
                                 )
                                 Text(
@@ -201,7 +202,7 @@ private fun NoteTreeItem(
     val startPadding = (16 * depth).dp
     val iconColor = when (node) {
         is NoteTreeNode.Folder -> Color(0xFFF59E0B)
-        is NoteTreeNode.File -> Primary
+        is NoteTreeNode.File -> Accent
     }
     val icon = when (node) {
         is NoteTreeNode.Folder -> if (isExpanded) Icons.Default.FolderOpen else Icons.Default.Folder
@@ -318,7 +319,7 @@ private fun NoteReaderScreen(
                     isLoading -> {
                         CircularProgressIndicator(
                             modifier = Modifier.align(Alignment.Center),
-                            color = Primary,
+                            color = Accent,
                         )
                     }
 
@@ -359,7 +360,11 @@ private fun NoteReaderScreen(
  * `$$...$$` 同时支持多行和单行形式。
  */
 @Composable
-fun NotesMarkdownRenderer(text: String) {
+fun NotesMarkdownRenderer(
+    text: String,
+    /** 正文样式：聊天传 bodyLarge，笔记默认 bodyMedium。 */
+    bodyStyle: TextStyle = MaterialTheme.typography.bodyMedium
+) {
     val blocks = remember(text) { MarkdownBlockParser.parse(text) }
 
     Column(
@@ -378,8 +383,8 @@ fun NotesMarkdownRenderer(text: String) {
 
                 is MarkdownBlock.Paragraph -> MarkdownInlineText(
                     nodes = block.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextPrimary,
+                    style = bodyStyle,
+                    color = TextBody,
                     modifier = Modifier.fillMaxWidth(),
                 )
 
@@ -390,14 +395,14 @@ fun NotesMarkdownRenderer(text: String) {
                 ) {
                     Text(
                         text = "•",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Primary,
+                        style = bodyStyle,
+                        color = Accent,
                         modifier = Modifier.alignByBaseline(),
                     )
                     MarkdownInlineText(
                         nodes = block.content,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextPrimary,
+                        style = bodyStyle,
+                        color = TextBody,
                         modifier = Modifier
                             .weight(1f)
                             .alignByBaseline(),
@@ -421,7 +426,7 @@ private fun RenderHeading(block: MarkdownBlock.Heading) {
         3 -> MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
         else -> MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
     }
-    val color = if (block.level == 3) Primary else TextPrimary
+    val color = if (block.level == 3) Accent else TextPrimary
 
     if (block.level == 2) Spacer(modifier = Modifier.height(4.dp))
     MarkdownInlineText(
@@ -499,7 +504,7 @@ private fun RenderCodeBlock(code: String, languageTag: String) {
             Text(
                 text = languageLabel,
                 style = MaterialTheme.typography.labelSmall,
-                color = EmotionGreen.copy(alpha = 0.8f),
+                color = Accent.copy(alpha = 0.8f),
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.padding(top = 8.dp, start = 12.dp),
             )
@@ -507,7 +512,7 @@ private fun RenderCodeBlock(code: String, languageTag: String) {
         Text(
             text = highlighted,
             style = MaterialTheme.typography.bodySmall,
-            color = EmotionGreen,
+            color = Accent,
             fontFamily = FontFamily.Monospace,
             modifier = Modifier
                 .horizontalScroll(rememberScrollState())
@@ -548,7 +553,7 @@ private fun RenderTable(rows: List<List<List<MarkdownInlineNode>>>) {
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Normal,
                             ),
-                            color = if (index == 0) Primary else TextSecondary,
+                            color = if (index == 0) Accent else TextSecondary,
                             modifier = Modifier.width(128.dp),
                         )
                     }

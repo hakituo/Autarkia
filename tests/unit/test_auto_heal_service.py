@@ -14,6 +14,7 @@ self_improvement / health_checker）均替换为内存替身，
 **不做任何真实修复动作**，不 sleep、不依赖真实时间，
 除 ``tmp_path`` 外不触碰真实文件系统。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -412,16 +413,10 @@ def test_initialize_background_flow_applies_settings(monkeypatch, tmp_path):
             "get_settings",
             lambda: SimpleNamespace(auto_heal=heal_settings),
         )
-        monkeypatch.setattr(
-            log_sanitizer_module, "register_error_callback", lambda cb: None
-        )
+        monkeypatch.setattr(log_sanitizer_module, "register_error_callback", lambda cb: None)
         checker = _StubHealthChecker()
-        monkeypatch.setattr(
-            async_monitor_module, "get_health_checker", lambda: checker
-        )
-        monkeypatch.setattr(
-            shared_roots_module, "get_logs_root", lambda: tmp_path / "logs"
-        )
+        monkeypatch.setattr(async_monitor_module, "get_health_checker", lambda: checker)
+        monkeypatch.setattr(shared_roots_module, "get_logs_root", lambda: tmp_path / "logs")
         _patch_infrastructure(monkeypatch)
 
         await svc.initialize()
@@ -457,9 +452,7 @@ def test_initialize_disabled_in_settings(monkeypatch, tmp_path):
                 )
             ),
         )
-        monkeypatch.setattr(
-            shared_roots_module, "get_logs_root", lambda: tmp_path / "logs"
-        )
+        monkeypatch.setattr(shared_roots_module, "get_logs_root", lambda: tmp_path / "logs")
         _patch_infrastructure(monkeypatch)
 
         await svc.initialize()
@@ -477,20 +470,14 @@ def test_initialize_without_heal_settings(monkeypatch, tmp_path):
 
     async def _run():
         svc = _make_service()
-        monkeypatch.setattr(
-            integrated_config_module, "get_settings", lambda: SimpleNamespace()
-        )
-        monkeypatch.setattr(
-            log_sanitizer_module, "register_error_callback", lambda cb: None
-        )
+        monkeypatch.setattr(integrated_config_module, "get_settings", lambda: SimpleNamespace())
+        monkeypatch.setattr(log_sanitizer_module, "register_error_callback", lambda cb: None)
         monkeypatch.setattr(
             async_monitor_module,
             "get_health_checker",
             lambda: _StubHealthChecker(),
         )
-        monkeypatch.setattr(
-            shared_roots_module, "get_logs_root", lambda: tmp_path / "logs"
-        )
+        monkeypatch.setattr(shared_roots_module, "get_logs_root", lambda: tmp_path / "logs")
         _patch_infrastructure(monkeypatch)
 
         await svc.initialize()
@@ -515,17 +502,13 @@ def test_initialize_settings_read_failure_degrades(monkeypatch, tmp_path):
             raise RuntimeError("config boom")
 
         monkeypatch.setattr(integrated_config_module, "get_settings", _boom)
-        monkeypatch.setattr(
-            log_sanitizer_module, "register_error_callback", lambda cb: None
-        )
+        monkeypatch.setattr(log_sanitizer_module, "register_error_callback", lambda cb: None)
         monkeypatch.setattr(
             async_monitor_module,
             "get_health_checker",
             lambda: _StubHealthChecker(),
         )
-        monkeypatch.setattr(
-            shared_roots_module, "get_logs_root", lambda: tmp_path / "logs"
-        )
+        monkeypatch.setattr(shared_roots_module, "get_logs_root", lambda: tmp_path / "logs")
         _patch_infrastructure(monkeypatch)
 
         await svc.initialize()
@@ -540,29 +523,21 @@ def test_initialize_settings_read_failure_degrades(monkeypatch, tmp_path):
     asyncio.run(_run())
 
 
-def test_initialize_reuses_existing_callback_and_checker_registration(
-    monkeypatch, tmp_path
-):
+def test_initialize_reuses_existing_callback_and_checker_registration(monkeypatch, tmp_path):
     """已注册过回调/健康检查时不应重复注册。"""
 
     async def _run():
         svc = _make_service()
         svc._registered_error_callback = True
         svc._registered_health_checker = True
-        monkeypatch.setattr(
-            integrated_config_module, "get_settings", lambda: SimpleNamespace()
-        )
+        monkeypatch.setattr(integrated_config_module, "get_settings", lambda: SimpleNamespace())
         register_calls = []
 
         def _register(cb):
             register_calls.append(cb)
 
-        monkeypatch.setattr(
-            log_sanitizer_module, "register_error_callback", _register
-        )
-        monkeypatch.setattr(
-            shared_roots_module, "get_logs_root", lambda: tmp_path / "logs"
-        )
+        monkeypatch.setattr(log_sanitizer_module, "register_error_callback", _register)
+        monkeypatch.setattr(shared_roots_module, "get_logs_root", lambda: tmp_path / "logs")
         _patch_infrastructure(monkeypatch)
 
         await svc.initialize()
@@ -600,9 +575,7 @@ def test_shutdown_cancels_task_and_unregisters(monkeypatch, tmp_path):
             "unregister_error_callback",
             lambda cb: unregistered.append(cb),
         )
-        monkeypatch.setattr(
-            shared_roots_module, "get_logs_root", lambda: tmp_path / "logs"
-        )
+        monkeypatch.setattr(shared_roots_module, "get_logs_root", lambda: tmp_path / "logs")
         _patch_infrastructure(monkeypatch)
 
         await svc.shutdown()
@@ -626,9 +599,7 @@ def test_shutdown_unregister_failure_is_swallowed(monkeypatch, tmp_path):
             raise RuntimeError("unregister boom")
 
         monkeypatch.setattr(log_sanitizer_module, "unregister_error_callback", _boom)
-        monkeypatch.setattr(
-            shared_roots_module, "get_logs_root", lambda: tmp_path / "logs"
-        )
+        monkeypatch.setattr(shared_roots_module, "get_logs_root", lambda: tmp_path / "logs")
         _patch_infrastructure(monkeypatch)
 
         await svc.shutdown()
@@ -803,9 +774,7 @@ def test_process_anomaly_protected_file_generates_suggestion(monkeypatch):
         svc = _make_service()
         _patch_infrastructure(monkeypatch)
         anomaly = _make_anomaly()
-        svc._analyzer.result = _make_root_cause(
-            anomaly, file_path="core/utils/logger.py"
-        )
+        svc._analyzer.result = _make_root_cause(anomaly, file_path="core/utils/logger.py")
         svc._patch_manager.protected = True
 
         await svc._process_anomaly(anomaly)
@@ -850,9 +819,7 @@ def test_process_anomaly_patch_too_large(monkeypatch):
         _patch_infrastructure(monkeypatch)
         anomaly = _make_anomaly()
         svc._analyzer.result = _make_root_cause(anomaly)
-        svc._generator.patch = _make_patch(
-            patched_code="a" * (512 * 1024 + 1)
-        )
+        svc._generator.patch = _make_patch(patched_code="a" * (512 * 1024 + 1))
         await svc._process_anomaly(anomaly)
         assert svc._history[-1]["action"] == "patch_too_large"
 
@@ -882,9 +849,7 @@ def test_process_anomaly_success_notifies_patch_ready(monkeypatch):
         svc = _make_service()
         bus, mgr = _patch_infrastructure(monkeypatch)
         ws_service = _StubWorkspaceService()
-        monkeypatch.setattr(
-            ws_service_module, "get_workspace_service", lambda: ws_service
-        )
+        monkeypatch.setattr(ws_service_module, "get_workspace_service", lambda: ws_service)
         anomaly = _make_anomaly(AnomalySeverity.LOW)
         root_cause = _make_root_cause(anomaly)
         svc._analyzer.result = root_cause
@@ -912,15 +877,11 @@ def test_process_anomaly_auto_apply_allowed(monkeypatch):
             lambda: _StubWorkspaceService(),
         )
         si = _StubSelfImprovement()
-        monkeypatch.setattr(
-            si_module, "get_self_improvement_service", lambda scope=None: si
-        )
+        monkeypatch.setattr(si_module, "get_self_improvement_service", lambda scope=None: si)
         anomaly = _make_anomaly(AnomalySeverity.LOW)
         root_cause = _make_root_cause(anomaly, file_path="core/foo.py")
         svc._analyzer.result = root_cause
-        svc._generator.patch = _make_patch(
-            file_path="core/foo.py", root_cause=root_cause
-        )
+        svc._generator.patch = _make_patch(file_path="core/foo.py", root_cause=root_cause)
         svc._auto_apply = True
         svc._patch_manager.apply_result = {"success": True, "message": "ok"}
 
@@ -978,9 +939,7 @@ def test_apply_patch_success_with_root_cause(monkeypatch):
         svc = _make_service()
         bus, _ = _patch_infrastructure(monkeypatch)
         si = _StubSelfImprovement()
-        monkeypatch.setattr(
-            si_module, "get_self_improvement_service", lambda scope=None: si
-        )
+        monkeypatch.setattr(si_module, "get_self_improvement_service", lambda scope=None: si)
         anomaly = _make_anomaly()
         root_cause = _make_root_cause(anomaly)
         patch = _make_patch(root_cause=root_cause)
@@ -1186,9 +1145,7 @@ def test_can_auto_apply_severity_not_allowed():
     svc = _make_service()
     patch = _make_patch(file_path="core/foo.py")
     assert svc._can_auto_apply(_make_anomaly(AnomalySeverity.HIGH), patch) is False
-    assert (
-        svc._can_auto_apply(_make_anomaly(AnomalySeverity.CRITICAL), patch) is False
-    )
+    assert svc._can_auto_apply(_make_anomaly(AnomalySeverity.CRITICAL), patch) is False
 
 
 def test_can_auto_apply_blocked_prefix_startswith():
@@ -1226,9 +1183,7 @@ def test_notify_patch_ready_writes_workspace_memory(monkeypatch):
         svc = _make_service()
         bus, _ = _patch_infrastructure(monkeypatch)
         ws_service = _StubWorkspaceService()
-        monkeypatch.setattr(
-            ws_service_module, "get_workspace_service", lambda: ws_service
-        )
+        monkeypatch.setattr(ws_service_module, "get_workspace_service", lambda: ws_service)
         patch = _make_patch()
         await svc._notify_patch_ready(patch)
 
@@ -1299,9 +1254,7 @@ def test_load_history_reads_valid_entries_and_skips_bad_lines(monkeypatch, tmp_p
         )
         monkeypatch.setattr(heal_service, "is_debug_enabled", lambda *a, **k: True)
         monkeypatch.setattr(heal_service, "logger", _FakeLogger())
-        monkeypatch.setattr(
-            shared_roots_module, "get_logs_root", lambda: tmp_path / "logs"
-        )
+        monkeypatch.setattr(shared_roots_module, "get_logs_root", lambda: tmp_path / "logs")
 
         await svc._load_history()
 
@@ -1313,9 +1266,7 @@ def test_load_history_reads_valid_entries_and_skips_bad_lines(monkeypatch, tmp_p
 def test_load_history_returns_when_file_missing(monkeypatch, tmp_path):
     async def _run():
         svc = _make_service()
-        monkeypatch.setattr(
-            shared_roots_module, "get_logs_root", lambda: tmp_path / "logs"
-        )
+        monkeypatch.setattr(shared_roots_module, "get_logs_root", lambda: tmp_path / "logs")
         await svc._load_history()
         assert svc._history == []
 
@@ -1346,9 +1297,7 @@ def test_load_history_read_failure_resets_history(monkeypatch, tmp_path):
         log_dir = tmp_path / "logs"
         # 故意把历史文件建成目录，触发 _read 的 IO 异常
         (log_dir / heal_service._HEAL_HISTORY_FILE).mkdir(parents=True, exist_ok=True)
-        monkeypatch.setattr(
-            shared_roots_module, "get_logs_root", lambda: tmp_path / "logs"
-        )
+        monkeypatch.setattr(shared_roots_module, "get_logs_root", lambda: tmp_path / "logs")
         await svc._load_history()
         assert svc._history == []
 
@@ -1361,9 +1310,7 @@ def test_load_history_read_failure_resets_history(monkeypatch, tmp_path):
 def test_save_history_skips_when_not_dirty(monkeypatch, tmp_path):
     async def _run():
         svc = _make_service()
-        monkeypatch.setattr(
-            shared_roots_module, "get_logs_root", lambda: tmp_path / "logs"
-        )
+        monkeypatch.setattr(shared_roots_module, "get_logs_root", lambda: tmp_path / "logs")
         await svc._save_history()
         assert not (tmp_path / "logs" / heal_service._HEAL_HISTORY_FILE).exists()
 
@@ -1374,9 +1321,7 @@ def test_save_history_writes_file(monkeypatch, tmp_path):
     async def _run():
         svc = _make_service()
         svc._record_history(_make_anomaly(), "persist")
-        monkeypatch.setattr(
-            shared_roots_module, "get_logs_root", lambda: tmp_path / "logs"
-        )
+        monkeypatch.setattr(shared_roots_module, "get_logs_root", lambda: tmp_path / "logs")
         await svc._save_history()
 
         path = tmp_path / "logs" / heal_service._HEAL_HISTORY_FILE
@@ -1408,12 +1353,8 @@ def test_save_history_write_failure_is_swallowed(monkeypatch, tmp_path):
         svc = _make_service()
         svc._record_history(_make_anomaly(), "persist")
         # 把历史文件建成目录，写入时触发 IO 异常
-        (tmp_path / "logs" / heal_service._HEAL_HISTORY_FILE).mkdir(
-            parents=True, exist_ok=True
-        )
-        monkeypatch.setattr(
-            shared_roots_module, "get_logs_root", lambda: tmp_path / "logs"
-        )
+        (tmp_path / "logs" / heal_service._HEAL_HISTORY_FILE).mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(shared_roots_module, "get_logs_root", lambda: tmp_path / "logs")
         await svc._save_history()
         assert svc._history_dirty is True
 

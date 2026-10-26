@@ -25,6 +25,18 @@ from .preparation import StreamPreparation
 
 logger = get_logger("ChatAgent")
 
+# 只有当前请求带图片时注入。顺序很重要：先判断是不是食物，再谈记录；
+# 之前只写「非食物图片不要记录」，模型仍会把任意照片当食物写进 Life 页。
+FOOD_IMAGE_AUTO_RECORD_INSTRUCTION = (
+    "【食物图片自动记录】先判断当前图片里有没有用户实际要吃/喝的食物或饮品实物。"
+    "确认是食物，才在本轮直接调用 record_nutrition_from_image"
+    "（image_is_food=true）保存，不要先问用户是否记录；"
+    "不是食物（人物、身体部位、聊天截图、文档、宠物、风景、表情包等）就不要调用，"
+    "也不要把照片内容本身当成食物名称、更不要为了凑一条记录去猜。"
+    "确认是食物后按可见份量逐项估算，营养标签清晰时优先照录并标记 nutrition_label；"
+    "照片估算必须标记为估算，无法可靠辨认的微量营养素留空。"
+)
+
 
 async def build_stream_messages(
     agent: Any,
@@ -116,16 +128,9 @@ async def build_stream_messages(
         extra_dynamic_context = f"{extra_dynamic_context}\n\n{svc_ctx}" if extra_dynamic_context else svc_ctx
 
     if image_refs:
-        food_image_instruction = (
-            "【食物图片自动记录】如果当前图片清楚显示用户实际吃/喝的食物或饮品，"
-            "请在本轮直接调用 record_nutrition_from_image 保存，不要先问用户是否记录；"
-            "按可见份量逐项估算，营养标签清晰时优先照录并标记 nutrition_label。"
-            "照片估算必须标记为估算，无法可靠辨认的微量营养素留空；"
-            "非食物图片不要记录，也不要把不确定的食物说成已确认。"
-        )
         extra_dynamic_context = (
-            f"{extra_dynamic_context}\n\n{food_image_instruction}"
-            if extra_dynamic_context else food_image_instruction
+            f"{extra_dynamic_context}\n\n{FOOD_IMAGE_AUTO_RECORD_INSTRUCTION}"
+            if extra_dynamic_context else FOOD_IMAGE_AUTO_RECORD_INSTRUCTION
         )
 
     if document_refs:
@@ -230,17 +235,14 @@ async def build_stream_messages(
                     )
                 user_text = "\n\n".join(part for part in text_parts if part)
 
+                # 本轮用户明确发来的图全部注入，不设张数/总量上限：
+                # 本地截断会让「我发了 5 张、模型只看到 2 张」变成静默丢数据。
+                # 单张文件大小仍由 load_uploaded_image_data_url 的合法性校验兜底。
                 image_parts = []
-                image_bytes_budget = 32 * 1024 * 1024
                 for image_ref in image_refs:
                     image_data_url = await load_uploaded_image_data_url(image_ref)
                     if not image_data_url:
                         continue
-                    estimated_bytes = len(image_data_url) * 3 // 4
-                    if estimated_bytes > image_bytes_budget:
-                        logger.warning("多图附件超过本轮视觉上下文上限，其余图片不注入")
-                        break
-                    image_bytes_budget -= estimated_bytes
                     image_parts.append(
                         {
                             "type": "image_url",

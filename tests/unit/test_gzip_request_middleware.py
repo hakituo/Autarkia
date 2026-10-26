@@ -81,5 +81,7 @@ def test_x_gzip_alias_is_accepted(client):
 
 
 def test_broken_gzip_body_returns_400(client):
-    response = client.post("/echo", content=b"not-a-gzip-stream", headers={"Content-Encoding": "gzip"})
+    response = client.post(
+        "/echo", content=b"not-a-gzip-stream", headers={"Content-Encoding": "gzip"}
+    )
     assert response.status_code == 400

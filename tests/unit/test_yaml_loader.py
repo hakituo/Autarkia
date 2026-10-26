@@ -23,9 +23,7 @@ def test_resolve_env_vars_nested_dict():
     data = {
         "key1": "${TEST_VAR}",
         "key2": ["${TEST_VAR}", "static"],
-        "key3": {
-            "nested": "${TEST_VAR}"
-        }
+        "key3": {"nested": "${TEST_VAR}"},
     }
 
     with patch.dict(os.environ, {"TEST_VAR": "value"}):

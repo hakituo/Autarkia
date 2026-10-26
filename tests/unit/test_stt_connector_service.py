@@ -134,8 +134,12 @@ def test_estimate_transcription_time_async(tmp_path):
     audio = tmp_path / "a.wav"
     audio.write_bytes(b"\x00" * (2 * 1024 * 1024))
 
-    assert asyncio.run(connector.estimate_transcription_time_async(str(audio))) == pytest.approx(4.0)
-    assert asyncio.run(connector.estimate_transcription_time_async("/no/such.wav")) == pytest.approx(5.0)
+    assert asyncio.run(connector.estimate_transcription_time_async(str(audio))) == pytest.approx(
+        4.0
+    )
+    assert asyncio.run(
+        connector.estimate_transcription_time_async("/no/such.wav")
+    ) == pytest.approx(5.0)
 
 
 # --------------------------------------------------------------------------

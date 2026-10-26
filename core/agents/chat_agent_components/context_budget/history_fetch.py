@@ -252,11 +252,25 @@ async def _backfill_from_chat_history_store(
         conversation_id = str(user_id or "").strip() or "default"
 
         def _fetch_events():
-            return store.list_conversation_events(
+            events = store.list_conversation_events(
                 conversation_id,
                 limit=120,
                 roles=["user", "assistant"],
             )
+            # 提示词回填也是原始事件读路径：先按回滚边界，再走统一世界线闸门。
+            try:
+                from core.agents.chat_agent_components.message_branch import (
+                    filter_events_by_branch_scope,
+                )
+                from memory.topology.read_gate import filter_raw_events
+
+                events = filter_events_by_branch_scope(
+                    events, conversation_id=conversation_id
+                )
+                events = filter_raw_events(events, conversation_id=conversation_id).events
+            except Exception as exc:  # noqa: BLE001 - 回填失败不得清空上下文
+                logger.warning(f"历史回填可见性过滤失败，按原样返回: {exc}")
+            return events
 
         events = await asyncio.to_thread(_fetch_events)
         if not events:

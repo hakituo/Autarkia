@@ -20,8 +20,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aveline.ai.mobile.data.local.storage.PersonaAvatarStorage
-import com.aveline.ai.mobile.presentation.theme.OverlayLight
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.SurfaceHigh
+import com.aveline.ai.mobile.presentation.theme.Accent
 
 /**
  * persona 头像：本地自定义头像 > 网络 URL > 昵称首字符兜底。
@@ -51,7 +51,7 @@ fun PersonaAvatar(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(OverlayLight),
+            .background(SurfaceHigh),
         contentAlignment = Alignment.Center
     ) {
         when {
@@ -120,7 +120,7 @@ fun AvatarTextFallback(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(Primary.copy(alpha = 0.3f)),
+            .background(Accent.copy(alpha = 0.3f)),
         contentAlignment = Alignment.Center
     ) {
         Text(

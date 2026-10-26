@@ -7,7 +7,7 @@ Android 仍使用 ``history_override`` 决定本轮 LLM 看见的激活路径；
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 
 _MAX_ID_LENGTH = 128
@@ -119,6 +119,22 @@ def branch_metadata_for_role(
     return result
 
 
+def request_branch_fields(role: str, turn_id: str) -> Dict[str, Any]:
+    """当前请求这一轮的节点关系；不是这一轮就返回空字典。
+
+    ``turn_id`` 用落库的 message_id 比对：只有 ``save_history`` 为当前这轮
+    写入的 user/assistant 才能继承 branch context。请求期间派生出的后台任务
+    即使复制了 ContextVar，也不会被误标成这条世界线。
+    """
+    metadata = get_request_branch_metadata()
+    if not metadata:
+        return {}
+    expected_turn = _clean_id(metadata.get("assistant_message_id"))
+    if not expected_turn or _clean_id(turn_id) != expected_turn:
+        return {}
+    return branch_metadata_for_role(metadata, role)
+
+
 # ---------------------------------------------------------------------------
 # 聊天记录检索的「当前分支可见范围」
 #
@@ -145,12 +161,15 @@ _chat_history_branch_scope: ContextVar[Optional[Dict[str, Any]]] = ContextVar(
 def set_chat_history_branch_scope(
     allowed_message_ids: Iterable[str],
     not_after_ts: Optional[float],
+    conversation_id: Optional[str] = None,
 ) -> Token:
     """绑定本轮请求的聊天记录检索边界。
 
     ``not_after_ts=None`` 表示客户端没带时间戳（老版本 App），只按 ID 规则过滤，
     不搞时间兜底——否则会把长会话的旧历史一起挡掉；``0.0`` 表示显式空路径
     （从零重生成第一轮回复），本会话此前的记录全部不可见。
+    ``conversation_id`` 标明边界属于哪个会话，供不带会话参数的读路径
+    （加权记忆检索 / 关系图）判断「本会话」，缺省时这些读路径不套用边界。
     """
     cleaned = {str(item).strip() for item in (allowed_message_ids or ()) if str(item).strip()}
     boundary: Optional[float]
@@ -162,7 +181,11 @@ def set_chat_history_branch_scope(
         except (TypeError, ValueError):
             boundary = None
     return _chat_history_branch_scope.set(
-        {"allowed_message_ids": cleaned, "not_after_ts": boundary}
+        {
+            "allowed_message_ids": cleaned,
+            "not_after_ts": boundary,
+            "conversation_id": str(conversation_id or "").strip(),
+        }
     )
 
 
@@ -222,3 +245,27 @@ def is_event_visible_in_branch(
     except (TypeError, ValueError):
         ts = 0.0
     return ts <= boundary
+
+
+def filter_events_by_branch_scope(
+    events: Iterable[Dict[str, Any]],
+    *,
+    conversation_id: str,
+    scope: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
+    """按当前请求的回滚边界过滤事件；没有边界时原样返回。
+
+    多个读入口（search_chat_history / search_memory / 事件历史 / 提示词回填）
+    共用这一份实现，避免各自维护一套「哪些算被回滚掉」的判断。
+    """
+    items = list(events)
+    active = scope if scope is not None else get_chat_history_branch_scope()
+    if not active:
+        return items
+    return [
+        event
+        for event in items
+        if is_event_visible_in_branch(
+            event, conversation_id=conversation_id, scope=active
+        )
+    ]

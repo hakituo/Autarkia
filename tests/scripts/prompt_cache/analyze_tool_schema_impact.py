@@ -37,7 +37,7 @@ def load_tool_events():
     events = []
     if not MAIN_LOG_DIR.exists():
         return events
-    for path in sorted(MAIN_LOG_DIR.rglob("xiaoyou_main.log")):
+    for path in sorted(MAIN_LOG_DIR.rglob("autarkia_main.log")):
         for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
             m = TOOL_RE.match(line.strip())
             if not m:

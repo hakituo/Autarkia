@@ -37,7 +37,7 @@ clients/bots/
 │   ├── utils.py                # 通用工具函数
 │   └── session/                # 会话子系统
 │       ├── __init__.py
-│       ├── session.py          # XiaoyouSession Facade
+│       ├── session.py          # AutarkiaSession Facade
 │       ├── heartbeat.py        # 心跳处理
 │       ├── state.py            # 会话状态管理
 │       ├── message.py          # 消息断句与发送
@@ -117,7 +117,7 @@ clients/bots/
 │  └─────────────────────────────────────────────────────────┘│
 │  ┌─────────────────────────────────────────────────────────┐│
 │  │ Stage 4: Chat (对话处理)                                ││
-│  │   └── XiaoyouSession -> WebSocket -> Autarkia       ││
+│  │   └── AutarkiaSession -> WebSocket -> Autarkia       ││
 │  └─────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────┘
                           │
@@ -165,7 +165,7 @@ CommandRoute({"切模型", "switchmodel"}, True, self._switch_model),
 
 ## 会话管理
 
-### XiaoyouSession 类
+### AutarkiaSession 类
 
 每个用户/群组拥有独立的会话实例，负责：
 
@@ -176,7 +176,7 @@ CommandRoute({"切模型", "switchmodel"}, True, self._switch_model),
 - **主动关怀**: 接收并处理主动关怀消息
 
 ```python
-class XiaoyouSession:
+class AutarkiaSession:
     def __init__(self, session_id, adapter):
         self.session_id = session_id
         self.ws = None
@@ -236,10 +236,10 @@ if random.random() < surprise_probability:
 ```json
 {
   "napcat_ws_url": "ws://localhost:3001",
-  "xiaoyou_ws_url": "ws://localhost:8000/api/v1/ws",
-  "xiaoyou_http_base_url": "http://localhost:8000",
+  "autarkia_ws_url": "ws://localhost:8000/api/v1/ws",
+  "autarkia_http_base_url": "http://localhost:8000",
   "napcat_access_token": "",
-  "xiaoyou_access_token": "",
+  "autarkia_access_token": "",
   "openclaw_enabled": false,
   "openclaw_http_base_url": "http://127.0.0.1:18789",
   "openclaw_api_key": "",
@@ -258,8 +258,8 @@ if random.random() < surprise_probability:
 | 配置项 | 说明 | 默认值 |
 |--------|------|--------|
 | `napcat_ws_url` | NapCat WebSocket 地址 | `ws://localhost:3001` |
-| `xiaoyou_ws_url` | Autarkia WebSocket 地址 | `ws://localhost:8000/api/v1/ws` |
-| `xiaoyou_http_base_url` | Autarkia HTTP 地址 | `http://localhost:8000` |
+| `autarkia_ws_url` | Autarkia WebSocket 地址 | `ws://localhost:8000/api/v1/ws` |
+| `autarkia_http_base_url` | Autarkia HTTP 地址 | `http://localhost:8000` |
 | `reply_mode` | 回复模式 (`at_only`/`all`) | `at_only` |
 | `master_qq_id` | Master QQ 号（仅回复此人消息） | - |
 | `session_idle_seconds` | 会话空闲超时（秒） | `1800` |

@@ -43,4 +43,4 @@
     2. _generate_plan_for_date 首次失败重试 1 次，仍失败返回带诊断 notes 的空计划且不保存
     3. 新增 GenerateTodayPlanTool 工具并注册到 registry
 *   **验证**:
-    1. `D:\projects\xiaoyou\venv_core\Scripts\python.exe -c "from core.tools.plan_tool import GenerateTodayPlanTool; print(GenerateTodayPlanTool.name)"`
+    1. `D:\AI\xiaoyou-core\venv_core\Scripts\python.exe -c "from core.tools.plan_tool import GenerateTodayPlanTool; print(GenerateTodayPlanTool.name)"`

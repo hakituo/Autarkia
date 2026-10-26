@@ -4,6 +4,7 @@ import com.aveline.ai.mobile.data.samsung.SamsungHealthReader
 import com.aveline.ai.mobile.data.wear.WearDataSource
 import com.aveline.ai.mobile.domain.repository.ContextRepository
 import com.aveline.ai.mobile.domain.repository.HealthRepository
+import com.aveline.ai.mobile.services.health.StartupHealthSyncManager
 import com.aveline.ai.mobile.util.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -42,6 +43,16 @@ class DailyDataViewModelDrinkTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
+    /**
+     * 启动同步管理器桩。
+     *
+     * DailyDataViewModel 会订阅 [StartupHealthSyncManager.cache]、读 [StartupHealthSyncManager.lastSyncAt]
+     * 并在快照未上报时补报。本测试只关心喝水 payload，这几条入口保持"无快照、未同步"的
+     * 静默默认值即可，用 relaxed mock 避免为了构造它再搭一套 SDK 依赖。
+     */
+    private fun stubStartupHealthSync(): StartupHealthSyncManager =
+        mockk(relaxed = true)
+
     @Test
     fun `recordDrink 传 amount_ml 而非 units`() = runTest {
         val mockRepo = mockk<HealthRepository>(relaxed = true)
@@ -55,7 +66,8 @@ class DailyDataViewModelDrinkTest {
             mockRepo,
             contextRepository = mockk<ContextRepository>(relaxed = true),
             wearDataSource = mockk<WearDataSource>(relaxed = true),
-            samsungHealthReader = mockk<SamsungHealthReader>(relaxed = true)
+            samsungHealthReader = mockk<SamsungHealthReader>(relaxed = true),
+            startupHealthSyncManager = stubStartupHealthSync()
         )
         advanceUntilIdle()
 
@@ -81,7 +93,8 @@ class DailyDataViewModelDrinkTest {
             mockRepo,
             contextRepository = mockk<ContextRepository>(relaxed = true),
             wearDataSource = mockk<WearDataSource>(relaxed = true),
-            samsungHealthReader = mockk<SamsungHealthReader>(relaxed = true)
+            samsungHealthReader = mockk<SamsungHealthReader>(relaxed = true),
+            startupHealthSyncManager = stubStartupHealthSync()
         )
         advanceUntilIdle()
 
@@ -105,7 +118,8 @@ class DailyDataViewModelDrinkTest {
             mockRepo,
             contextRepository = mockk<ContextRepository>(relaxed = true),
             wearDataSource = mockk<WearDataSource>(relaxed = true),
-            samsungHealthReader = mockk<SamsungHealthReader>(relaxed = true)
+            samsungHealthReader = mockk<SamsungHealthReader>(relaxed = true),
+            startupHealthSyncManager = stubStartupHealthSync()
         )
         advanceUntilIdle()
 
@@ -126,7 +140,8 @@ class DailyDataViewModelDrinkTest {
             mockRepo,
             contextRepository = mockk<ContextRepository>(relaxed = true),
             wearDataSource = mockk<WearDataSource>(relaxed = true),
-            samsungHealthReader = mockk<SamsungHealthReader>(relaxed = true)
+            samsungHealthReader = mockk<SamsungHealthReader>(relaxed = true),
+            startupHealthSyncManager = stubStartupHealthSync()
         )
         advanceUntilIdle()
 
@@ -150,7 +165,8 @@ class DailyDataViewModelDrinkTest {
             mockRepo,
             contextRepository = mockk<ContextRepository>(relaxed = true),
             wearDataSource = mockk<WearDataSource>(relaxed = true),
-            samsungHealthReader = mockk<SamsungHealthReader>(relaxed = true)
+            samsungHealthReader = mockk<SamsungHealthReader>(relaxed = true),
+            startupHealthSyncManager = stubStartupHealthSync()
         )
         advanceUntilIdle()
 

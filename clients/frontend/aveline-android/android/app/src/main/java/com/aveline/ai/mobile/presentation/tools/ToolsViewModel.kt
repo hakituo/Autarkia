@@ -10,29 +10,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import javax.inject.Inject
 
 data class ToolsUiState(
-    val imageModelsText: String = "",
-    val imagePrompt: String = "",
-    val imageModelId: String = "",
-    val imageNegativePrompt: String = "",
-    val imageResultUrl: String? = null,
-    val imageResultBase64: String? = null,
-    val visionInput: String = "",
-    val visionPrompt: String = "",
-    val visionResult: String? = null,
     val foodMenu: List<FoodItem> = emptyList(),
     val foodInventory: List<FoodInventoryItem> = emptyList(),
     val notifications: List<NotificationItem> = emptyList(),
     val intentText: String = "",
     val intentResult: IntentResult? = null,
-    val systemResourcesText: String? = null,
-    val systemStatsText: String? = null,
+    val systemResources: JsonElement? = null,
+    val systemStats: JsonElement? = null,
     val preferences: SystemPreferences = SystemPreferences(),
     val sensitiveEnabled: Boolean? = null,
-    val isImageLoading: Boolean = false,
-    val isVisionLoading: Boolean = false,
     val isFoodLoading: Boolean = false,
     val isNotificationsLoading: Boolean = false,
     val isIntentLoading: Boolean = false,
@@ -49,26 +40,6 @@ class ToolsViewModel @Inject constructor(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ToolsUiState())
     val uiState: StateFlow<ToolsUiState> = _uiState.asStateFlow()
-
-    fun setImagePrompt(value: String) {
-        _uiState.update { it.copy(imagePrompt = value) }
-    }
-
-    fun setImageModelId(value: String) {
-        _uiState.update { it.copy(imageModelId = value) }
-    }
-
-    fun setImageNegativePrompt(value: String) {
-        _uiState.update { it.copy(imageNegativePrompt = value) }
-    }
-
-    fun setVisionInput(value: String) {
-        _uiState.update { it.copy(visionInput = value) }
-    }
-
-    fun setVisionPrompt(value: String) {
-        _uiState.update { it.copy(visionPrompt = value) }
-    }
 
     fun setIntentText(value: String) {
         _uiState.update { it.copy(intentText = value) }
@@ -96,78 +67,6 @@ class ToolsViewModel @Inject constructor(
 
     fun toggleDebugVisible(enabled: Boolean) {
         _uiState.update { it.copy(preferences = it.preferences.copy(debugVisible = enabled)) }
-    }
-
-    fun loadImageModels() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isImageLoading = true, error = null, message = null) }
-            val result = toolsRepository.getImageModels()
-            _uiState.update {
-                result.fold(
-                    onSuccess = { data ->
-                        it.copy(
-                            isImageLoading = false,
-                            imageModelsText = data?.toString().orEmpty()
-                        )
-                    },
-                    onFailure = { e ->
-                        it.copy(isImageLoading = false, error = "获取模型失败: ${e.message}")
-                    }
-                )
-            }
-        }
-    }
-
-    fun generateImage() {
-        val prompt = _uiState.value.imagePrompt.trim()
-        if (prompt.isEmpty()) {
-            _uiState.update { it.copy(error = "请输入图片提示词") }
-            return
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isImageLoading = true, error = null, message = null) }
-            val result = toolsRepository.generateImage(
-                prompt = prompt,
-                modelPath = _uiState.value.imageModelId.trim().ifBlank { null },
-                negativePrompt = _uiState.value.imageNegativePrompt.trim().ifBlank { null }
-            )
-            _uiState.update {
-                result.fold(
-                    onSuccess = { (url, base64) ->
-                        it.copy(
-                            isImageLoading = false,
-                            imageResultUrl = url,
-                            imageResultBase64 = base64
-                        )
-                    },
-                    onFailure = { e ->
-                        it.copy(isImageLoading = false, error = "生成失败: ${e.message}")
-                    }
-                )
-            }
-        }
-    }
-
-    fun describeVision() {
-        val input = _uiState.value.visionInput.trim()
-        if (input.isEmpty()) {
-            _uiState.update { it.copy(error = "请先选择图片") }
-            return
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isVisionLoading = true, error = null, message = null) }
-            val result = toolsRepository.describeVision(input, _uiState.value.visionPrompt.trim().ifBlank { null })
-            _uiState.update {
-                result.fold(
-                    onSuccess = { desc ->
-                        it.copy(isVisionLoading = false, visionResult = desc)
-                    },
-                    onFailure = { e ->
-                        it.copy(isVisionLoading = false, error = "识别失败: ${e.message}")
-                    }
-                )
-            }
-        }
     }
 
     fun loadFoodMenu() {
@@ -286,7 +185,10 @@ class ToolsViewModel @Inject constructor(
             _uiState.update {
                 result.fold(
                     onSuccess = { data ->
-                        it.copy(isSystemLoading = false, systemResourcesText = data?.toString())
+                        it.copy(
+                            isSystemLoading = false,
+                            systemResources = data?.takeUnless { d -> d is JsonNull }
+                        )
                     },
                     onFailure = { e ->
                         it.copy(isSystemLoading = false, error = "获取资源失败: ${e.message}")
@@ -303,7 +205,10 @@ class ToolsViewModel @Inject constructor(
             _uiState.update {
                 result.fold(
                     onSuccess = { data ->
-                        it.copy(isSystemLoading = false, systemStatsText = data?.toString())
+                        it.copy(
+                            isSystemLoading = false,
+                            systemStats = data?.takeUnless { d -> d is JsonNull }
+                        )
                     },
                     onFailure = { e ->
                         it.copy(isSystemLoading = false, error = "获取统计失败: ${e.message}")

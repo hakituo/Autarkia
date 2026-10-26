@@ -11,6 +11,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from core.llm.siliconflow_client import SiliconFlowClient
 
 
+@pytest.fixture(autouse=True)
+def _silence_usage_log(monkeypatch):
+    """测试用的是假 usage，不能写进真实 logs/prompt_cache_stats.log。"""
+    import core.llm.siliconflow_client as siliconflow_module
+
+    monkeypatch.setattr(siliconflow_module, "log_llm_usage", lambda *args, **kwargs: None)
+
+
 def _build_client(chunks):
     """构造一个返回指定 SSE 分片的 SiliconFlow 客户端"""
 

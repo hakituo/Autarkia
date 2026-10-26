@@ -1,7 +1,7 @@
 r"""验证学习低打扰、晚安低打扰和起床意图不会串线。
 
 运行：
-    D:\projects\xiaoyou\venv_core\Scripts\python.exe -m tests.scripts.active_care.verify_reduced_mode_routing
+    D:\AI\autarkia\venv_core\Scripts\python.exe -m tests.scripts.active_care.verify_reduced_mode_routing
 """
 
 from __future__ import annotations

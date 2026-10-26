@@ -1,206 +1,163 @@
 package com.aveline.ai.mobile.presentation.settings
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.aveline.ai.mobile.presentation.components.AvelineTabRow
-import com.aveline.ai.mobile.presentation.components.ModuleHeader
+import com.aveline.ai.mobile.domain.models.EmotionType
 import com.aveline.ai.mobile.presentation.plugins.PluginsUiState
 import com.aveline.ai.mobile.presentation.tools.ToolsUiState
-import kotlinx.coroutines.launch
 
-/**
- * 设置模块 V2 的 5 个 tab。
- *
- * 合并 Plugins + Tools 的设置功能,统一入口:
- * - 常规:网络 / 模型 / 语音 / 响应 / 情绪 / 学习模式 / 分级模式
- * - 权限: 使用情况访问 / 通知访问
- * - 隐私:上下文同步 / 常驻模式
- * - 数据:聊天记录 / 关于
- * - 高级:图像生成 / 视觉分析 / 系统资源(调试工具,默认折叠)
- */
-private enum class SettingsTabV2(val title: String) {
-    GENERAL("常规"),
-    ACCESS("权限"),
-    PRIVACY("隐私"),
-    DATA("数据"),
-    ADVANCED("高级")
+private enum class SettingsPage {
+    HOME,
+    NETWORK,
+    ACCESSIBILITY,
+    SHIZUKU,
+    DEVELOPER
 }
 
 /**
- * 设置主界面 V2。
+ * 设置主界面：一页分组列表 + 四个二级页。
  *
- * 使用 TabRow + HorizontalPager 组织 5 个 tab,支持左右滑动切换。
- * 复用现有 [SettingsUiState] / [PluginsUiState] / [ToolsUiState],不修改旧文件。
+ * 旧的五 Tab（常规 / 权限 / 隐私 / 数据 / 高级）已经取消；每次只渲染当前页，
+ * 二级页用本地状态而非导航路由，返回键统一回到首页。
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun SettingsScreenV2(
+internal fun SettingsScreenV2(
     settingsUiState: SettingsUiState,
     pluginsUiState: PluginsUiState,
     toolsUiState: ToolsUiState,
-    // Settings 回调
     onOpenUsageStatsSettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
-    onToggleContextSync: () -> Unit,
-    onBackendUrlChange: (String) -> Unit,
-    onLanUrlChange: (String) -> Unit,
-    onVpnUrlChange: (String) -> Unit,
-    onTunnelUrlChange: (String) -> Unit,
-    onTokenChange: (String) -> Unit,
-    onTestConnection: () -> Unit,
-    onReprobeEndpoint: () -> Unit,
-    onSaveBackendUrl: () -> Unit,
-    onModelChange: (String) -> Unit,
-    onVoiceIdChange: (String) -> Unit,
-    onResponseLengthChange: (String) -> Unit,
-    onToggleAutoTts: () -> Unit,
-    onToggleResidentMode: () -> Unit,
+    onToggleContextSync: (Boolean) -> Unit,
+    onToggleAutoTts: (Boolean) -> Unit,
+    onToggleStageDirection: (Boolean) -> Unit,
+    onToggleResidentMode: (Boolean) -> Unit,
     onConfirmBatteryOptimization: () -> Unit,
     onDismissBatteryOptimization: () -> Unit,
     onClearHistory: () -> Unit,
     onShowClearConfirm: () -> Unit,
     onHideClearConfirm: () -> Unit,
-    onHideSaveConfirm: () -> Unit,
-    // Plugins 回调(合并进来)
-    onSetManualEmotion: (String) -> Unit,
-    onToggleStudyMode: () -> Unit,
+    onRefreshPermissions: () -> Unit,
+    onSaveAddress: (SettingsAddressSlot, String) -> Unit,
+    onSaveAccessToken: (String) -> Unit,
+    onTestConnection: () -> Unit,
+    onReprobeEndpoint: () -> Unit,
+    onRefreshCandidates: () -> Unit,
     onToggleAutoEmotion: () -> Unit,
+    onSetManualEmotion: (EmotionType) -> Unit,
     onShowEmotionSelector: () -> Unit,
     onHideEmotionSelector: () -> Unit,
-    onToggleSensitive: (Boolean) -> Unit,
-    onRefreshSensitive: () -> Unit,
-    // Tools 回调(调试工具部分)
-    onLoadImageModels: () -> Unit,
-    onGenerateImage: () -> Unit,
-    onImagePromptChange: (String) -> Unit,
-    onImageModelChange: (String) -> Unit,
-    onVisionInputChange: (String) -> Unit,
-    onVisionPromptChange: (String) -> Unit,
-    onDescribeVision: () -> Unit,
     onLoadSystemResources: () -> Unit,
     onLoadSystemStats: () -> Unit,
-    onClearError: () -> Unit,
-    onRefreshPermissions: () -> Unit = {}
+    onClearToolsError: () -> Unit,
+    onDismissClearError: () -> Unit
 ) {
-    val tabs = SettingsTabV2.values()
-    val pagerState = rememberPagerState(initialPage = 0) { tabs.size }
-    val scope = rememberCoroutineScope()
+    var pageName by rememberSaveable { mutableStateOf(SettingsPage.HOME.name) }
+    val page = SettingsPage.valueOf(pageName)
+    var permissionRefreshKey by rememberSaveable { mutableIntStateOf(0) }
+    val deviceStatus = rememberDevicePermissionStatus(permissionRefreshKey)
 
-    // 监听 ON_RESUME: 用户从系统设置授权完返回时重新检测权限状态
-    // 修复: 之前只在 init 检测一次, 授权后 UI 仍显示 ×, 必须杀进程才刷新
+    // 从系统设置授权 / 从 Shizuku 返回时，系统状态和 ViewModel 里的权限都要重读
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 onRefreshPermissions()
+                permissionRefreshKey++
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-    ) {
-        // 顶部模块标题
-        ModuleHeader(
-            title = "Settings",
-            subtitle = "应用设置"
+    BackHandler(enabled = page != SettingsPage.HOME) {
+        pageName = SettingsPage.HOME.name
+    }
+
+    val goHome = { pageName = SettingsPage.HOME.name }
+
+    when (page) {
+        SettingsPage.HOME -> SettingsHomePage(
+            state = settingsUiState,
+            deviceStatus = deviceStatus,
+            pluginSettings = pluginsUiState.settings,
+            onOpenNetwork = { pageName = SettingsPage.NETWORK.name },
+            onToggleAutoTts = onToggleAutoTts,
+            onToggleStageDirection = onToggleStageDirection,
+            onToggleAutoEmotion = onToggleAutoEmotion,
+            onOpenEmotionSelector = onShowEmotionSelector,
+            onOpenUsageStatsSettings = onOpenUsageStatsSettings,
+            onOpenNotificationSettings = onOpenNotificationSettings,
+            onOpenAccessibilityWizard = { pageName = SettingsPage.ACCESSIBILITY.name },
+            onOpenShizukuWizard = { pageName = SettingsPage.SHIZUKU.name },
+            onToggleContextSync = onToggleContextSync,
+            onToggleResidentMode = onToggleResidentMode,
+            onOpenDeveloperTools = { pageName = SettingsPage.DEVELOPER.name },
+            onShowClearConfirm = onShowClearConfirm,
+            onDismissClearError = onDismissClearError
         )
 
-        AvelineTabRow(
-            titles = tabs.map { it.title },
-            selectedTabIndex = pagerState.currentPage,
-            onTabSelected = { index ->
-                scope.launch { pagerState.animateScrollToPage(index) }
-            },
-            modifier = Modifier.fillMaxWidth()
+        SettingsPage.NETWORK -> SettingsNetworkScreen(
+            state = settingsUiState,
+            onBack = goHome,
+            onSaveAddress = onSaveAddress,
+            onSaveAccessToken = onSaveAccessToken,
+            onTestConnection = onTestConnection,
+            onReprobeEndpoint = onReprobeEndpoint,
+            onRefreshCandidates = onRefreshCandidates
         )
 
-        // Tab 内容区域:HorizontalPager 支持左右滑动
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp)
-        ) { page ->
-            when (tabs[page]) {
-                SettingsTabV2.GENERAL -> SettingsGeneralTab(
-                    settingsUiState = settingsUiState,
-                    pluginsUiState = pluginsUiState,
-                    onBackendUrlChange = onBackendUrlChange,
-                    onLanUrlChange = onLanUrlChange,
-                    onVpnUrlChange = onVpnUrlChange,
-                    onTunnelUrlChange = onTunnelUrlChange,
-                    onTokenChange = onTokenChange,
-                    onTestConnection = onTestConnection,
-                    onReprobeEndpoint = onReprobeEndpoint,
-                    onSaveBackendUrl = onSaveBackendUrl,
-                    onModelChange = onModelChange,
-                    onVoiceIdChange = onVoiceIdChange,
-                    onResponseLengthChange = onResponseLengthChange,
-                    onToggleAutoTts = onToggleAutoTts,
-                    onSetManualEmotion = onSetManualEmotion,
-                    onToggleStudyMode = onToggleStudyMode,
-                    onToggleAutoEmotion = onToggleAutoEmotion,
-                    onShowEmotionSelector = onShowEmotionSelector,
-                    onHideEmotionSelector = onHideEmotionSelector,
-                    onToggleSensitive = onToggleSensitive,
-                    onRefreshSensitive = onRefreshSensitive,
-                    onHideSaveConfirm = onHideSaveConfirm
-                )
+        SettingsPage.ACCESSIBILITY -> SettingsPermissionWizard(
+            kind = PermissionWizardKind.ACCESSIBILITY,
+            status = deviceStatus,
+            onBack = goHome,
+            onRefresh = { permissionRefreshKey++ }
+        )
 
-                SettingsTabV2.ACCESS -> SettingsAccessTab(
-                    settingsUiState = settingsUiState,
-                    onOpenUsageStatsSettings = onOpenUsageStatsSettings,
-                    onOpenNotificationSettings = onOpenNotificationSettings
-                )
+        SettingsPage.SHIZUKU -> SettingsPermissionWizard(
+            kind = PermissionWizardKind.SHIZUKU,
+            status = deviceStatus,
+            onBack = goHome,
+            onRefresh = { permissionRefreshKey++ }
+        )
 
-                SettingsTabV2.PRIVACY -> SettingsPrivacyTab(
-                    settingsUiState = settingsUiState,
-                    onToggleContextSync = onToggleContextSync,
-                    onToggleResidentMode = onToggleResidentMode,
-                    onConfirmBatteryOptimization = onConfirmBatteryOptimization,
-                    onDismissBatteryOptimization = onDismissBatteryOptimization
-                )
+        SettingsPage.DEVELOPER -> SettingsSystemResourcesScreen(
+            state = toolsUiState,
+            onBack = goHome,
+            onLoadSystemResources = onLoadSystemResources,
+            onLoadSystemStats = onLoadSystemStats,
+            onClearError = onClearToolsError
+        )
+    }
 
-                SettingsTabV2.DATA -> SettingsDataTab(
-                    settingsUiState = settingsUiState,
-                    onClearHistory = onClearHistory,
-                    onShowClearConfirm = onShowClearConfirm,
-                    onHideClearConfirm = onHideClearConfirm
-                )
+    if (pluginsUiState.showEmotionSelector) {
+        SettingsEmotionDialog(
+            selected = pluginsUiState.settings.manualEmotion,
+            onSelect = onSetManualEmotion,
+            onDismiss = onHideEmotionSelector
+        )
+    }
 
-                SettingsTabV2.ADVANCED -> SettingsAdvancedTab(
-                    toolsUiState = toolsUiState,
-                    onLoadImageModels = onLoadImageModels,
-                    onGenerateImage = onGenerateImage,
-                    onImagePromptChange = onImagePromptChange,
-                    onImageModelChange = onImageModelChange,
-                    onVisionInputChange = onVisionInputChange,
-                    onVisionPromptChange = onVisionPromptChange,
-                    onDescribeVision = onDescribeVision,
-                    onLoadSystemResources = onLoadSystemResources,
-                    onLoadSystemStats = onLoadSystemStats,
-                    onClearError = onClearError
-                )
-            }
-        }
+    if (settingsUiState.showClearConfirm) {
+        SettingsClearHistoryDialog(
+            isClearing = settingsUiState.isClearing,
+            onConfirm = onClearHistory,
+            onDismiss = onHideClearConfirm
+        )
+    }
+
+    if (settingsUiState.showBatteryOptimizationRequest) {
+        SettingsBatteryOptimizationDialog(
+            onConfirm = onConfirmBatteryOptimization,
+            onDismiss = onDismissBatteryOptimization
+        )
     }
 }

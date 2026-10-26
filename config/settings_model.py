@@ -47,7 +47,7 @@ PROVIDER_DEFAULT_MODELS: Dict[str, List[str]] = {
         "zai-org/GLM-5.3-Flash",
     ],
     "dashscope": ["qwen3-max-2025-09-23", "qwen3-plus"],
-    "minimax": ["MiniMax-M3"],
+    "minimax": ["MiniMax-M3.1-Flash", "MiniMax-M3"],
     "ark": ["doubao-seed-2-0-lite-260215"],
     "zhipu": ["glm-4.5-air", "glm-4.6v"],
     "aveline": ["nalang-xl-0826-16k"],
@@ -61,12 +61,26 @@ PROVIDER_DEFAULT_MODELS: Dict[str, List[str]] = {
         "deepseek/deepseek-v4-flash",
         # GLM-5.3（OpenRouter 托管）：智谱新一代型号
         "z-ai/glm-5.3",
-        "minimax/minimax-m3.1-flash:free",
+        # minimax 免费型号（m3/m3.1-flash:free）已下架：2026-10-23 起正式渠道走
+        # cloud:minimax:plan:*（M Plan 订阅），免费端点不稳定且与官方路由重复
     ],
 }
 
 # 支持的供应商列表（基于 PROVIDER_BASE_URLS 的键自动派生）
 SUPPORTED_PROVIDERS = list(PROVIDER_BASE_URLS.keys())
+
+# MiniMax M Plan 订阅 Key（sk-cp- 前缀）与按量付费 Key 相互独立、不可混用：
+# - 订阅 Key 只能走国内 OpenAI 兼容端点，且额度来自套餐
+# - 独立成 minimax 的 plan 别名，模型路径 cloud:minimax:plan:<model>
+# 官方文档：https://platform.minimax.io/docs/m-plan/quickstart
+MINIMAX_PLAN_KEY_ENV = "MINIMAX_PLAN_API_KEY"
+MINIMAX_PLAN_BASE_URL = "https://api.minimaxi.com/v1/chat/completions"
+# 只登记当前实际可用的两个型号：M2.5 / M2.7 已不再单独提供，
+# 向它们发请求会被服务端路由到 M3，注册出来只会让选择列表产生假选项。
+MINIMAX_PLAN_DEFAULT_MODELS = [
+    "MiniMax-M3.1-Flash",
+    "MiniMax-M3",
+]
 
 
 class CloudProviderSettings(BaseSettings):
@@ -119,7 +133,7 @@ class ModelSettings(BaseSettings):
     device: str = Field(default="cuda", description="设备类型(cpu/cuda)")
     max_memory: Optional[int] = Field(default=None, description="最大内存使用(MB)")
     name: str = Field(
-        default_factory=lambda: _get_model_config().get_default_chat_model("cloud:deepseek:deepseek-v4-flash").split(":")[-1] if ":" in _get_model_config().get_default_chat_model("cloud:deepseek:deepseek-v4-flash") else "deepseek-v4-flash",
+        default_factory=lambda: _get_model_config().get_default_chat_model("cloud:minimax:plan:MiniMax-M3.1-Flash").split(":")[-1] if ":" in _get_model_config().get_default_chat_model("cloud:minimax:plan:MiniMax-M3.1-Flash") else "MiniMax-M3.1-Flash",
         description="默认模型名称（从 YAML 的 model_routing.default_chat_model 自动同步）",
     )
     text_path: Optional[str] = Field(default=None, description="文本模型路径")
@@ -155,7 +169,7 @@ class ModelSettings(BaseSettings):
     model_load_timeout: int = Field(default=60, description="本地模型加载超时（秒）")
 
     journal_model_hint: str = Field(
-        default_factory=lambda: _get_model_config().get_journal_model("cloud:deepseek:deepseek-v4-flash"),
+        default_factory=lambda: _get_model_config().get_journal_model("cloud:minimax:plan:MiniMax-M3"),
         description="日记/总结/导出专用模型路由提示",
     )
 
@@ -213,7 +227,7 @@ class ModelSettings(BaseSettings):
     llm: CloudProviderSettings = Field(
         default_factory=lambda: CloudProviderSettings(
             provider="deepseek",
-            model=_get_model_config().get_default_chat_model("cloud:deepseek:deepseek-v4-flash").split(":")[-1] if ":" in _get_model_config().get_default_chat_model("cloud:deepseek:deepseek-v4-flash") else "deepseek-v4-flash",
+            model=_get_model_config().get_default_chat_model("cloud:minimax:plan:MiniMax-M3.1-Flash").split(":")[-1] if ":" in _get_model_config().get_default_chat_model("cloud:minimax:plan:MiniMax-M3.1-Flash") else "MiniMax-M3.1-Flash",
             api_key=os.getenv("DEEPSEEK_API_KEY"),
             base_url=os.getenv(
                 "DEEPSEEK_BASE_URL", PROVIDER_BASE_URLS.get("deepseek")
@@ -449,5 +463,19 @@ def _load_cloud_provider_keys_from_env() -> Dict[str, Dict[str, CloudProviderKey
 
         if provider_keys:
             result[provider] = provider_keys
+
+    # M Plan 订阅 Key 的环境变量名是 MINIMAX_PLAN_API_KEY，不符合
+    # `{PROVIDER}_API_KEY_{ALIAS}` 约定，单独登记为 minimax 的 plan 别名。
+    plan_key = os.getenv(MINIMAX_PLAN_KEY_ENV)
+    if plan_key:
+        result.setdefault("minimax", {})["plan"] = CloudProviderKeyConfig(
+            key_alias="plan",
+            api_key=plan_key,
+            api_key_env=MINIMAX_PLAN_KEY_ENV,
+            base_url=os.getenv("MINIMAX_PLAN_BASE_URL") or MINIMAX_PLAN_BASE_URL,
+            models=list(MINIMAX_PLAN_DEFAULT_MODELS),
+            thinking_enabled=True,
+            reasoning_effort="high",
+        )
 
     return result

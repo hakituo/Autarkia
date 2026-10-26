@@ -47,10 +47,10 @@ async def main() -> int:
     checker._probe_tcp_port = lambda host, port, timeout: host == "127.0.0.1" and port == 8000
 
     ok = await checker.preflight_check(
-        config_file="d:/AI/xiaoyou-core/clients/bots/config/config.json",
+        config_file="d:/AI/autarkia/clients/bots/config/config.json",
         napcat_ws_url="ws://127.0.0.1:3001",
-        xiaoyou_ws_url="ws://127.0.0.1:8000/api/v1/ws",
-        xiaoyou_http_base_url="http://127.0.0.1:8000",
+        autarkia_ws_url="ws://127.0.0.1:8000/api/v1/ws",
+        autarkia_http_base_url="http://127.0.0.1:8000",
     )
 
     print("=== QQ 后端探活验证 ===")

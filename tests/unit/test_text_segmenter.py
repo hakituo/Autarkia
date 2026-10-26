@@ -87,7 +87,9 @@ def test_split_after_ellipsis():
 
 
 def test_short_sentence_and_bracket_tag_keep_intact():
-    assert split_chat_message("你好啊，今天天气不错。", comma_split_prob=NO_COMMA_SPLIT) == ["你好啊，今天天气不错。"]
+    assert split_chat_message("你好啊，今天天气不错。", comma_split_prob=NO_COMMA_SPLIT) == [
+        "你好啊，今天天气不错。"
+    ]
     assert split_chat_message("[THINK_STORE: 他需要燃料]", comma_split_prob=NO_COMMA_SPLIT) == [
         "[THINK_STORE: 他需要燃料]"
     ]
@@ -206,4 +208,6 @@ def test_display_pipeline_does_not_tear_inline_spans():
 def test_generic_entry_does_not_depend_on_channel():
     """公共入口不接 preprocess / pass_through_markers 时也应正常工作。"""
     assert split_chat_message("", comma_split_prob=NO_COMMA_SPLIT) == []
-    assert split_chat_message("**加粗**在这里", comma_split_prob=NO_COMMA_SPLIT) == ["**加粗**在这里"]
+    assert split_chat_message("**加粗**在这里", comma_split_prob=NO_COMMA_SPLIT) == [
+        "**加粗**在这里"
+    ]

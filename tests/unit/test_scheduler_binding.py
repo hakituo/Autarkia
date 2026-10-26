@@ -5,9 +5,7 @@ import time
 _DLL_DIR_HANDLES = []
 
 # tests/unit/test_scheduler_binding.py → tests/unit → tests → 项目根（需要三层 dirname）
-project_root = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 build_dir_candidates = [
     os.path.join(project_root, "cpp_modules", "cpp_scheduler", "build", "Release"),
     os.path.join(project_root, "cpp_modules", "cpp_scheduler", "build"),
@@ -78,21 +76,23 @@ def _set_gpu_device_id(cfg, value: int):
 def _set_max_context_size(cfg, value: int):
     _set_cfg_attr(cfg, value, "max_context_size", "maxContextSize")
 
+
 def test_basic_lifecycle():
     print("\n--- Testing Basic Lifecycle ---")
     if scheduler_py is None:
         try:
             import pytest
+
             pytest.skip("scheduler_py 未构建或不可导入", allow_module_level=False)
         except Exception:
             return
     try:
         scheduler = scheduler_py.ResourceIsolationScheduler()
         print("Created ResourceIsolationScheduler instance")
-        
-        scheduler.initialize(4) # Pass worker count
+
+        scheduler.initialize(4)  # Pass worker count
         print("Initialized scheduler")
-        
+
         # Check biological system
         # Note: getBiologicalSystem might return None if not initialized or not exposed correctly
         try:
@@ -100,22 +100,26 @@ def test_basic_lifecycle():
             if bio:
                 print("Got BiologicalSystem instance")
                 nt = bio.getNeurotransmitters()
-                print(f"Neurotransmitters: Dopamine={nt.dopamine:.4f}, Serotonin={nt.serotonin:.4f}")
-                
+                print(
+                    f"Neurotransmitters: Dopamine={nt.dopamine:.4f}, Serotonin={nt.serotonin:.4f}"
+                )
+
                 energy = bio.getEnergy()
                 print(f"Energy: {energy:.4f}")
-                
+
                 # Test update
-                bio.update(1.0) # 1 second
+                bio.update(1.0)  # 1 second
                 print("Updated biological system (1s)")
-                
+
                 nt_after = bio.getNeurotransmitters()
                 print(f"Neurotransmitters after update: Dopamine={nt_after.dopamine:.4f}")
             else:
                 print("WARNING: getBiologicalSystem returned None")
         except AttributeError as e:
-            print(f"WARNING: getBiologicalSystem not found on scheduler object or method missing: {e}")
-            print(dir(bio)) # Print available methods
+            print(
+                f"WARNING: getBiologicalSystem not found on scheduler object or method missing: {e}"
+            )
+            print(dir(bio))  # Print available methods
         except Exception as e:
             print(f"Error accessing BiologicalSystem: {e}")
 
@@ -125,11 +129,13 @@ def test_basic_lifecycle():
         print(f"Lifecycle test failed: {e}")
         raise
 
+
 def test_llm_config_structs():
     print("\n--- Testing LLM Config Structures ---")
     if scheduler_py is None:
         try:
             import pytest
+
             pytest.skip("scheduler_py 未构建或不可导入", allow_module_level=False)
         except Exception:
             return
@@ -141,23 +147,27 @@ def test_llm_config_structs():
         _set_gpu_device_id(config, 0)
         _set_max_context_size(config, 4096)
         config.temperature = 0.7
-        
-        print(f"Created config: path={config.modelPath}, type={config.modelType}, temp={config.temperature}")
-        
+
+        print(
+            f"Created config: path={config.modelPath}, type={config.modelType}, temp={config.temperature}"
+        )
+
         # Create Inference Response
         resp = scheduler_py.LLMInferenceResponse()
         resp.success = True
         resp.generatedText = "Hello world"
-        
+
         print(f"Created response: success={resp.success}, text={resp.generatedText}")
     except Exception as e:
         print(f"Config struct test failed: {e}")
         raise
 
+
 def test_llm_mock_stream_callback():
     if scheduler_py is None:
         try:
             import pytest
+
             pytest.skip("scheduler_py 未构建或不可导入", allow_module_level=False)
         except Exception:
             return
@@ -282,6 +292,7 @@ def test_cancel_running_llm_task():
         assert task.getStatus() == scheduler_py.TaskStatus.CANCELLED
     finally:
         scheduler.shutdown()
+
 
 if __name__ == "__main__":
     try:

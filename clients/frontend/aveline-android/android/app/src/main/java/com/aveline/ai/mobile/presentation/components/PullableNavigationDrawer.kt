@@ -35,6 +35,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlin.math.abs
 
+/** 宽窗口断点：平板（≥600dp）上抽屉按窗口三分之一展开，手机窄屏保持近全屏。 */
+private val WideWindowMinWidth = 600.dp
+
 enum class PullableDrawerValue {
     Closed,
     Open
@@ -92,7 +95,13 @@ fun PullableNavigationDrawer(
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val density = LocalDensity.current
-        val drawerWidth = maxWidth - drawerWidthGap
+        // 宽窗口（平板）按三分之一宽开抽屉，与常驻侧栏宽度保持一致；
+        // 窄窗口（手机）沿用标准抽屉：铺满到离右边留一条可点关闭的缝。
+        val drawerWidth = if (maxWidth >= WideWindowMinWidth) {
+            maxWidth / 3
+        } else {
+            maxWidth - drawerWidthGap
+        }
         val drawerWidthPx = with(density) { drawerWidth.toPx() }
         val velocityThresholdPx = with(density) { SwipeGestureDefaults.VelocityThreshold.toPx() }
         val drawerGesturesEnabled = WindowInsets.ime.getBottom(density) == 0

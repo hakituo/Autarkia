@@ -20,7 +20,7 @@ import subprocess
 from pathlib import Path
 
 # 真实 QQ 号从环境变量读取（避免硬编码泄露），占位符替换
-REAL_QQ = os.getenv("XIAOYOU_QQ_MASTER_ID", "").strip()
+REAL_QQ = os.getenv("AUTARKIA_QQ_MASTER_ID", "").strip()
 PLACEHOLDER_QQ = "10001"
 
 # 项目根目录

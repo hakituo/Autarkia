@@ -78,7 +78,7 @@ for r in results:
 所以编完必须把 `.pyd` 拷进 venv：
 
 ```
-D:\projects\xiaoyou\venv_core\Lib\site-packages\
+D:\AI\xiaoyou-core\venv_core\Lib\site-packages\
 ```
 
 模块目录下那份 `memory_index_py.cp310-win_amd64.pyd` **不是**加载目标；它只会在你把当前目录设成
@@ -87,7 +87,7 @@ D:\projects\xiaoyou\venv_core\Lib\site-packages\
 ### 推荐：直接 CMake（离线可用，复用已下载的 pybind11）
 
 ```bat
-cd /d D:\projects\xiaoyou\cpp_modules\cpp_memory_index
+cd /d D:\AI\xiaoyou-core\cpp_modules\cpp_memory_index
 
 rem 必须用 VS 自带的 CMake：PATH 上的 cmake 3.29 不认识 "Visual Studio 18 2026" 生成器
 set CMAKE="C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
@@ -104,7 +104,7 @@ copy /Y build_vs18\Release\memory_index_py.cp310-win_amd64.pyd ..\..\venv_core\L
 验证（**必须在仓库根目录跑**，否则会被模块目录下那份旧 `.pyd` 遮蔽）：
 
 ```bat
-cd /d D:\projects\xiaoyou
+cd /d D:\AI\xiaoyou-core
 venv_core\Scripts\python.exe -c "import memory_index_py as m; print(m.__file__); print(hasattr(m.VectorIndexer,'addRecords'), hasattr(m.VectorIndexer,'dimension'))"
 ```
 
@@ -150,7 +150,7 @@ set https_proxy=
 ### 方式二：pip install（会重新联网拉 pybind11）
 
 ```bash
-cd D:\projects\xiaoyou
+cd D:\AI\xiaoyou-core
 venv_core\Scripts\python.exe -m pip install cpp_modules\cpp_memory_index --no-deps --force-reinstall
 ```
 

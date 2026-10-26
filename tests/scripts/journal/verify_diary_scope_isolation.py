@@ -18,7 +18,7 @@
     5. 源码层面 get_tomorrow_tone / _get_journal_summary 已带 scope 解析。
 
 运行：
-    d:\\AI\\xiaoyou-core\\venv_core\\scripts\\python.exe ^
+    d:\\AI\\autarkia\\venv_core\\scripts\\python.exe ^
         tests\\scripts\\journal\\verify_diary_scope_isolation.py
 """
 from __future__ import annotations

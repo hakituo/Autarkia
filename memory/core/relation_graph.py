@@ -39,6 +39,8 @@ _EXPLICIT_ALTERNATE_FIELDS = (
     "superseded_by",
 )
 BranchLineage = Tuple[str, ...]
+# 未显式传 visibility 时按当前请求上下文构造世界线闸门（v3 E3）
+_FROM_CONTEXT = object()
 
 
 @dataclass(frozen=True)
@@ -442,6 +444,18 @@ def _is_allowed(
     return True
 
 
+def _resolve_visibility(visibility: Any) -> Any:
+    """返回本次调用的世界线闸门；``None`` 表示请求没有任何世界线约束。"""
+    if visibility is not _FROM_CONTEXT:
+        return visibility
+    try:
+        from memory.topology.memory_gate import build_memory_visibility
+
+        return build_memory_visibility()
+    except Exception:  # noqa: BLE001 - 闸门构造失败不得清空检索
+        return None
+
+
 def _result_score(result: Dict[str, Any]) -> float:
     for field in ("hybrid_score", "weighted_score", "similarity_score", "similarity"):
         value = result.get(field)
@@ -459,14 +473,22 @@ def rerank_with_relation_graph(
     exclude_categories: Optional[List[str]] = None,
     seed_count: int = 3,
     max_depth: int = 2,
+    visibility: Any = _FROM_CONTEXT,
 ) -> List[Dict[str, Any]]:
     """用关系簇扩展并重排语义/BM25 候选。
 
     高相关结果仍由原检索器决定；关系图只做二阶段 rerank。强事件/父子/连续关系
     可以补回同簇上下文；Android 明确分叉后的兄弟 lineage 不互相扩散。
+    世界线闸门 ``visibility`` 同时作用于种子、每一跳扩展与最终返回（v3 E3）。
     """
     if limit <= 0 or not results:
         return []
+
+    gate = _resolve_visibility(visibility)
+    if gate is not None:
+        results = [item for item in results if gate.is_visible(item)]
+        if not results:
+            return []
 
     graph = ensure_relation_graph(manager)
     if not graph:
@@ -511,6 +533,8 @@ def rerank_with_relation_graph(
                 if not _lineages_compatible(seed_lineage, target_lineage):
                     continue
                 visited.add(target)
+                if gate is not None and not gate.is_visible(memories.get(target) or {}):
+                    continue  # 兄弟线节点既不计分，也不能当跳板继续扩散
                 next_strength = path_strength * edge.strength * (0.72 ** depth)
                 support = seed_score * next_strength
                 if support > relation_scores[target]:
@@ -572,6 +596,7 @@ def get_relation_cluster(
     *,
     limit: int = 12,
     max_depth: int = 2,
+    visibility: Any = _FROM_CONTEXT,
 ) -> List[Dict[str, Any]]:
     """返回某条记忆附近的同世界线关系簇，供搜索工具/调试接口直接使用。"""
     root = _clean_id(memory_id)
@@ -581,6 +606,9 @@ def get_relation_cluster(
     with get_read_lock(manager):
         memories = {mid: dict(memory) for mid, memory in manager.weighted_memories.items()}
     if root not in memories:
+        return []
+    gate = _resolve_visibility(visibility)
+    if gate is not None and not gate.is_visible(memories[root]):
         return []
     lineages = getattr(manager, "_memory_relation_lineages", {})
     if not isinstance(lineages, dict):
@@ -599,6 +627,8 @@ def get_relation_cluster(
             continue
         visited.add(current)
         memory = memories.get(current)
+        if memory and gate is not None and not gate.is_visible(memory):
+            continue
         if memory:
             item = dict(memory)
             item["relation_context"] = {

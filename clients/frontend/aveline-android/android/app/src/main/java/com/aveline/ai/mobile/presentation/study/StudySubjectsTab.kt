@@ -25,8 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.presentation.components.SectionCard
-import com.aveline.ai.mobile.presentation.theme.EmotionGreen
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
@@ -86,11 +85,7 @@ fun StudySubjectsTab(dailyUiState: StudyDailyUiState) {
 
 @Composable
 private fun SubjectOverviewCard(subject: StudySubjectProgress) {
-    val color = when {
-        subject.progress >= 0.7f -> EmotionGreen
-        subject.progress >= 0.3f -> Primary
-        else -> TextTertiary
-    }
+    val color = if (subject.progress >= 0.3f) Accent else TextTertiary
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),

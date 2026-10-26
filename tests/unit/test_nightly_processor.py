@@ -39,6 +39,7 @@ from memory import weighted_memory_manager as wmm
 # 桩与代理
 # ============================================================
 
+
 def _capture_logger(monkeypatch, module):
     """替换模块 logger，返回收集到的 (level, text) 列表。
 
@@ -218,8 +219,7 @@ class _AnalysisServiceStub:
         self.calls = []
         self._result = result if result is not None else {"ok": True}
 
-    def process_user_chat_history(self, user_id, manager, *, target_date,
-                                  run_nightly_async_tasks):
+    def process_user_chat_history(self, user_id, manager, *, target_date, run_nightly_async_tasks):
         self.calls.append(("process", user_id, target_date, run_nightly_async_tasks))
         return self._result
 
@@ -305,8 +305,9 @@ def _make_processor(monkeypatch, config=None, **stub_kwargs):
     if config:
         merged.update(config)
     processor = nproc.NightlyProcessor(merged)
-    monkeypatch.setattr(nproc, "NightlyRunStateStore",
-                        lambda *a, **k: _RunStateStoreStub(**stub_kwargs))
+    monkeypatch.setattr(
+        nproc, "NightlyRunStateStore", lambda *a, **k: _RunStateStoreStub(**stub_kwargs)
+    )
     return processor
 
 
@@ -336,6 +337,7 @@ def _run_as_main(monkeypatch, argv):
 # ============================================================
 # 构造与惰性缓存
 # ============================================================
+
 
 class TestConstruction:
     def test_uses_default_config_and_starts_scheduler(self, monkeypatch):
@@ -397,7 +399,9 @@ class TestLazyCollaborators:
         assert first is second
         assert first.config is processor.config
 
-    def test_analysis_service_is_recreated_when_config_identity_changes(self, processor, monkeypatch):
+    def test_analysis_service_is_recreated_when_config_identity_changes(
+        self, processor, monkeypatch
+    ):
         monkeypatch.setattr(nproc, "NightlyAnalysisService", _AnalysisServiceStub)
         first = processor._get_analysis_service()
 
@@ -434,6 +438,7 @@ class TestLazyCollaborators:
 # ============================================================
 # 调度线程启停
 # ============================================================
+
 
 class TestStartScheduler:
     def test_starts_daemon_thread(self, processor, monkeypatch):
@@ -498,8 +503,11 @@ class TestStartScheduler:
 
     def test_start_failure_is_logged_and_flag_cleared(self, processor, monkeypatch):
         monkeypatch.setattr(
-            nproc, "threading",
-            _ThreadingProxy(lambda **kwargs: _ThreadStub(start_exc=RuntimeError("不能起线程"), **kwargs)),
+            nproc,
+            "threading",
+            _ThreadingProxy(
+                lambda **kwargs: _ThreadStub(start_exc=RuntimeError("不能起线程"), **kwargs)
+            ),
         )
         records = _capture_logger(monkeypatch, nproc)
 
@@ -671,8 +679,7 @@ class TestSleepAwareSchedulerLoop:
         checked = []
         monkeypatch.setattr(processor, "_check_user_sleeping", lambda: checked.append(1))
 
-        self._run(processor, monkeypatch, datetime.datetime(2026, 9, 23, 6, 0),
-                  stop_on_wait=2)
+        self._run(processor, monkeypatch, datetime.datetime(2026, 9, 23, 6, 0), stop_on_wait=2)
 
         assert checked == []
         assert processor._stop_event.waits == [600, 600]
@@ -696,8 +703,7 @@ class TestSleepAwareSchedulerLoop:
         monkeypatch.setattr(processor, "_check_user_sleeping", lambda: False)
         monkeypatch.setattr(processor, "process_all_users", lambda **kwargs: True)
 
-        self._run(processor, monkeypatch, datetime.datetime(2026, 9, 23, 6, 0),
-                  stop_on_wait=2)
+        self._run(processor, monkeypatch, datetime.datetime(2026, 9, 23, 6, 0), stop_on_wait=2)
 
         assert processor._task_executed_today is True
         assert processor._stop_event.waits == [600, 600]
@@ -706,6 +712,7 @@ class TestSleepAwareSchedulerLoop:
 # ============================================================
 # process_all_users
 # ============================================================
+
 
 class TestProcessAllUsers:
     def test_skips_outside_time_window(self, processor, monkeypatch):
@@ -742,8 +749,7 @@ class TestProcessAllUsers:
         monkeypatch.setattr(wmm, "_instances_lock", threading.RLock())
         monkeypatch.setattr(nproc, "load_users_from_disk", lambda: {"a": object()})
         monkeypatch.setattr(nproc, "filter_real_users", lambda managers: {"a": managers["a"]})
-        monkeypatch.setattr(processor, "process_user_chat_history",
-                            lambda *a, **k: {"ok": True})
+        monkeypatch.setattr(processor, "process_user_chat_history", lambda *a, **k: {"ok": True})
         monkeypatch.setattr(processor, "_run_nightly_global_tasks", lambda *a, **k: {})
         records = _capture_logger(monkeypatch, nproc)
 
@@ -780,8 +786,11 @@ class TestProcessAllUsers:
         monkeypatch.setattr(wmm, "_instances_lock", threading.RLock())
         monkeypatch.setattr(nproc, "filter_real_users", lambda managers: dict(managers))
         processed = []
-        monkeypatch.setattr(processor, "process_user_chat_history",
-                            lambda scope_id, manager, **k: processed.append(scope_id) or {})
+        monkeypatch.setattr(
+            processor,
+            "process_user_chat_history",
+            lambda scope_id, manager, **k: processed.append(scope_id) or {},
+        )
         monkeypatch.setattr(processor, "_run_nightly_global_tasks", lambda *a, **k: {})
         records = _capture_logger(monkeypatch, nproc)
 
@@ -819,7 +828,8 @@ class TestProcessAllUsers:
         monkeypatch.setattr(wmm, "_instances_lock", threading.RLock())
         monkeypatch.setattr(nproc, "filter_real_users", lambda managers: dict(managers))
         monkeypatch.setattr(
-            processor, "process_user_chat_history",
+            processor,
+            "process_user_chat_history",
             lambda *a, **k: {"nightly_scope_error": "标记出来的错误"},
         )
         monkeypatch.setattr(processor, "_run_nightly_global_tasks", lambda *a, **k: {})
@@ -836,8 +846,9 @@ class TestProcessAllUsers:
         monkeypatch.setattr(wmm, "_instances_lock", threading.RLock())
         monkeypatch.setattr(nproc, "load_users_from_disk", lambda: {})
         monkeypatch.setattr(nproc, "filter_real_users", lambda managers: {})
-        monkeypatch.setattr(processor, "_run_nightly_global_tasks",
-                            lambda *a, **k: {"global_error": "全局失败"})
+        monkeypatch.setattr(
+            processor, "_run_nightly_global_tasks", lambda *a, **k: {"global_error": "全局失败"}
+        )
         records = _capture_logger(monkeypatch, nproc)
 
         assert processor.process_all_users() is False
@@ -854,8 +865,9 @@ class TestProcessAllUsers:
         monkeypatch.setattr(wmm, "_instances_lock", threading.RLock())
         monkeypatch.setattr(nproc, "load_users_from_disk", lambda: {})
         monkeypatch.setattr(nproc, "filter_real_users", lambda managers: {})
-        monkeypatch.setattr(processor, "_run_nightly_global_tasks",
-                            lambda *a, **k: {"_nightly_error": "下划线错误"})
+        monkeypatch.setattr(
+            processor, "_run_nightly_global_tasks", lambda *a, **k: {"_nightly_error": "下划线错误"}
+        )
 
         assert processor.process_all_users() is False
         assert ("mark_global_failed", "下划线错误") in store.calls
@@ -870,8 +882,9 @@ class TestProcessAllUsers:
         monkeypatch.setattr(nproc, "load_users_from_disk", lambda: {})
         monkeypatch.setattr(nproc, "filter_real_users", lambda managers: {})
         called = []
-        monkeypatch.setattr(processor, "_run_nightly_global_tasks",
-                            lambda *a, **k: called.append(1))
+        monkeypatch.setattr(
+            processor, "_run_nightly_global_tasks", lambda *a, **k: called.append(1)
+        )
         records = _capture_logger(monkeypatch, nproc)
 
         assert processor.process_all_users() is True
@@ -902,7 +915,8 @@ class TestProcessAllUsers:
         monkeypatch.setattr(wmm, "_instances", {})
         monkeypatch.setattr(wmm, "_instances_lock", threading.RLock())
         monkeypatch.setattr(
-            nproc, "load_users_from_disk",
+            nproc,
+            "load_users_from_disk",
             lambda: (_ for _ in ()).throw(RuntimeError("扫盘炸了")),
         )
         records = _capture_logger(monkeypatch, nproc)
@@ -920,7 +934,8 @@ class TestProcessAllUsers:
         monkeypatch.setattr(wmm, "_instances", {})
         monkeypatch.setattr(wmm, "_instances_lock", threading.RLock())
         monkeypatch.setattr(
-            nproc, "load_users_from_disk",
+            nproc,
+            "load_users_from_disk",
             lambda: (_ for _ in ()).throw(RuntimeError("扫盘炸了")),
         )
         _capture_logger(monkeypatch, nproc)
@@ -962,6 +977,7 @@ class TestProcessAllUsers:
 # 兼容转发
 # ============================================================
 
+
 class TestCompatibilityDelegation:
     def test_process_user_chat_history_creates_manager_when_missing(self, processor, monkeypatch):
         sentinel = object()
@@ -981,7 +997,8 @@ class TestCompatibilityDelegation:
     def test_process_user_chat_history_keeps_given_manager(self, processor, monkeypatch):
         manager = object()
         monkeypatch.setattr(
-            nproc, "get_weighted_memory_manager",
+            nproc,
+            "get_weighted_memory_manager",
             lambda user_id: pytest.fail("不应自行创建 manager"),
         )
         service = _AnalysisServiceStub(processor.config)
@@ -1120,27 +1137,27 @@ class TestCompatibilityDelegation:
 # 时间窗口 / 配置 / 状态
 # ============================================================
 
+
 class TestTimeWindow:
     @pytest.mark.parametrize(
         "start,end,now,expected",
         [
-            ("23:00", "12:00", "03:00", True),    # 跨零点窗口内（凌晨）
-            ("23:00", "12:00", "23:30", True),    # 跨零点窗口内（深夜）
-            ("23:00", "12:00", "15:00", False),   # 跨零点窗口外
-            ("09:00", "17:00", "10:00", True),    # 普通窗口内
-            ("09:00", "17:00", "08:00", False),   # 普通窗口外
-            ("09:00", "17:00", "09:00", True),    # 左边界闭区间
-            ("09:00", "17:00", "17:00", True),    # 右边界闭区间
+            ("23:00", "12:00", "03:00", True),  # 跨零点窗口内（凌晨）
+            ("23:00", "12:00", "23:30", True),  # 跨零点窗口内（深夜）
+            ("23:00", "12:00", "15:00", False),  # 跨零点窗口外
+            ("09:00", "17:00", "10:00", True),  # 普通窗口内
+            ("09:00", "17:00", "08:00", False),  # 普通窗口外
+            ("09:00", "17:00", "09:00", True),  # 左边界闭区间
+            ("09:00", "17:00", "17:00", True),  # 右边界闭区间
         ],
     )
     def test_window_membership(self, monkeypatch, start, end, now, expected):
         monkeypatch.setattr(nproc.NightlyProcessor, "_start_scheduler", lambda self: None)
-        proc = nproc.NightlyProcessor(
-            {"enabled": False, "start_time": start, "end_time": end}
-        )
+        proc = nproc.NightlyProcessor({"enabled": False, "start_time": start, "end_time": end})
         hour, minute = (int(part) for part in now.split(":"))
         monkeypatch.setattr(
-            nproc, "get_current_time",
+            nproc,
+            "get_current_time",
             lambda: datetime.datetime(2026, 9, 23, hour, minute),
         )
 
@@ -1262,6 +1279,7 @@ class TestStatus:
 # __main__ CLI 入口
 # ============================================================
 
+
 class TestMainBlock:
     """``if __name__ == "__main__":`` 三种分支。
 
@@ -1274,7 +1292,8 @@ class TestMainBlock:
         """把新模块命名空间会读到的模块级名字全部换成桩。"""
         monkeypatch.setattr(nightly_pkg, "ANALYSIS_DIR", str(tmp_path))
         monkeypatch.setattr(
-            nightly_pkg, "DEFAULT_NIGHTLY_CONFIG",
+            nightly_pkg,
+            "DEFAULT_NIGHTLY_CONFIG",
             {
                 "enabled": False,
                 "auto_run": False,
@@ -1290,9 +1309,7 @@ class TestMainBlock:
         monkeypatch.setattr(nightly_pkg, "check_user_sleeping", lambda: False)
         monkeypatch.setattr(wmm, "_instances", {})
         monkeypatch.setattr(wmm, "_instances_lock", threading.RLock())
-        monkeypatch.setattr(
-            wmm, "get_weighted_memory_manager", lambda user_id: object()
-        )
+        monkeypatch.setattr(wmm, "get_weighted_memory_manager", lambda user_id: object())
         return tmp_path
 
     def test_no_arguments_processes_all_users(self, monkeypatch, cli_env):

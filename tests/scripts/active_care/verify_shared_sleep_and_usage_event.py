@@ -1,7 +1,7 @@
 r"""验证 Active Care 用户级睡眠状态与数字健康硬事件链路。
 
 运行：
-    D:\projects\xiaoyou\venv_core\Scripts\python.exe -m tests.scripts.active_care.verify_shared_sleep_and_usage_event
+    D:\AI\autarkia\venv_core\Scripts\python.exe -m tests.scripts.active_care.verify_shared_sleep_and_usage_event
 """
 
 from __future__ import annotations

@@ -105,6 +105,22 @@ async def call_llm_sleep_decision(
         silence_seconds=int(profile.silence_window_seconds),
         recent_events=format_recent_events(state),
     )
+    if not model_path:
+        # 路由唯一真源是 model_routing.character_daily_models.sleep_decision；
+        # 取不到时退回默认对话模型，仍走 YAML，不在代码里写死供应商。
+        try:
+            from config.model_config import (
+                get_character_daily_sleep_decision_model,
+                get_default_chat_model,
+            )
+
+            model_path = (
+                get_character_daily_sleep_decision_model("")
+                or get_default_chat_model("")
+            )
+        except Exception:
+            model_path = ""
+
     raw = ""
     async for chunk in scheduler.submit_llm_task(
         [
@@ -113,7 +129,7 @@ async def call_llm_sleep_decision(
         ],
         max_tokens=260,
         temperature=0.4,
-        model_path=str(model_path or "cloud:deepseek:qqbot1:deepseek-v4-flash"),
+        model_path=str(model_path or ""),
     ):
         if isinstance(chunk, str):
             raw += chunk

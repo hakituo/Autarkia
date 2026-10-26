@@ -5,6 +5,7 @@
 
 所有 IO 落 tmp_path，绝不触碰真实 companion_data。
 """
+
 from __future__ import annotations
 
 import json

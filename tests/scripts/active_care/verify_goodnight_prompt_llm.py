@@ -11,10 +11,10 @@
 4. good_morning_proactive + reduced_mode（aveline）：起床问候但 active_care 还在 reduced_mode
 
 运行方式：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_goodnight_prompt_llm
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_goodnight_prompt_llm
 
 可选参数：
-    --model cloud:deepseek:activecare:deepseek-v4-flash  指定模型路径（默认与线上主动关怀一致）
+    --model cloud:minimax:plan:MiniMax-M3.1-Flash  指定模型路径（默认与线上主动关怀一致）
     --n 5                           每个场景调用 LLM 的次数（默认 3）
     --scenario goodnight_aveline    只跑指定场景（默认全部）
 """
@@ -277,7 +277,7 @@ async def main():
     parser = argparse.ArgumentParser(description="晚安/早安 prompt LLM 输出测试")
     parser.add_argument(
         "--model",
-        default="cloud:deepseek:activecare:deepseek-v4-flash",
+        default="cloud:minimax:plan:MiniMax-M3.1-Flash",
         help="模型路径（默认与线上主动关怀一致）",
     )
     parser.add_argument(

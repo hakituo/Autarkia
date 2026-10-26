@@ -6,6 +6,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from core.tools.ad_classifier import get_ad_classifier, AD_TRAINING_DATA
@@ -137,7 +138,9 @@ URL: https://www.jiqizhixin.com/glm-5-launch"""
     if preprocessed:
         print(f"LLM精炼后: {len(preprocessed)}字")
         print(preprocessed)
-        print(f"\n总压缩比: {len(raw_search_results)}字 -> {len(preprocessed)}字 ({len(preprocessed)/len(raw_search_results)*100:.1f}%)")
+        print(
+            f"\n总压缩比: {len(raw_search_results)}字 -> {len(preprocessed)}字 ({len(preprocessed)/len(raw_search_results)*100:.1f}%)"
+        )
         assert isinstance(preprocessed, str), "LLM精炼应返回字符串"
     else:
         print("LLM精炼失败")

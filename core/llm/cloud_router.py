@@ -314,7 +314,9 @@ class CloudRouterLLMModule(LLMModule):
                 if default_model and ":" in default_model:
                     model_name = default_model.split(":")[-1]
                 else:
-                    model_name = "deepseek-v4-flash"
+                    from config.model_config import get_provider_default_model
+
+                    model_name = get_provider_default_model(provider, "")
             return f"cloud:{provider}:{model_name}"
         except Exception:
             return f"cloud:{provider}:default"

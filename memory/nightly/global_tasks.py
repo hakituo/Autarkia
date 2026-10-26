@@ -32,7 +32,9 @@ class NightlyGlobalTaskService:
         if memory_managers is not None:
             await self._run_people_profiles(memory_managers, results)
         await self._run_character_relationships(results)
+        await self._run_self_view_distill(results)
         resolved_target = target_date or get_diary_target_date()
+        await self._run_self_view_review(resolved_target, results)
         await self._run_journal_plan_and_wellbeing(resolved_target, results)
         self._prepare_character_daily(resolved_target, results)
         await self._run_core_memory_maintenance(results)
@@ -93,6 +95,33 @@ class NightlyGlobalTaskService:
             logger.error("角色社交关系提取失败: %s", exc)
             results["character_relationships"] = {}
             results["character_relationship_error"] = str(exc)
+
+    @staticmethod
+    async def _run_self_view_distill(results: dict[str, Any]) -> None:
+        """按角色蒸馏用户长期事实，写入对应角色的主人卡（self-view）。"""
+        try:
+            from core.character.people.self_view_distill import run_self_view_distill
+
+            await run_self_view_distill(results)
+        except Exception as exc:  # noqa: BLE001 - 主人卡失败不阻断 Nightly
+            logger.warning("主人卡蒸馏失败: %s", exc)
+            results["self_view_updated"] = {}
+            results["self_view_errors"] = {"global": str(exc)}
+
+    @staticmethod
+    async def _run_self_view_review(
+        target_date: datetime.date,
+        results: dict[str, Any],
+    ) -> None:
+        """月末审查主人卡过期记忆（与月度总结同时机，非月末自动跳过）。"""
+        try:
+            from core.character.people.self_view_review import run_self_view_review
+
+            await run_self_view_review(results, target_date)
+        except Exception as exc:  # noqa: BLE001 - 主人卡月审失败不阻断 Nightly
+            logger.warning("主人卡月度审查失败: %s", exc)
+            results["self_view_review"] = {}
+            results["self_view_review_errors"] = {"global": str(exc)}
 
     async def _run_journal_plan_and_wellbeing(
         self,

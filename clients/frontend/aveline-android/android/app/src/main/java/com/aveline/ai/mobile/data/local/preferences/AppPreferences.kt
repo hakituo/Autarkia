@@ -321,6 +321,29 @@ class AppPreferences @Inject constructor(
      */
     val currentSessionIdFlow: StateFlow<String?> = _currentSessionIdFlow.asStateFlow()
     
+    /** [stageDirectionEnabled] 的响应式视图，初值取自已落盘的值。 */
+    private val _stageDirectionEnabledFlow: MutableStateFlow<Boolean> =
+        MutableStateFlow(prefs.getBoolean(KEY_STAGE_DIRECTION_ENABLED, DEFAULT_STAGE_DIRECTION_ENABLED))
+
+    val stageDirectionEnabledFlow: StateFlow<Boolean> = _stageDirectionEnabledFlow.asStateFlow()
+
+    /**
+     * 括号里的动作 / 场景描写是否渲染成居中旁白。
+     *
+     * true（默认）= 沿用现有协议：成对的 `（…）` / `(…)` 被 [com.aveline.ai.mobile.utils.text.ReplySegmenter]
+     * 切成旁白段，居中淡色显示；
+     * false = 完全不做括号识别，括号原样留在正文里，避免正文中正常出现的括号被误判成动作。
+     *
+     * SharedPreferences 本身不可观察，Compose 侧要跟开关实时联动必须订阅
+     * [stageDirectionEnabledFlow]，否则改完设置得退出聊天页才生效。
+     */
+    var stageDirectionEnabled: Boolean
+        get() = prefs.getBoolean(KEY_STAGE_DIRECTION_ENABLED, DEFAULT_STAGE_DIRECTION_ENABLED)
+        set(value) {
+            prefs.edit().putBoolean(KEY_STAGE_DIRECTION_ENABLED, value).apply()
+            _stageDirectionEnabledFlow.value = value
+        }
+
     /**
      * Auto TTS enabled flag.
      * When true, AI responses are automatically read aloud.
@@ -662,6 +685,7 @@ class AppPreferences @Inject constructor(
         private const val KEY_AUTO_EMOTION = "auto_emotion"
         private const val KEY_CURRENT_SESSION_ID = "current_session_id"
         private const val KEY_AUTO_TTS_ENABLED = "auto_tts_enabled"
+        private const val KEY_STAGE_DIRECTION_ENABLED = "stage_direction_enabled"
         private const val KEY_RESIDENT_MODE_ENABLED = "resident_mode_enabled"
         private const val KEY_ASR_PROVIDER = "asr_provider"
         private const val KEY_ASSISTANT_CAPSULE_ENABLED = "assistant_capsule_enabled"
@@ -696,6 +720,8 @@ class AppPreferences @Inject constructor(
         private const val DEFAULT_BREATHING_RATE = 1.0f
         private const val DEFAULT_AUTO_EMOTION = true
         private const val DEFAULT_AUTO_TTS_ENABLED = false
+        /** 默认保留括号旁白：这是老行为，关掉是用户显式选择。 */
+        private const val DEFAULT_STAGE_DIRECTION_ENABLED = true
         private const val DEFAULT_RESIDENT_MODE_ENABLED = false
         private const val DEFAULT_ASR_PROVIDER = "auto"
         /**

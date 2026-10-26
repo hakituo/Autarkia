@@ -109,7 +109,7 @@ xiaoyou_models:                 # 大资产在外接盘
   vae: VAE/
   loras: lora/Krea2/
 xiaoyou_comfy_local:            # ComfyUI 本体仍在本机
-  base_path: d:/AI/xiaoyou-core/models/Image/ComfyUI/
+  base_path: d:/AI/autarkia/models/Image/ComfyUI/
   text_encoders: models/text_encoders/
 ```
 

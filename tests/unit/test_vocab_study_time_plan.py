@@ -130,8 +130,14 @@ class _FakeDaily:
         self.calls = []
 
     def record_study(
-        self, topic, content, *, session_id=None, minutes=None,
-        count_in_total=True, source=None,
+        self,
+        topic,
+        content,
+        *,
+        session_id=None,
+        minutes=None,
+        count_in_total=True,
+        source=None,
     ):
         self.calls.append(
             {
@@ -199,9 +205,7 @@ def test_report_zero_seconds_returns_day_total_without_writing(vocab_route):
     route, daily, journal = vocab_route
     daily.record["study"]["sessions"].append({"content": "朗读 30分钟"})
 
-    result = asyncio.run(
-        route.report_vocab_study_time({"session_id": "abc", "seconds": 0})
-    )
+    result = asyncio.run(route.report_vocab_study_time({"session_id": "abc", "seconds": 0}))
 
     assert result["status"] == "success"
     assert result["data"]["minutes"] == 0
@@ -214,9 +218,7 @@ def test_report_zero_seconds_returns_day_total_without_writing(vocab_route):
 def test_report_rounds_thirty_seconds_to_one_minute(vocab_route):
     route, _daily, _journal = vocab_route
 
-    result = asyncio.run(
-        route.report_vocab_study_time({"session_id": "half", "seconds": 30})
-    )
+    result = asyncio.run(route.report_vocab_study_time({"session_id": "half", "seconds": 30}))
 
     assert result["data"]["minutes"] == 1
 
@@ -225,14 +227,10 @@ def test_report_overwrites_by_session_id_and_projects_to_plan(vocab_route):
     route, daily, journal = vocab_route
 
     asyncio.run(
-        route.report_vocab_study_time(
-            {"session_id": "abc", "seconds": 300, "mode": "review"}
-        )
+        route.report_vocab_study_time({"session_id": "abc", "seconds": 300, "mode": "review"})
     )
     result = asyncio.run(
-        route.report_vocab_study_time(
-            {"session_id": "abc", "seconds": 720, "mode": "review"}
-        )
+        route.report_vocab_study_time({"session_id": "abc", "seconds": 720, "mode": "review"})
     )
 
     sessions = daily.record["study"]["sessions"]

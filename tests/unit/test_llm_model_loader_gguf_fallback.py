@@ -6,6 +6,7 @@ psutil 报错回退、ctx 候选扩展、CUDA 缓存清理异常、n_gpu_layers 
 llama_cpp / transformers / torch / psutil 全部以替身注入，不加载真实模型、
 不使用 GPU、不发网络请求；所有文件 IO 落在 pytest 的 tmp_path 内。
 """
+
 from __future__ import annotations
 
 import core.modules.llm.model_loader as model_loader
@@ -110,9 +111,7 @@ class _FakeTorch:
     """torch 替身，只提供被测代码会读到的属性。"""
 
     def __init__(self, available=True, error=None, empty_cache_error=None):
-        self.cuda = _FakeCuda(
-            available=available, error=error, empty_cache_error=empty_cache_error
-        )
+        self.cuda = _FakeCuda(available=available, error=error, empty_cache_error=empty_cache_error)
         self.float16 = "float16"
         self.bfloat16 = "bfloat16"
         self.float32 = "float32"
@@ -192,13 +191,16 @@ def _gguf_loader(
 # _load_gguf_model —— GPU 健康检查与回退
 # --------------------------------------------------------------------------- #
 
+
 def test_gguf_gpu_health_check_failure_falls_back_to_cpu(monkeypatch):
     """GPU 健康检查失败 → 归零 n_gpu_layers 并重新走 load_sync。"""
     import core.modules.llm.gpu_manager as gpu_manager
 
     llama_cls = _fake_llama_class(lambda kwargs, index: None)
     monkeypatch.setattr(model_loader, "Llama", llama_cls)
-    monkeypatch.setattr(model_loader, "get_torch", lambda: _FakeTorch(error=RuntimeError("cuda gone")))
+    monkeypatch.setattr(
+        model_loader, "get_torch", lambda: _FakeTorch(error=RuntimeError("cuda gone"))
+    )
 
     class _UnhealthyGPUManager:
         def __init__(self, module):
@@ -212,7 +214,9 @@ def test_gguf_gpu_health_check_failure_falls_back_to_cpu(monkeypatch):
     config = {}
     module = _FakeModule(config=config, text_model_path="model.gguf")
     loader = _gguf_loader(
-        monkeypatch, module=module, params=dict(_DEFAULT_PARAMS, n_gpu_layers=8),
+        monkeypatch,
+        module=module,
+        params=dict(_DEFAULT_PARAMS, n_gpu_layers=8),
         candidates=[8],
     )
     reload_calls = []
@@ -242,7 +246,9 @@ def test_gguf_gpu_health_check_failure_and_reload_fails(monkeypatch):
 
     module = _FakeModule(text_model_path="model.gguf")
     loader = _gguf_loader(
-        monkeypatch, module=module, params=dict(_DEFAULT_PARAMS, n_gpu_layers=8),
+        monkeypatch,
+        module=module,
+        params=dict(_DEFAULT_PARAMS, n_gpu_layers=8),
         candidates=[8],
     )
     monkeypatch.setattr(loader, "load_sync", lambda: False)
@@ -269,7 +275,9 @@ def test_gguf_gpu_health_check_exception_is_swallowed(monkeypatch):
 
     module = _FakeModule(text_model_path="model.gguf")
     loader = _gguf_loader(
-        monkeypatch, module=module, params=dict(_DEFAULT_PARAMS, n_gpu_layers=8),
+        monkeypatch,
+        module=module,
+        params=dict(_DEFAULT_PARAMS, n_gpu_layers=8),
         candidates=[8],
     )
 
@@ -297,7 +305,9 @@ def test_gguf_gpu_layer_verification_warning_is_swallowed(monkeypatch):
 
     module = _FakeModule(text_model_path="model.gguf")
     loader = _gguf_loader(
-        monkeypatch, module=module, params=dict(_DEFAULT_PARAMS, n_gpu_layers=8),
+        monkeypatch,
+        module=module,
+        params=dict(_DEFAULT_PARAMS, n_gpu_layers=8),
         candidates=[8],
     )
 
@@ -309,9 +319,7 @@ def test_gguf_use_mmap_fallback_when_psutil_errors(monkeypatch):
     """读内存占用抛异常 → use_mmap 候选退回单一 (True,)。"""
     llama_cls = _fake_llama_class(lambda kwargs, index: None)
     monkeypatch.setattr(model_loader, "Llama", llama_cls)
-    monkeypatch.setattr(
-        model_loader, "psutil", _FakePsutil(error=RuntimeError("no /proc"))
-    )
+    monkeypatch.setattr(model_loader, "psutil", _FakePsutil(error=RuntimeError("no /proc")))
 
     module = _FakeModule(
         settings=_FakeSettings(model=_Attrs(use_mmap=None, ram_mirror_offload=False)),
@@ -332,7 +340,9 @@ def test_gguf_expands_ctx_candidates_when_n_ctx_large(monkeypatch):
     config = {}
     module = _FakeModule(config=config, text_model_path="model.gguf")
     loader = _gguf_loader(
-        monkeypatch, module=module, params=dict(_DEFAULT_PARAMS, n_ctx=4096),
+        monkeypatch,
+        module=module,
+        params=dict(_DEFAULT_PARAMS, n_ctx=4096),
         candidates=[0],
     )
 
@@ -343,21 +353,22 @@ def test_gguf_expands_ctx_candidates_when_n_ctx_large(monkeypatch):
 
 def test_gguf_cuda_cache_cleanup_errors_are_swallowed(monkeypatch):
     """CUDA 失败后的显存清理自身抛异常 → 吞掉后仍能继续降级到 CPU。"""
+
     def _behavior(kwargs, index):
         if index == 0:
             raise RuntimeError("ggml-cuda error: kernel launch failed")
 
     llama_cls = _fake_llama_class(_behavior)
     monkeypatch.setattr(model_loader, "Llama", llama_cls)
-    broken_torch = _FakeTorch(
-        available=True, empty_cache_error=RuntimeError("cache boom")
-    )
+    broken_torch = _FakeTorch(available=True, empty_cache_error=RuntimeError("cache boom"))
     monkeypatch.setattr(model_loader, "get_torch", lambda: broken_torch)
 
     config = {}
     module = _FakeModule(config=config, text_model_path="model.gguf")
     loader = _gguf_loader(
-        monkeypatch, module=module, params=dict(_DEFAULT_PARAMS, n_gpu_layers=8),
+        monkeypatch,
+        module=module,
+        params=dict(_DEFAULT_PARAMS, n_gpu_layers=8),
         candidates=[8, 0],
     )
 
@@ -381,4 +392,3 @@ def test_gguf_success_always_writes_int_n_gpu_layers(monkeypatch):
 
     assert loader._load_gguf_model() is True
     assert isinstance(config["n_gpu_layers"], int)
-

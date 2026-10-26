@@ -133,6 +133,7 @@ class _RecordingScheduler(PeerChatScheduler):
 # __init__ 与配置
 # ============================================================
 
+
 class TestInit:
     """__init__ 的参数读取与兜底。"""
 
@@ -370,9 +371,7 @@ class TestRunSingleCycle:
 
     async def test_negotiation_takes_priority(self):
         """提醒分工协商触发时，跳过后续所有普通互聊检查。"""
-        sched = _RecordingScheduler(
-            connections=CONNS, negotiation_result=True
-        )
+        sched = _RecordingScheduler(connections=CONNS, negotiation_result=True)
 
         await sched._run_single_cycle()
 
@@ -399,9 +398,7 @@ class TestRunSingleCycle:
 
     async def test_checks_each_role_when_no_negotiation(self):
         """两个协商都没触发时，逐角色检查。"""
-        sched = _RecordingScheduler(
-            connections=CONNS, role_results=[True, False]
-        )
+        sched = _RecordingScheduler(connections=CONNS, role_results=[True, False])
 
         await sched._run_single_cycle()
 
@@ -461,14 +458,13 @@ class TestRunSingleCycle:
 # _run_loop
 # ============================================================
 
+
 class TestRunLoop:
     """主循环：接管退出与异常处理（sleep 全部替换为 no-op）。"""
 
     async def test_exits_when_character_daily_takes_over(self, monkeypatch):
         """CharacterDailyEngine 激活后立即退出并交出调度权。"""
-        monkeypatch.setattr(
-            sched_mod.asyncio, "sleep", lambda _s: _noop_coro()
-        )
+        monkeypatch.setattr(sched_mod.asyncio, "sleep", lambda _s: _noop_coro())
         sched = _RecordingScheduler()
         sched._running = True
         sched._is_character_daily_active = lambda: True
@@ -479,9 +475,7 @@ class TestRunLoop:
 
     async def test_loads_user_activity_on_start(self, monkeypatch):
         """启动时先恢复用户活跃时间戳。"""
-        monkeypatch.setattr(
-            sched_mod.asyncio, "sleep", lambda _s: _noop_coro()
-        )
+        monkeypatch.setattr(sched_mod.asyncio, "sleep", lambda _s: _noop_coro())
         sched = _RecordingScheduler()
         sched._running = True
         sched._is_character_daily_active = lambda: True
@@ -495,13 +489,9 @@ class TestRunLoop:
 
         assert loaded["n"] == 1
 
-    async def test_cycle_exception_is_recorded_and_loop_continues(
-        self, monkeypatch
-    ):
+    async def test_cycle_exception_is_recorded_and_loop_continues(self, monkeypatch):
         """周期内异常被捕获并记失败，循环继续而不是崩掉。"""
-        monkeypatch.setattr(
-            sched_mod.asyncio, "sleep", lambda _s: _noop_coro()
-        )
+        monkeypatch.setattr(sched_mod.asyncio, "sleep", lambda _s: _noop_coro())
         sched = _RecordingScheduler()
         sched._running = True
         calls = {"n": 0}
@@ -567,9 +557,7 @@ class TestRunLoop:
 
     async def test_next_check_ts_is_set(self, monkeypatch):
         """每轮结束会设置下次检查时间戳。"""
-        monkeypatch.setattr(
-            sched_mod.asyncio, "sleep", lambda _s: _noop_coro()
-        )
+        monkeypatch.setattr(sched_mod.asyncio, "sleep", lambda _s: _noop_coro())
         sched = _RecordingScheduler(connections=CONNS)
         sched._running = True
         sched._is_character_daily_active = lambda: True
@@ -646,6 +634,7 @@ def _capture_logs(monkeypatch, module):
 # 用户活跃委托
 # ============================================================
 
+
 class TestUserActivityDelegation:
     """对外委托方法应正确转发到 UserActivityTracker。"""
 
@@ -689,6 +678,7 @@ class TestUserActivityDelegation:
 # ============================================================
 # 全局单例
 # ============================================================
+
 
 class TestGlobalSingleton:
     """get / init 单例语义。"""

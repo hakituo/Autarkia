@@ -1,4 +1,5 @@
 """词汇学习洞察回归：今日已背 / 词书进度 / 已学单词。"""
+
 from __future__ import annotations
 
 import json
@@ -16,9 +17,7 @@ def _build_store(tmp_path, dictionary, progress):
     progress_path = tmp_path / "vocab_progress.json"
     progress_path.write_text(json.dumps(progress, ensure_ascii=False), encoding="utf-8")
 
-    store = VocabDataStore(
-        dictionary_path=str(words_path), progress_path=str(progress_path)
-    )
+    store = VocabDataStore(dictionary_path=str(words_path), progress_path=str(progress_path))
     # 不加载仓库里的真实例句与全量词书，保证测试只依赖入参
     store.sentence_path = None
     store.master_path = str(tmp_path / "no-master.json")
@@ -64,9 +63,7 @@ def _fixture_progress(now: float, today_start: float) -> dict:
 
 def test_today_words_split_new_and_review(tmp_path):
     now = get_current_time().timestamp()
-    today_start = get_current_time().replace(
-        hour=0, minute=0, second=0, microsecond=0
-    ).timestamp()
+    today_start = get_current_time().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
     store = _build_store(
         tmp_path,
         [_word("alpha"), _word("beta"), _word("gamma"), _word("delta")],
@@ -89,9 +86,7 @@ def test_today_words_split_new_and_review(tmp_path):
 
 def test_book_progress_only_counts_current_book(tmp_path):
     now = get_current_time().timestamp()
-    today_start = get_current_time().replace(
-        hour=0, minute=0, second=0, microsecond=0
-    ).timestamp()
+    today_start = get_current_time().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
     progress = _fixture_progress(now, today_start)
     # 不属于当前词书的进度不能算进本书
     progress["outside"] = {
@@ -121,9 +116,7 @@ def test_book_progress_only_counts_current_book(tmp_path):
 
 def test_learned_words_support_status_filter_and_paging(tmp_path):
     now = get_current_time().timestamp()
-    today_start = get_current_time().replace(
-        hour=0, minute=0, second=0, microsecond=0
-    ).timestamp()
+    today_start = get_current_time().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
     store = _build_store(
         tmp_path,
         [_word("alpha"), _word("beta"), _word("gamma")],

@@ -9,6 +9,7 @@
 注：Windows 上 ``D:\\AI\\Study`` 被原生 Path 判定为绝对路径、第一关直接原样返回，
 该平台行为由 pathlib 平台语义保证，无需在 POSIX 上模拟。
 """
+
 from __future__ import annotations
 
 from pathlib import Path

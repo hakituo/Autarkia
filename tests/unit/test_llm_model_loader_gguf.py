@@ -6,6 +6,7 @@
 llama_cpp / transformers / torch / psutil 全部以替身注入，不加载真实模型、
 不使用 GPU、不发网络请求；所有文件 IO 落在 pytest 的 tmp_path 内。
 """
+
 from __future__ import annotations
 
 import sys
@@ -113,9 +114,7 @@ class _FakeTorch:
     """torch 替身，只提供被测代码会读到的属性。"""
 
     def __init__(self, available=True, error=None, empty_cache_error=None):
-        self.cuda = _FakeCuda(
-            available=available, error=error, empty_cache_error=empty_cache_error
-        )
+        self.cuda = _FakeCuda(available=available, error=error, empty_cache_error=empty_cache_error)
         self.float16 = "float16"
         self.bfloat16 = "bfloat16"
         self.float32 = "float32"
@@ -195,6 +194,7 @@ def _gguf_loader(
 # _load_gguf_model —— 基础路径与重试
 # --------------------------------------------------------------------------- #
 
+
 def test_gguf_returns_false_without_llama_cpp(monkeypatch):
     """llama_cpp 未安装 → 直接返回 False（仅写日志，不落 _last_load_error）。"""
     monkeypatch.setattr(model_loader, "Llama", None)
@@ -257,6 +257,7 @@ def test_gguf_success_on_cpu_without_health_check(monkeypatch):
 
 def test_gguf_dedupes_use_mmap_candidates(monkeypatch):
     """ram_mirror_offload 让两个 use_mmap 候选归一 → 第二个 key 被去重跳过。"""
+
     def _behavior(kwargs, index):
         if index == 0:
             raise RuntimeError("transient backend hiccup")
@@ -265,9 +266,7 @@ def test_gguf_dedupes_use_mmap_candidates(monkeypatch):
     monkeypatch.setattr(model_loader, "Llama", llama_cls)
 
     module = _FakeModule(
-        settings=_FakeSettings(
-            model=_Attrs(use_mmap=None, ram_mirror_offload=True)
-        ),
+        settings=_FakeSettings(model=_Attrs(use_mmap=None, ram_mirror_offload=True)),
         text_model_path="model.gguf",
     )
     monkeypatch.setattr(model_loader, "psutil", _FakePsutil(percent=50.0))
@@ -298,11 +297,10 @@ def test_gguf_tolerates_settings_attribute_errors(monkeypatch):
 
 def test_gguf_retries_after_unexpected_keyword(monkeypatch):
     """TypeError 提示 unexpected keyword → 弹掉该参数后重试成功。"""
+
     def _behavior(kwargs, index):
         if index == 0:
-            raise TypeError(
-                "Llama.__init__() got an unexpected keyword argument 'flash_attn'"
-            )
+            raise TypeError("Llama.__init__() got an unexpected keyword argument 'flash_attn'")
 
     llama_cls = _fake_llama_class(_behavior)
     monkeypatch.setattr(model_loader, "Llama", llama_cls)
@@ -317,6 +315,7 @@ def test_gguf_retries_after_unexpected_keyword(monkeypatch):
 
 def test_gguf_fails_when_typeerror_has_no_removable_keyword(monkeypatch):
     """TypeError 无法匹配可弹参数 → 直接抛出并被外层捕获，最终返回 False。"""
+
     def _behavior(kwargs, index):
         raise TypeError("unrelated TypeError from the backend")
 
@@ -334,6 +333,7 @@ def test_gguf_fails_when_typeerror_has_no_removable_keyword(monkeypatch):
 
 def test_gguf_aborts_on_invalid_vector_subscript(monkeypatch):
     """加载抛 invalid vector subscript → 立即返回 False，不再尝试其它候选。"""
+
     def _behavior(kwargs, index):
         raise RuntimeError("invalid vector subscript at layer 3")
 
@@ -349,6 +349,7 @@ def test_gguf_aborts_on_invalid_vector_subscript(monkeypatch):
 
 def test_gguf_cuda_backend_error_falls_back_to_cpu(monkeypatch):
     """GPU 加载触发 CUDA 后端错误 → 强制 CPU，跳过非零层候选后成功。"""
+
     def _behavior(kwargs, index):
         if int(kwargs["n_gpu_layers"]) != 0:
             raise RuntimeError("ggml-cuda error: failed to launch kernel")
@@ -361,7 +362,9 @@ def test_gguf_cuda_backend_error_falls_back_to_cpu(monkeypatch):
     config = {}
     module = _FakeModule(config=config, text_model_path="model.gguf")
     loader = _gguf_loader(
-        monkeypatch, module=module, params=dict(_DEFAULT_PARAMS, n_gpu_layers=8),
+        monkeypatch,
+        module=module,
+        params=dict(_DEFAULT_PARAMS, n_gpu_layers=8),
         candidates=[8, 4, 0],
     )
 
@@ -375,6 +378,7 @@ def test_gguf_cuda_backend_error_falls_back_to_cpu(monkeypatch):
 
 def test_gguf_oom_error_keeps_trying_then_fails(monkeypatch):
     """OOM 错误 → 继续尝试下一个候选，全部失败后返回 False。"""
+
     def _behavior(kwargs, index):
         raise RuntimeError("CUDA out of memory while allocating")
 
@@ -392,6 +396,7 @@ def test_gguf_oom_error_keeps_trying_then_fails(monkeypatch):
 
 def test_gguf_model_load_error_keeps_trying_then_fails(monkeypatch):
     """模型文件类加载错误 → 继续尝试下一个候选，全部失败后返回 False。"""
+
     def _behavior(kwargs, index):
         raise RuntimeError("failed to load model from file: bad tensor")
 
@@ -403,4 +408,3 @@ def test_gguf_model_load_error_keeps_trying_then_fails(monkeypatch):
 
     assert loader._load_gguf_model() is False
     assert len(llama_cls.calls) == 4
-

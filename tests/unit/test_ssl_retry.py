@@ -30,9 +30,7 @@ def test_ssl_error_detection():
         "SSL alert certificate expired",
     ]
     for error_msg in ssl_cases:
-        assert is_transient_ssl_error(Exception(error_msg)), (
-            f"{error_msg} 应识别为瞬时 SSL 错误"
-        )
+        assert is_transient_ssl_error(Exception(error_msg)), f"{error_msg} 应识别为瞬时 SSL 错误"
 
 
 def test_non_transient_errors_are_not_ssl():
@@ -43,9 +41,9 @@ def test_non_transient_errors_are_not_ssl():
         "",
     ]
     for error_msg in normal_cases:
-        assert not is_transient_ssl_error(Exception(error_msg)), (
-            f"{error_msg} 不应识别为瞬时 SSL 错误"
-        )
+        assert not is_transient_ssl_error(
+            Exception(error_msg)
+        ), f"{error_msg} 不应识别为瞬时 SSL 错误"
 
 
 def test_transient_error_includes_network_markers():

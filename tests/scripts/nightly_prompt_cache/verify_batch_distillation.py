@@ -18,7 +18,7 @@
 6. config 默认值含 distillation_batch_size
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.nightly_prompt_cache.verify_batch_distillation
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.nightly_prompt_cache.verify_batch_distillation
 """
 
 from __future__ import annotations
@@ -215,6 +215,8 @@ class _FakeManager:
     """模拟记忆管理器，记录 update_memory_distillation 调用。"""
 
     def __init__(self, memory: Optional[Dict[str, Dict[str, Any]]] = None) -> None:
+        # 蒸馏按角色白名单放行，这里声明成默认放行的 aveline
+        self.user_id = "shared__scope__aveline"
         self.memory: Dict[str, Dict[str, Any]] = dict(memory or {})
         self.updates: List[Dict[str, Any]] = []
 

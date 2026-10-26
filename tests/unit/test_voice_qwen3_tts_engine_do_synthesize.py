@@ -7,6 +7,7 @@
 小数组），``ThreadPoolExecutor`` 换成就地执行的替身；不下载权重、不使用 GPU、不发起
 网络请求，文件 IO 全部落在 ``tmp_path``。
 """
+
 from __future__ import annotations
 
 import concurrent.futures
@@ -21,8 +22,9 @@ from core.voice.engines.qwen3_tts_engine import Qwen3TTSEngine
 
 # `soundfile` 属 voice 可选 extra（pyproject.toml），CI 只跑 `uv sync --extra dev` 不装它。
 # 缺依赖时整体跳过而不是失败（与 test_tts_manager_core.py 同口径）。
-sf = pytest.importorskip("soundfile", exc_type=ImportError,
-                         reason="soundfile 属 voice 可选 extra，CI 未安装")
+sf = pytest.importorskip(
+    "soundfile", exc_type=ImportError, reason="soundfile 属 voice 可选 extra，CI 未安装"
+)
 
 
 class _RecordingLogger:
@@ -37,15 +39,16 @@ class _RecordingLogger:
     def _bind(level):
         def _log(self, msg, *args, **kwargs):
             self.records.append((level, msg))
+
         return _log
 
-    debug, info, warning, error = (_bind("debug"), _bind("info"),
-                                   _bind("warning"), _bind("error"))
+    debug, info, warning, error = (_bind("debug"), _bind("info"), _bind("warning"), _bind("error"))
 
 
 class _SettingsStub:
     def __init__(self, reference_audio=None, tts_vram_threshold_mb=0):
         import types
+
         self.voice = types.SimpleNamespace(
             reference_audio=reference_audio,
             tts_vram_threshold_mb=tts_vram_threshold_mb,
@@ -108,8 +111,7 @@ class _FakeResourceLock:
 
 def _wav_bytes(samples=240, sample_rate=24000, value=0.5):
     buf = io.BytesIO()
-    sf.write(buf, np.full(samples, value, dtype=np.float32), sample_rate,
-             format="WAV")
+    sf.write(buf, np.full(samples, value, dtype=np.float32), sample_rate, format="WAV")
     return buf.getvalue()
 
 
@@ -128,11 +130,11 @@ class TestDoSynthesize:
         return engine
 
     def _settings(self, monkeypatch, reference_audio=None):
-        monkeypatch.setattr(mod, "get_settings",
-                            lambda: _SettingsStub(reference_audio=reference_audio))
+        monkeypatch.setattr(
+            mod, "get_settings", lambda: _SettingsStub(reference_audio=reference_audio)
+        )
 
-    async def test_default_reference_audio_and_xvec_fallback(self, env, monkeypatch,
-                                                             tmp_path):
+    async def test_default_reference_audio_and_xvec_fallback(self, env, monkeypatch, tmp_path):
         rec = _RecordingLogger()
         monkeypatch.setattr(mod, "logger", rec)
         self._settings(monkeypatch, reference_audio=None)
@@ -143,31 +145,32 @@ class TestDoSynthesize:
 
         assert out[:4] == b"RIFF"
         call = model.calls[0]
-        assert call["ref_audio"] == str(
-            tmp_path / "ref_audio" / "female" / "ref_calm.wav")
+        assert call["ref_audio"] == str(tmp_path / "ref_audio" / "female" / "ref_calm.wav")
         assert call["language"] == "chinese"
         assert call["ref_text"] is None
         assert call["x_vector_only_mode"] is True
         assert (call["max_new_tokens"], call["repetition_penalty"]) == (4096, 1.1)
         assert (call["temperature"], call["top_p"]) == (0.7, 0.8)
         assert env._is_generating is False
-        assert any("Switching to x_vector_only" in m
-                   for m in rec.messages("warning"))
+        assert any("Switching to x_vector_only" in m for m in rec.messages("warning"))
 
     @pytest.mark.parametrize("reference_audio", ["rel/ref.wav", "/abs/ref.wav"])
-    async def test_reference_audio_path_normalisation(self, env, monkeypatch, tmp_path,
-                                                      reference_audio):
+    async def test_reference_audio_path_normalisation(
+        self, env, monkeypatch, tmp_path, reference_audio
+    ):
         self._settings(monkeypatch, reference_audio=reference_audio)
         model = _FakeModel()
         env._model = model
         await env._do_synthesize("hi")
-        want = reference_audio if os.path.isabs(reference_audio) else os.path.join(
-            str(tmp_path), reference_audio)
+        want = (
+            reference_audio
+            if os.path.isabs(reference_audio)
+            else os.path.join(str(tmp_path), reference_audio)
+        )
         assert model.calls[0]["ref_audio"] == want
 
     @pytest.mark.parametrize("key", ["ref_audio_path", "reference_audio"])
-    async def test_kwargs_reference_audio_overrides_default(self, env, monkeypatch,
-                                                            tmp_path, key):
+    async def test_kwargs_reference_audio_overrides_default(self, env, monkeypatch, tmp_path, key):
         self._settings(monkeypatch, reference_audio=str(tmp_path / "d.wav"))
         model = _FakeModel()
         env._model = model
@@ -198,8 +201,7 @@ class TestDoSynthesize:
         assert model.calls[0]["ref_text"] == "自动加载的参考文本"
         assert any("Auto-loaded ref_text" in m for m in rec.messages("info"))
 
-    async def test_ref_text_read_failure_falls_back_to_xvec(self, env, monkeypatch,
-                                                            tmp_path):
+    async def test_ref_text_read_failure_falls_back_to_xvec(self, env, monkeypatch, tmp_path):
         ref = tmp_path / "voice.wav"
         ref.write_bytes(_wav_bytes())
         (tmp_path / "voice.txt").mkdir()  # 目录：open() 必抛异常，被 except 吞掉
@@ -212,8 +214,7 @@ class TestDoSynthesize:
         assert model.calls[0]["ref_text"] is None
         assert model.calls[0]["x_vector_only_mode"] is True
 
-    async def test_x_vector_only_mode_skips_txt_and_warning(self, env, monkeypatch,
-                                                            tmp_path):
+    async def test_x_vector_only_mode_skips_txt_and_warning(self, env, monkeypatch, tmp_path):
         rec = _RecordingLogger()
         monkeypatch.setattr(mod, "logger", rec)
         ref = tmp_path / "voice.wav"
@@ -229,14 +230,17 @@ class TestDoSynthesize:
         assert model.calls[0]["x_vector_only_mode"] is True
         assert (rec.messages("warning"), rec.messages("info")) == ([], [])
 
-    @pytest.mark.parametrize("kwargs,expected", [
-        ({"language": "zh"}, "chinese"),
-        ({"language": "EN"}, "english"),
-        ({"language": "mixed"}, "auto"),
-        ({"language": "auto"}, "auto"),
-        ({"language": "klingon"}, "klingon"),
-        ({"text_lang": "ja"}, "japanese"),
-    ])
+    @pytest.mark.parametrize(
+        "kwargs,expected",
+        [
+            ({"language": "zh"}, "chinese"),
+            ({"language": "EN"}, "english"),
+            ({"language": "mixed"}, "auto"),
+            ({"language": "auto"}, "auto"),
+            ({"language": "klingon"}, "klingon"),
+            ({"text_lang": "ja"}, "japanese"),
+        ],
+    )
     async def test_language_mapping(self, env, monkeypatch, tmp_path, kwargs, expected):
         self._settings(monkeypatch, reference_audio=str(tmp_path / "r.wav"))
         model = _FakeModel()
@@ -255,15 +259,13 @@ class TestDoSynthesize:
     async def test_resource_lock_is_acquired(self, env, monkeypatch, tmp_path):
         self._settings(monkeypatch, reference_audio=str(tmp_path / "r.wav"))
         record = []
-        monkeypatch.setattr(mod, "get_resource_lock",
-                            lambda: _FakeResourceLock(record))
+        monkeypatch.setattr(mod, "get_resource_lock", lambda: _FakeResourceLock(record))
         env._model = _FakeModel()
         out = await env._do_synthesize("hi")
         assert out[:4] == b"RIFF"
         assert record == [("TTS", True), "enter", "exit"]
 
-    async def test_inference_error_resets_generating_flag(self, env, monkeypatch,
-                                                          tmp_path):
+    async def test_inference_error_resets_generating_flag(self, env, monkeypatch, tmp_path):
         self._settings(monkeypatch, reference_audio=str(tmp_path / "r.wav"))
         env._model = _FakeModel(exc=RuntimeError("infer fail"))
         with pytest.raises(RuntimeError, match="infer fail"):
@@ -272,8 +274,7 @@ class TestDoSynthesize:
 
 
 class TestSynthesize:
-    async def test_empty_results_when_soundfile_missing_or_bytes_falsy(
-            self, engine, monkeypatch):
+    async def test_empty_results_when_soundfile_missing_or_bytes_falsy(self, engine, monkeypatch):
         monkeypatch.setattr(mod, "sf", None)
         assert (await engine.synthesize("x")).size == 0
 
@@ -299,8 +300,7 @@ class TestSynthesize:
 
     async def test_end_to_end_with_fake_model(self, engine, monkeypatch, tmp_path):
         monkeypatch.setattr(mod, "get_project_root", lambda: tmp_path)
-        monkeypatch.setattr(mod, "get_settings",
-                            lambda: _SettingsStub(reference_audio=None))
+        monkeypatch.setattr(mod, "get_settings", lambda: _SettingsStub(reference_audio=None))
         monkeypatch.setattr(mod, "get_resource_lock", None)
         engine.model_path = str(tmp_path)
         engine._model = _FakeModel(wavs=[np.full(240, 0.25, dtype=np.float32)])

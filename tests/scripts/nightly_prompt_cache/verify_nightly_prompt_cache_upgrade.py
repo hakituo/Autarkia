@@ -21,7 +21,7 @@
 8. cache_ratio 估算：单字符串版本 vs 双段版本的静态前缀占比
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.nightly_prompt_cache.verify_nightly_prompt_cache_upgrade
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.nightly_prompt_cache.verify_nightly_prompt_cache_upgrade
 """
 
 from __future__ import annotations

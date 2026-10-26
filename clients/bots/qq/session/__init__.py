@@ -1,4 +1,4 @@
 # QQ Session Subsystem
-from clients.bots.qq.session.session import XiaoyouSession
+from clients.bots.qq.session.session import AutarkiaSession
 
-__all__ = ["XiaoyouSession"]
+__all__ = ["AutarkiaSession"]

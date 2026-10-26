@@ -25,30 +25,30 @@ from config import patch_qwen_tts as mod
 # --------------------------------------------------------------------------
 
 # 补丁 1a：modeling 文件 mask_kwargs 旧块（12 空格缩进）
-MODELING_OLD_A = '''            mask_kwargs = {
+MODELING_OLD_A = """            mask_kwargs = {
                 "config": self.config,
                 "inputs_embeds": inputs_embeds,
                 "attention_mask": attention_mask,
                 "past_key_values": past_key_values,
-            }'''
+            }"""
 
 # 补丁 1b：modeling 文件直接传参旧块（8 空格缩进）
-MODELING_OLD_B = '''        causal_mask = mask_function(
+MODELING_OLD_B = """        causal_mask = mask_function(
             config=self.config,
             inputs_embeds=inputs_embeds,
             attention_mask=attention_mask,
             past_key_values=past_key_values,
             position_ids=text_position_ids,
-        )'''
+        )"""
 
 # 补丁 2a：tokenizer 文件 mask_kwargs 旧块（比 1a 多一行 position_ids）
-TOKENIZER_OLD_A = '''            mask_kwargs = {
+TOKENIZER_OLD_A = """            mask_kwargs = {
                 "config": self.config,
                 "inputs_embeds": inputs_embeds,
                 "attention_mask": attention_mask,
                 "past_key_values": past_key_values,
                 "position_ids": position_ids,
-            }'''
+            }"""
 
 # 补丁 2b：装饰器旧写法
 TOKENIZER_OLD_B = "    @check_model_inputs\n    @auto_docstring"
@@ -59,12 +59,8 @@ def _modeling_source() -> str:
     return (
         "# modeling_qwen3_tts.py\n"
         "class Qwen3TTS:\n"
-        "    def forward(self):\n"
-        + MODELING_OLD_A
-        + "\n"
-        "        # 内部会调用 create_causal_mask\n"
-        + MODELING_OLD_B
-        + "\n"
+        "    def forward(self):\n" + MODELING_OLD_A + "\n"
+        "        # 内部会调用 create_causal_mask\n" + MODELING_OLD_B + "\n"
     )
 
 
@@ -72,12 +68,8 @@ def _tokenizer_source() -> str:
     """构造一份「补丁 2a/2b 都还没打」的 tokenizer 文件内容。"""
     return (
         "# modeling_qwen3_tts_tokenizer_v2.py\n"
-        "class Tokenizer:\n"
-        + TOKENIZER_OLD_B
-        + "\n"
-        "    def forward(self):\n"
-        + TOKENIZER_OLD_A
-        + "\n"
+        "class Tokenizer:\n" + TOKENIZER_OLD_B + "\n"
+        "    def forward(self):\n" + TOKENIZER_OLD_A + "\n"
     )
 
 
@@ -88,8 +80,7 @@ def _point_to_tmp(monkeypatch, tmp_path, modeling_text: str | None, tokenizer_te
     """
     modeling = tmp_path / "qwen_tts" / "core" / "models" / "modeling_qwen3_tts.py"
     tokenizer = (
-        tmp_path / "qwen_tts" / "core" / "tokenizer_12hz"
-        / "modeling_qwen3_tts_tokenizer_v2.py"
+        tmp_path / "qwen_tts" / "core" / "tokenizer_12hz" / "modeling_qwen3_tts_tokenizer_v2.py"
     )
     for path, text in ((modeling, modeling_text), (tokenizer, tokenizer_text)):
         if text is None:
@@ -267,9 +258,7 @@ def test_main_no_warning_when_causal_mask_absent(tmp_path, monkeypatch, capsys):
     覆盖校验条件里 ``and`` 的短路分支。
     """
     modeling_src = (
-        "# modeling_qwen3_tts.py\n"
-        "def f():\n"
-        '        "inputs_embeds": inputs_embeds,\n'
+        "# modeling_qwen3_tts.py\n" "def f():\n" '        "inputs_embeds": inputs_embeds,\n'
     )
     _point_to_tmp(monkeypatch, tmp_path, modeling_src, "# tokenizer\n")
 
@@ -298,9 +287,7 @@ def test_main_missing_files_reports_errors(tmp_path, monkeypatch, capsys):
 
 def test_main_one_file_missing_partial_patch(tmp_path, monkeypatch, capsys):
     """只有 modeling 存在：它被修好，tokenizer 缺失只报错。"""
-    modeling, tokenizer = _point_to_tmp(
-        monkeypatch, tmp_path, _modeling_source(), None
-    )
+    modeling, tokenizer = _point_to_tmp(monkeypatch, tmp_path, _modeling_source(), None)
 
     assert mod.main() == 0
 
@@ -348,10 +335,7 @@ def test_run_as_main_windows_layout_patches_and_exits_zero(tmp_path, monkeypatch
     fake_exe = tmp_path / "fakevenv" / "bin" / "python.exe"
     site = tmp_path / "fakevenv" / "Lib" / "site-packages"
     modeling = site / "qwen_tts" / "core" / "models" / "modeling_qwen3_tts.py"
-    tokenizer = (
-        site / "qwen_tts" / "core" / "tokenizer_12hz"
-        / "modeling_qwen3_tts_tokenizer_v2.py"
-    )
+    tokenizer = site / "qwen_tts" / "core" / "tokenizer_12hz" / "modeling_qwen3_tts_tokenizer_v2.py"
     modeling.parent.mkdir(parents=True, exist_ok=True)
     tokenizer.parent.mkdir(parents=True, exist_ok=True)
     modeling.write_text(_modeling_source(), encoding="utf-8")
@@ -374,10 +358,7 @@ def test_run_as_main_falls_back_to_posix_layout(tmp_path, monkeypatch, capsys):
     pyver = f"python{sys.version_info.major}.{sys.version_info.minor}"
     site = tmp_path / "fakevenv2" / "lib" / pyver / "site-packages"
     modeling = site / "qwen_tts" / "core" / "models" / "modeling_qwen3_tts.py"
-    tokenizer = (
-        site / "qwen_tts" / "core" / "tokenizer_12hz"
-        / "modeling_qwen3_tts_tokenizer_v2.py"
-    )
+    tokenizer = site / "qwen_tts" / "core" / "tokenizer_12hz" / "modeling_qwen3_tts_tokenizer_v2.py"
     modeling.parent.mkdir(parents=True, exist_ok=True)
     tokenizer.parent.mkdir(parents=True, exist_ok=True)
     modeling.write_text(_modeling_source(), encoding="utf-8")

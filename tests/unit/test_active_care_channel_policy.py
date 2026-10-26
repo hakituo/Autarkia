@@ -208,7 +208,10 @@ def test_every_mode_always_delivers_somewhere():
                         mode=mode,
                     )
                     assert decision.deliver_qq or decision.deliver_app, (
-                        mode, app_online, origin, active,
+                        mode,
+                        app_online,
+                        origin,
+                        active,
                     )
 
 

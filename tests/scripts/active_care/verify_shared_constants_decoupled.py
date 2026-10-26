@@ -26,7 +26,7 @@
 以及关键函数的行为未因搬迁而改变。
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_shared_constants_decoupled
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.active_care.verify_shared_constants_decoupled
 """
 
 from __future__ import annotations

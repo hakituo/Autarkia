@@ -387,7 +387,7 @@ VITE_API_URL=http://localhost:8000
 | 键 | 说明 |
 |----|------|
 | `AVELINE_API_URL` | 自定义API地址 |
-| `XIAOYOU_ACCESS_TOKEN` | 访问令牌 |
+| `AUTARKIA_ACCESS_TOKEN` | 访问令牌 |
 | `XIAOYOU_USER_ID` | 用户ID |
 | `XIAOYOU_USER_NAME` | 用户名称 |
 | `aveline_chat_history_v2` | 聊天历史 |

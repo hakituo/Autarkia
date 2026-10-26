@@ -20,7 +20,7 @@ const REQUEST_TIMEOUT = config.timeout;
 const getHeaders = (): HeadersInit => {
   let token = '';
   try {
-    token = (localStorage.getItem('XIAOYOU_ACCESS_TOKEN') || '').trim();
+    token = (localStorage.getItem('AUTARKIA_ACCESS_TOKEN') || '').trim();
   } catch {}
 
   const headers: Record<string, string> = {

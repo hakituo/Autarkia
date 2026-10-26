@@ -325,12 +325,18 @@ async def apply_reply_policy(
 
         _accumulated_to_inject: List[str] = []
 
-        if reply_decision.accumulated_messages:
-            logger.info(
-                f"[ReplyPolicy] cid={conversation_id} 强制唤醒/打断，附带 "
-                f"{len(reply_decision.accumulated_messages)} 条累积消息"
-            )
-            _accumulated_to_inject = list(reply_decision.accumulated_messages)
+        if reply_decision.accumulated_messages or reply_decision.woke_from_sleep:
+            if reply_decision.woke_from_sleep and not reply_decision.accumulated_messages:
+                # 睡着被叫醒：把之前静默累积的消息一并带上，避免前面几条石沉大海
+                reply_decision.accumulated_messages = list(
+                    get_pending_messages(conversation_id)
+                )
+            if reply_decision.accumulated_messages:
+                logger.info(
+                    f"[ReplyPolicy] cid={conversation_id} 强制唤醒/打断，附带 "
+                    f"{len(reply_decision.accumulated_messages)} 条累积消息"
+                )
+                _accumulated_to_inject = list(reply_decision.accumulated_messages)
             clear_pending_messages(conversation_id)
             from core.services.character_daily.activity_model import (
                 ActivityType,

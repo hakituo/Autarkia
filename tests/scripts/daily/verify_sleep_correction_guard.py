@@ -15,7 +15,7 @@
 3. 有明确时间的正常修正仍然生效（不误伤）。
 
 运行：
-    D:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe -m tests.scripts.daily.verify_sleep_correction_guard
+    D:\\AI\\autarkia\\venv_core\\Scripts\\python.exe -m tests.scripts.daily.verify_sleep_correction_guard
 """
 
 import shutil

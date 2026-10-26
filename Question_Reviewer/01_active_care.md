@@ -630,7 +630,7 @@
 *   **解决方案**:
     1. 在 `core/lifecycle/lifespan.py` 中导出 `get_main_loop()` 公开函数，返回 `_main_loop`；
     2. 修改 `nightly_processor._run_nightly_async_tasks`，优先用主 loop 的 `run_coroutine_threadsafe(coro, main_loop).result(timeout=...)`，仅在拿不到主 loop 时才回退到新 loop；
-    3. 修复 `ANALYSIS_DIR` 路径为 `parents[1] / "history" / "analysis"`（项目根 `D:\projects\xiaoyou\history\analysis`）。
+    3. 修复 `ANALYSIS_DIR` 路径为 `parents[1] / "history" / "analysis"`（项目根 `d:\AI\xiaoyou-core\history\analysis`）。
 *   **状态**: ✅ 已修复，需重启服务后观察下一晚蒸馏日志验证
 
 ### 10.136 Active Care Storage 并发写入 WinError 2（第三次复发，根因：async 临时文件名非唯一）(2026-06-27)
@@ -1877,7 +1877,7 @@
     3. 修复 prompt_builder good_morning_proactive 分支拼接 specific_instruction
     4. 模板改为『起床问候』，放开早安硬约束
 *   **验证**:
-    1. `D:\projects\xiaoyou\venv_core\Scripts\python.exe -m pytest tests/scripts/active_care/verify_character_good_morning.py -v`
+    1. `d:\AI\xiaoyou-core\venv_core\Scripts\python.exe -m pytest tests/scripts/active_care/verify_character_good_morning.py -v`
 
 ### ISSUE-20260713-REPLY-WAKE /wake 唤醒后角色不回复消息（reply_policy 使用过时 activity） (2026-07-13)
 *   **问题描述**: 用户半夜 /wake 唤醒角色后，给角色发消息她不回复。日志显示 ReplyPolicy 走 DND 分支静默累积消息（activity=napping/sleeping），即使 sleep_manager 的 phase 已变为 fully_awake 或 night_awake。
@@ -1952,8 +1952,8 @@
     2. 同步修改 TASK_SLEEP_AGAIN_PROACTIVE_TEMPLATE：加同样的【语义红线】约束
     3. 新增测试用例 test_goodnight_proactive_template_has_semantic_redline：验证两个模板都必须包含语义红线约束
 *   **验证**:
-    1. `D:\projects\xiaoyou\venv_core\Scripts\python.exe -m unittest tests.scripts.active_care.verify_character_goodnight -v`
-    2. `D:\projects\xiaoyou\venv_core\Scripts\python.exe -m ruff check core\agents\chat_agent_components\persona_system\prompt\active_care_prompts.py tests\scripts\active_care\verify_character_goodnight.py`
+    1. `D:\AI\xiaoyou-core\venv_core\Scripts\python.exe -m unittest tests.scripts.active_care.verify_character_goodnight -v`
+    2. `D:\AI\xiaoyou-core\venv_core\Scripts\python.exe -m ruff check core\agents\chat_agent_components\persona_system\prompt\active_care_prompts.py tests\scripts\active_care\verify_character_goodnight.py`
 
 ### QR-20260718-PEER-CHAT-SLEEP-GUARD 提醒分工协商 peer_chat 触发时未检查角色睡眠状态，角色 SLEEPING 后仍参与做计划对话 (2026-07-18)
 *   **问题描述**: 07-17 23:00 aveline 进入 SLEEPING 并给用户发晚安『困了，先去睡了』，但 07-18 00:02 PeerChatScheduler 跨天触发『提醒分工协商』peer_chat，生成剧本里 aveline 说『睡不着 刷会手机』并跟 ling 讨论家务分工（就周五开始，先从厨房开始），跟睡眠状态矛盾。用户反馈角色声明睡了又参与做计划，行为不一致。
@@ -2113,7 +2113,7 @@
     3. 新增 UpdateSleepRecordTool 工具供 AI 调用（daily_tool.py L126-205）
     4. 在 registry.py 注册 update_sleep_record 工具（registry.py L185-196）
 *   **验证**:
-    1. `D:\projects\xiaoyou\venv_core\Scripts\python.exe -m tests.scripts.daily.verify_sleep_record_correction`
+    1. `D:\AI\xiaoyou-core\venv_core\Scripts\python.exe -m tests.scripts.daily.verify_sleep_record_correction`
     2. `验证脚本包含 12 个测试：合理性校验、update_sleep_cycle 方法、工具异步调用、registry 注册、保护逻辑仍生效`
 
 ### QR-20260730-ACTIVE-CARE-PROBABLE-SLEEP-REMOVAL probable_sleep 推断入睡机制不科学，会覆盖 UIE 正确作息数据 (2026-07-30)
@@ -2143,7 +2143,7 @@
     3. 保留 _try_infer_probable_sleep 方法名以兼容调用签名，但只处理 sleep_hint
     4. goodnight 退出时仍同步作息到 daily_record（sleep_ts 准确）
 *   **验证**:
-    1. `D:\projects\xiaoyou\venv_core\Scripts\python.exe -m tests.scripts.active_care.verify_probable_sleep_removed`
+    1. `D:\AI\xiaoyou-core\venv_core\Scripts\python.exe -m tests.scripts.active_care.verify_probable_sleep_removed`
     2. `验证脚本包含 14 个测试：常量移除、方法移除、条件分支移除、模块导入、sleep_hint/goodnight 保留`
 
 ### QR-20260801-AC-FALLBACK 未知角色触发 active_care 主动消息 fallback 到 aveline 名义，导致角色精神分裂 (2026-08-01)
@@ -2225,9 +2225,9 @@
     2. 同步更新 verify_activity_return.py 与 verify_unknown_role_no_fallback.py 断言
     3. 新增 verify_sleep_again_persona_match.py 端到端验证 conversation_id 与 QQ receiver 期望一致
 *   **验证**:
-    1. `D:\projects\xiaoyou\venv_cpu\Scripts\python.exe tests/scripts/active_care/verify_sleep_again_persona_match.py`
-    2. `D:\projects\xiaoyou\venv_cpu\Scripts\python.exe tests/scripts/active_care/verify_unknown_role_no_fallback.py`
-    3. `D:\projects\xiaoyou\venv_cpu\Scripts\python.exe -m pytest tests/scripts/character_daily/verify_activity_return.py -q`
+    1. `D:\AI\xiaoyou-core\venv_cpu\Scripts\python.exe tests/scripts/active_care/verify_sleep_again_persona_match.py`
+    2. `D:\AI\xiaoyou-core\venv_cpu\Scripts\python.exe tests/scripts/active_care/verify_unknown_role_no_fallback.py`
+    3. `D:\AI\xiaoyou-core\venv_cpu\Scripts\python.exe -m pytest tests/scripts/character_daily/verify_activity_return.py -q`
 
 ### QR-20260803-WAKE-DND /wake 后 waking_up 状态下中断窗口失效导致静默累积 (2026-08-03)
 *   **问题描述**: 用户 /wake 后发消息，角色仍走 dnd_sleeping_silent 静默累积分支不回复。日志显示 wake API 已激活中断窗口（'已自动激活中断窗口 conv=private_10001__persona__aveline_qq_master'），但 reply_policy 仍输出 'dnd_sleeping_silent(activity=waking_up) count=2, will_process_on_wake'。
@@ -2249,7 +2249,7 @@
 *   **修复方案**:
     1. 条件改为 `activity != ActivityType.SLEEPING and not ac_sleeping`，允许 DND 过渡态走中断窗口分支，仅排除 SLEEPING（防御性）
 *   **验证**:
-    1. `D:\projects\xiaoyou\venv_core\Scripts\python.exe -m pytest tests/character_daily/test_manual_interrupt_window.py -v`
+    1. `d:\AI\xiaoyou-core\venv_core\Scripts\python.exe -m pytest tests/character_daily/test_manual_interrupt_window.py -v`
     2. `3 个测试全部通过：test_manual_interrupt_window_allows_busy_chat / test_manual_interrupt_window_does_not_bypass_sleeping / test_wake_interrupt_window_allows_waking_up_chat`
 
 ### QR-20260803-INTERRUPT-WINDOW-PERSISTENCE InterruptWindowManager 无持久化导致 backend 重启后 /跳过 / /打断 窗口丢失 (2026-08-03)
@@ -2276,7 +2276,7 @@
     2. activate/extend/mark_skip_activity/clear/mark_window_ending_notified 写盘（safe_json_dump use_fsync=True）
     3. __init__ 时 _load_from_disk 恢复未过期窗口
 *   **验证**:
-    1. `D:\projects\xiaoyou\venv_core\Scripts\python.exe tests/scripts/character_daily/verify_interrupt_window_persistence.py`
+    1. `d:\AI\xiaoyou-core\venv_core\Scripts\python.exe tests/scripts/character_daily/verify_interrupt_window_persistence.py`
     2. `验证脚本 4 个步骤全部通过：activate 写盘 / 重启恢复 / reply_policy 命中 / 过期窗口过滤`
 
 ### QR-20260804-01 角色按作息入睡时晚安消息被间隔保护拦截 (2026-08-04)
@@ -2318,7 +2318,7 @@
     1. 在文件顶部从 core.agents.chat_agent_components.persona_system.prompt.active_care_prompts 导入 LANGUAGE_GUARD_ZH
     2. 在 _build_specific_instruction 函数内赋值 lang_guard = LANGUAGE_GUARD_ZH（起床问候固定走中文）
 *   **验证**:
-    1. `D:\projects\xiaoyou\venv_core\Scripts\python.exe -c "from core.services.active_care.good_morning_proactive import _build_specific_instruction; print(_build_specific_instruction('ling', False)[:120])"`
+    1. `D:\AI\xiaoyou-core\venv_core\Scripts\python.exe -c "from core.services.active_care.good_morning_proactive import _build_specific_instruction; print(_build_specific_instruction('ling', False)[:120])"`
 
 ### QR-20260804-AC-MAIN-REPLY-ANCHOR Active Care 在主程序已回复用户后仍重新回应用户消息而非顺着主程序回复继续 (2026-08-04)
 *   **问题描述**: active care 在主程序（chat agent）已经回复过用户最后一条消息后，再次触发时仍把用户那条消息当作'待跟进'目标，导致 active care 重新回应用户，而不是接着主程序的回复继续往下说。
@@ -2342,7 +2342,7 @@
     2. 当主程序回复晚于用户最后消息时，把主程序回复作为延续锚点（build_continuation_input）
     3. context_builder.py 计算 last_assistant_after_user = last_assistant_ts > last_user_ts_raw 并传递
 *   **验证**:
-    1. `D:\projects\xiaoyou\venv_cpu\Scripts\python.exe tests\scripts\active_care\verify_main_chat_reply_anchor.py`
+    1. `D:\AI\xiaoyou-core\venv_cpu\Scripts\python.exe tests\scripts\active_care\verify_main_chat_reply_anchor.py`
 
 ### QR-20260805-PEER-CHAT-FILTER-MISSING peer chat 互聊剧本缺话（filter_script 误杀短回复 + 日志混在 active_care 中） (2026-08-05)
 *   **问题描述**: peer chat 历史记录里出现角色连续发言缺少交替回复的现象（如一方说『XX』后另一方应回『没有，你呢』才接续电影话题，但实际缺这句），排查时发现 peer chat 没有独立日志，全混在 active_care_schedule.log / ACTIVE_CARE_EXECUTOR 里。

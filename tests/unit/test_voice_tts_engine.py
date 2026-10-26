@@ -28,11 +28,13 @@ from core.voice import tts_engine as te
 # 桩：配置 / 引擎 / 资源管理器
 # ============================================================
 
+
 class _TTSConfigStub:
     """``settings.voice.tts`` 替身。``model_extra`` 模拟 pydantic v2 的额外字段容器。"""
 
-    def __init__(self, provider="cloud", model=None, base_url=None, api_key="key",
-                 model_extra=None, **attrs):
+    def __init__(
+        self, provider="cloud", model=None, base_url=None, api_key="key", model_extra=None, **attrs
+    ):
         self.provider = provider
         self.model = model
         self.base_url = base_url
@@ -53,11 +55,22 @@ class _SettingsStub:
         self.voice = _VoiceStub(tts_config, tts_engine)
 
 
-def make_engine_cls(record, *, name="stub", fail_init=False, device="cpu",
-                    move_cpu_result=True, move_gpu_result=True,
-                    synth_result=None, synth_exc=None,
-                    bytes_result=b"audio", bytes_exc=None,
-                    has_move_cpu=True, has_move_gpu=True, has_bytes=True):
+def make_engine_cls(
+    record,
+    *,
+    name="stub",
+    fail_init=False,
+    device="cpu",
+    move_cpu_result=True,
+    move_gpu_result=True,
+    synth_result=None,
+    synth_exc=None,
+    bytes_result=b"audio",
+    bytes_exc=None,
+    has_move_cpu=True,
+    has_move_gpu=True,
+    has_bytes=True,
+):
     """生成替身引擎类，行为由参数控制，调用痕迹写进 ``record``。"""
 
     class _Stub:
@@ -82,6 +95,7 @@ def make_engine_cls(record, *, name="stub", fail_init=False, device="cpu",
             return np.zeros(3, dtype=np.float32)
 
         if has_bytes:
+
             async def synthesize_bytes(self, text, **kwargs):
                 record.setdefault("synthesize_bytes", []).append((name, text, kwargs))
                 if bytes_exc is not None:
@@ -89,11 +103,13 @@ def make_engine_cls(record, *, name="stub", fail_init=False, device="cpu",
                 return bytes_result
 
         if has_move_cpu:
+
             async def move_to_cpu(self):
                 record.setdefault("move_to_cpu", []).append(name)
                 return move_cpu_result
 
         if has_move_gpu:
+
             async def move_to_gpu(self):
                 record.setdefault("move_to_gpu", []).append(name)
                 return move_gpu_result
@@ -115,8 +131,9 @@ class _MonitorStub:
 class _ResourceManagerStub:
     """资源管理器替身；``register_model_raises`` 用于覆盖注册失败被吞的分支。"""
 
-    def __init__(self, *, pressure=False, free_mb=99999, register_model_raises=False,
-                 raise_on_free_mb=False):
+    def __init__(
+        self, *, pressure=False, free_mb=99999, register_model_raises=False, raise_on_free_mb=False
+    ):
         self.monitor = _MonitorStub(pressure)
         self.models = []
         self.handlers = []
@@ -172,12 +189,15 @@ def _patch_engine(monkeypatch, name, engine_cls):
 # 单例
 # ============================================================
 
+
 class TestSingleton:
     """单例与幂等：重复构造不能重复初始化。"""
 
     def test_repeated_construction_returns_same_instance(self, monkeypatch, tts_config):
         calls = []
-        monkeypatch.setattr(te, "get_settings", lambda: calls.append(1) or _SettingsStub(tts_config))
+        monkeypatch.setattr(
+            te, "get_settings", lambda: calls.append(1) or _SettingsStub(tts_config)
+        )
 
         first = te.TTSManager()
         second = te.TTSManager()
@@ -234,6 +254,7 @@ class TestSingleton:
 # device 属性
 # ============================================================
 
+
 class TestDeviceProperty:
     """device getter 的三级回退与 setter 的归一化。"""
 
@@ -273,6 +294,7 @@ class TestDeviceProperty:
 # initialize：provider 分发
 # ============================================================
 
+
 class TestInitialize:
     """7 类 provider 的分发、默认值填充与失败回退。"""
 
@@ -288,12 +310,12 @@ class TestInitialize:
         assert manager.engine is sentinel
         assert "ctor" not in record
 
-    async def test_legacy_tts_engine_overrides_local_provider(
-        self, monkeypatch, tts_config
-    ):
+    async def test_legacy_tts_engine_overrides_local_provider(self, monkeypatch, tts_config):
         """旧配置兼容：provider=local 但 tts_engine=cloud 时走云端分支。"""
         tts_config.provider = "local"
-        monkeypatch.setattr(te, "get_settings", lambda: _SettingsStub(tts_config, tts_engine="cloud"))
+        monkeypatch.setattr(
+            te, "get_settings", lambda: _SettingsStub(tts_config, tts_engine="cloud")
+        )
         record = {}
         _patch_engine(monkeypatch, "CloudTTSEngine", make_engine_cls(record, name="cloud"))
 
@@ -343,7 +365,8 @@ class TestInitialize:
         )
         registered = []
         monkeypatch.setattr(
-            te.TTSManager, "_register_resource_manager_safely",
+            te.TTSManager,
+            "_register_resource_manager_safely",
             lambda self: registered.append(1),
         )
 
@@ -373,7 +396,8 @@ class TestInitialize:
         tts_config.provider = "gpt_sovits"
         monkeypatch.setattr(te, "get_settings", lambda: _SettingsStub(tts_config))
         _patch_engine(
-            monkeypatch, "GPTSoVITSEngine",
+            monkeypatch,
+            "GPTSoVITSEngine",
             make_engine_cls({}, name="gptsovits", fail_init=True),
         )
 
@@ -458,12 +482,14 @@ class TestInitialize:
         mgr = te.TTSManager()
         await mgr.initialize()
 
-        assert record["ctor"] == [{
-            "name": "cloud",
-            "api_key": "sk-1",
-            "base_url": "https://example.com/speech",
-            "model": "my-model",
-        }]
+        assert record["ctor"] == [
+            {
+                "name": "cloud",
+                "api_key": "sk-1",
+                "base_url": "https://example.com/speech",
+                "model": "my-model",
+            }
+        ]
 
     async def test_siliconflow_provider_fills_defaults(self, monkeypatch, tts_config):
         tts_config.provider = "siliconflow"
@@ -534,15 +560,17 @@ class TestInitialize:
         mgr = te.TTSManager()
         await mgr.initialize()
 
-        assert record["ctor"] == [{
-            "name": "volcano",
-            "api_key": "vk",
-            "appid": None,
-            "model": "volcano-model",
-            "voice_map": {"zh_female": "voice-1"},
-            "key_map": {"a": "b"},
-            "resource_id": "volc.megatts.default",
-        }]
+        assert record["ctor"] == [
+            {
+                "name": "volcano",
+                "api_key": "vk",
+                "appid": None,
+                "model": "volcano-model",
+                "voice_map": {"zh_female": "voice-1"},
+                "key_map": {"a": "b"},
+                "resource_id": "volc.megatts.default",
+            }
+        ]
 
     async def test_volcano_appid_falls_back_to_attribute(self, monkeypatch, tts_config):
         """model_extra 里没有 appid 时，回退到配置对象上的 appid 属性。"""
@@ -628,6 +656,7 @@ class TestInitialize:
 # 资源管理器注册
 # ============================================================
 
+
 class TestRegisterResourceManager:
     """注册失败一律降级，不能影响 TTS 主流程。"""
 
@@ -711,6 +740,7 @@ class TestModuleImportGuard:
 # ============================================================
 # 资源压力与设备迁移
 # ============================================================
+
 
 class TestResourcePressure:
     """handle_resource_pressure 只对 release 生效，且不冒泡异常。"""
@@ -942,9 +972,7 @@ class TestEnsureOptimalDevice:
         assert "move_to_gpu" not in record
         assert manager.current_device == "cuda"
 
-    async def test_config_read_failure_falls_back_to_default_threshold(
-        self, manager, monkeypatch
-    ):
+    async def test_config_read_failure_falls_back_to_default_threshold(self, manager, monkeypatch):
         """读阈值失败时按 1200MB 兜底：此时 100MB 空闲仍判定为不足。"""
         record = {}
         manager.engine = make_engine_cls(record, name="e")()
@@ -1022,6 +1050,7 @@ class TestEnsureOptimalDevice:
 # get_engine / synthesize
 # ============================================================
 
+
 class TestGetEngine:
     async def test_returns_engine_after_lazy_initialize(self, monkeypatch, tts_config):
         monkeypatch.setattr(te, "get_settings", lambda: _SettingsStub(tts_config))
@@ -1048,6 +1077,7 @@ class TestSynthesize:
     @pytest.fixture(autouse=True)
     def _no_device_probe(self, monkeypatch):
         """设备迁移另有专测，这里隔离掉以免引入资源管理器依赖。"""
+
         async def _noop(self):
             return None
 
@@ -1082,7 +1112,8 @@ class TestSynthesize:
         )()
         fallback_result = np.full(2, 0.5, dtype=np.float32)
         _patch_engine(
-            monkeypatch, "Qwen3TTSEngine",
+            monkeypatch,
+            "Qwen3TTSEngine",
             make_engine_cls(record, name="qwen3", synth_result=fallback_result),
         )
 
@@ -1125,9 +1156,7 @@ class TestSynthesize:
     async def test_qwen3_connection_error_does_not_retry_itself(self, manager, monkeypatch):
         """当前引擎已经是 Qwen3 时不再自我回退，直接返回空数组。"""
         record = {}
-        qwen_cls = make_engine_cls(
-            record, name="qwen3", synth_exc=RuntimeError("cannot connect")
-        )
+        qwen_cls = make_engine_cls(record, name="qwen3", synth_exc=RuntimeError("cannot connect"))
         manager.initialized = True
         manager.engine = qwen_cls()
         _patch_engine(monkeypatch, "Qwen3TTSEngine", qwen_cls)
@@ -1141,12 +1170,11 @@ class TestSynthesize:
     async def test_non_connection_error_returns_empty_without_fallback(self, manager, monkeypatch):
         record = {}
         manager.initialized = True
-        manager.engine = make_engine_cls(
-            record, name="e", synth_exc=ValueError("文本为空")
-        )()
+        manager.engine = make_engine_cls(record, name="e", synth_exc=ValueError("文本为空"))()
         fallback_calls = []
         _patch_engine(
-            monkeypatch, "Qwen3TTSEngine",
+            monkeypatch,
+            "Qwen3TTSEngine",
             make_engine_cls(record, name="qwen3", fail_init=True),
         )
 
@@ -1194,7 +1222,8 @@ class TestSynthesizeBytes:
             record, name="cloud", bytes_exc=RuntimeError("cannot connect")
         )()
         _patch_engine(
-            monkeypatch, "Qwen3TTSEngine",
+            monkeypatch,
+            "Qwen3TTSEngine",
             make_engine_cls(record, name="qwen3", bytes_result=b"fallback"),
         )
 
@@ -1220,17 +1249,14 @@ class TestSynthesizeBytes:
         assert result is None
         assert isinstance(manager.engine, fallback_cls)
 
-    async def test_connection_error_fallback_failure_restores_engine(
-        self, manager, monkeypatch
-    ):
+    async def test_connection_error_fallback_failure_restores_engine(self, manager, monkeypatch):
         record = {}
-        original = make_engine_cls(
-            record, name="cloud", bytes_exc=RuntimeError("timeout")
-        )()
+        original = make_engine_cls(record, name="cloud", bytes_exc=RuntimeError("timeout"))()
         manager.initialized = True
         manager.engine = original
         _patch_engine(
-            monkeypatch, "Qwen3TTSEngine",
+            monkeypatch,
+            "Qwen3TTSEngine",
             make_engine_cls(record, name="qwen3", fail_init=True),
         )
 
@@ -1242,9 +1268,7 @@ class TestSynthesizeBytes:
     async def test_non_connection_error_returns_none(self, manager, monkeypatch):
         record = {}
         manager.initialized = True
-        manager.engine = make_engine_cls(
-            record, name="e", bytes_exc=ValueError("坏参数")
-        )()
+        manager.engine = make_engine_cls(record, name="e", bytes_exc=ValueError("坏参数"))()
         _patch_engine(monkeypatch, "Qwen3TTSEngine", make_engine_cls(record, name="qwen3"))
 
         assert await manager.synthesize_bytes("你好") is None
@@ -1254,6 +1278,7 @@ class TestSynthesizeBytes:
 # ============================================================
 # shutdown / switch_engine
 # ============================================================
+
 
 class TestShutdown:
     async def test_shuts_down_engine_and_clears_flag(self, manager):
@@ -1340,9 +1365,7 @@ class TestSwitchEngine:
         assert record["shutdown"] == ["old"]
         assert record["initialized"] == ["volcano"]
 
-    async def test_shutdown_failure_during_switch_is_swallowed(
-        self, monkeypatch, tts_config
-    ):
+    async def test_shutdown_failure_during_switch_is_swallowed(self, monkeypatch, tts_config):
         """旧引擎关闭失败不能阻断切换。"""
         tts_config.provider = "qwen3"
         monkeypatch.setattr(te, "get_settings", lambda: _SettingsStub(tts_config))

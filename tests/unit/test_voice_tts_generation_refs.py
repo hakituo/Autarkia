@@ -39,9 +39,7 @@ def _wav_bytes(sr: int = 16000, n: int = 800) -> bytes:
 
 def _settings(cache_dir="cache", auto=False, auto_from_ref=False):
     """假 settings：只保留被测代码实际读取的字段。"""
-    tts = types.SimpleNamespace(
-        auto_prompt_text=auto, auto_prompt_text_from_ref=auto_from_ref
-    )
+    tts = types.SimpleNamespace(auto_prompt_text=auto, auto_prompt_text_from_ref=auto_from_ref)
     return types.SimpleNamespace(
         model=types.SimpleNamespace(cache_dir=cache_dir),
         voice=types.SimpleNamespace(tts=tts),
@@ -62,8 +60,15 @@ class _Engine:
 class _Mgr:
     """假 TTS manager：记录 synthesize_bytes / synthesize 的调用参数。"""
 
-    def __init__(self, bytes_result=None, bytes_exc=None, array_result=None,
-                 array_exc=None, last_error=None, engine=None):
+    def __init__(
+        self,
+        bytes_result=None,
+        bytes_exc=None,
+        array_result=None,
+        array_exc=None,
+        last_error=None,
+        engine=None,
+    ):
         self.engine = engine if engine is not None else _Engine()
         self._bytes = _wav_bytes() if bytes_result is None else bytes_result
         self._bytes_exc = bytes_exc
@@ -99,6 +104,7 @@ def _use_manager(env, mgr, rm=None, rm_exc=None):
 
     env.mp.setattr(cv, "get_tts_manager", _get)
     if rm_exc is not None:
+
         def _boom():
             raise rm_exc
 

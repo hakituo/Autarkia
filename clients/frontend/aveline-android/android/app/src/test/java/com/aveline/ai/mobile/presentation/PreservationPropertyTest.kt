@@ -3,6 +3,7 @@ package com.aveline.ai.mobile.presentation
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.compose.ui.graphics.Color
 import com.aveline.ai.mobile.data.local.preferences.AppPreferences
 import com.aveline.ai.mobile.data.remote.api.WebSocketManager
 import com.aveline.ai.mobile.data.remote.api.WebSocketMessage
@@ -13,7 +14,7 @@ import com.aveline.ai.mobile.domain.repository.PersonaRepository
 import com.aveline.ai.mobile.domain.repository.SessionRepository
 import com.aveline.ai.mobile.domain.repository.ToolsRepository
 import com.aveline.ai.mobile.presentation.chat.ChatViewModel
-import com.aveline.ai.mobile.presentation.utils.EmotionResolver
+import com.aveline.ai.mobile.presentation.theme.EmotionPalette
 import com.aveline.ai.mobile.services.FileUploadManager
 import com.aveline.ai.mobile.services.TTSEngine
 import com.aveline.ai.mobile.services.TTSState
@@ -582,8 +583,8 @@ class PreservationPropertyTest {
      * 
      * **Validates: Requirements 3.5, 3.7**
      * 
-     * This test verifies that EmotionResolver provides colors for all emotions
-     * (even if they're not the correct Web colors - that's tested in bug condition tests)
+     * This test verifies that EmotionPalette provides a glow color for all emotions
+     * (even if they're not the Web 4-color scheme anymore).
      */
     @Test
     fun `preservation - breathing light colors exist for all emotions`() {
@@ -593,16 +594,12 @@ class PreservationPropertyTest {
         )
         
         for (emotion in emotions) {
-            val colors = EmotionResolver.getColorsForEmotion(emotion)
-            
-            assertNotNull(
-                "PRESERVATION: Colors should exist for emotion '$emotion'",
-                colors
-            )
-            
-            assertTrue(
-                "PRESERVATION: Color list should not be empty for emotion '$emotion'",
-                colors.isNotEmpty()
+            val color = EmotionPalette.of(emotion)
+
+            assertNotEquals(
+                "PRESERVATION: Color should exist for emotion '$emotion'",
+                Color.Unspecified,
+                color
             )
         }
     }

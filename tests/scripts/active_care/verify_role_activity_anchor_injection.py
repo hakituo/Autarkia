@@ -6,8 +6,8 @@
 3. decision.py: character_daily 注入从「拦截」改为「话题源」（关键字符串校验）
 
 运行：
-    d:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe ^
-        d:\\AI\\xiaoyou-core\\tests\\scripts\\active_care\\verify_role_activity_anchor_injection.py
+    d:\\AI\\autarkia\\venv_core\\Scripts\\python.exe ^
+        d:\\AI\\autarkia\\tests\\scripts\\active_care\\verify_role_activity_anchor_injection.py
 """
 from __future__ import annotations
 

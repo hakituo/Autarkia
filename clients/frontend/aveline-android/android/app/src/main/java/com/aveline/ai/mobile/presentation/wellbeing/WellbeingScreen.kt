@@ -47,12 +47,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.aveline.ai.mobile.data.remote.dto.AppLimitDto
 import com.aveline.ai.mobile.presentation.components.ModuleHeader
 import com.aveline.ai.mobile.presentation.components.ModuleHeaderActionContainer
-import com.aveline.ai.mobile.presentation.theme.CardBackground
-import com.aveline.ai.mobile.presentation.theme.CardBorder
-import com.aveline.ai.mobile.presentation.theme.EmotionGreen
-import com.aveline.ai.mobile.presentation.theme.EmotionRed
-import com.aveline.ai.mobile.presentation.theme.EmotionYellow
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Line
+import com.aveline.ai.mobile.presentation.theme.Accent
+import com.aveline.ai.mobile.presentation.theme.Danger
+import com.aveline.ai.mobile.presentation.theme.StatusConnecting
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
@@ -149,7 +147,7 @@ fun WellbeingScreen(
                 item {
                     Text(
                         text = msg,
-                        color = EmotionGreen,
+                        color = Accent,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
@@ -159,7 +157,7 @@ fun WellbeingScreen(
                 item {
                     Text(
                         text = err,
-                        color = EmotionRed,
+                        color = Danger,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
@@ -203,17 +201,17 @@ private fun EnforcementStatusCard(
     val (message, color, action) = when {
         !hasUsageStatsPermission -> Triple(
             "未授权使用情况访问，当前无法统计和执行限额。点此授权",
-            EmotionRed,
+            Danger,
             onOpenUsageStats
         )
         !hasAccessibilityService -> Triple(
             "计时已就绪；开启无障碍后可实时拦截，单次限额精确到秒",
-            EmotionYellow,
+            StatusConnecting,
             onOpenAccessibility
         )
         else -> Triple(
             "实时拦截已就绪：每日额度用完或单次时间到，应用会被立即退回桌面",
-            EmotionGreen,
+            Accent,
             {}
         )
     }
@@ -261,8 +259,8 @@ private fun AppLimitCard(
     Card(
         onClick = onEdit,
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
-        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Line),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
@@ -288,13 +286,13 @@ private fun AppLimitCard(
                     )
                 }
                 when {
-                    dailyExceeded -> StatusChip("今日已用完", EmotionRed)
+                    dailyExceeded -> StatusChip("今日已用完", Danger)
                     limit.blockReason == "cooldown" -> StatusChip(
                         "休息中 · 还需 ${formatDuration(remainingMs(limit))}",
-                        EmotionYellow
+                        StatusConnecting
                     )
-                    sessionExceeded -> StatusChip("本次时间到", EmotionYellow)
-                    limit.ratio >= 1.0 -> StatusChip("已超限", EmotionRed)
+                    sessionExceeded -> StatusChip("本次时间到", StatusConnecting)
+                    limit.ratio >= 1.0 -> StatusChip("已超限", Danger)
                 }
                 IconButton(onClick = onRemove) {
                     Icon(
@@ -330,12 +328,12 @@ private fun AppLimitCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "无每日限制",
-                    color = EmotionGreen,
+                    color = Accent,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(EmotionGreen.copy(alpha = 0.15f))
+                        .background(Accent.copy(alpha = 0.15f))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
             }
@@ -449,9 +447,9 @@ private fun SummaryLine(label: String, value: String? = null) {
 
 /** 进度条颜色: 绿(正常) → 黄(接近上限) → 红(超限)。 */
 private fun progressColor(ratio: Double): Color = when {
-    ratio >= 1.0 -> EmotionRed
-    ratio >= 0.8 -> EmotionYellow
-    else -> EmotionGreen
+    ratio >= 1.0 -> Danger
+    ratio >= 0.8 -> StatusConnecting
+    else -> Accent
 }
 
 /** 冷却剩余时长 (毫秒)。 */
@@ -481,11 +479,11 @@ private fun EmptyLimitHint(onAdd: () -> Unit) {
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
-                .background(Primary.copy(alpha = 0.15f))
+                .background(Accent.copy(alpha = 0.15f))
                 .clickable(onClick = onAdd)
                 .padding(horizontal = 20.dp, vertical = 10.dp)
         ) {
-            Text(text = "添加限额", color = Primary)
+            Text(text = "添加限额", color = Accent)
         }
     }
 }

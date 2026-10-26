@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-验证 Active Care 统一走 DeepSeek flash + ACTIVECARE 专用 key
+验证 Active Care 统一走 MiniMax M Plan 的 M3.1 Flash
 
 检查点：
-1. active_care_models 全部指向 cloud:deepseek:activecare:deepseek-v4-flash
+1. active_care_models 全部指向 cloud:minimax:plan:MiniMax-M3.1-Flash
 2. 不再配置 Active Care 二次回退
 3. 配置访问层能识别全部 Active Care 主模型，且按角色解析到同一路由
-4. .env 里存在 DEEPSEEK_API_KEY_ACTIVECARE（别名 activecare 能被工厂注册）
+4. .env 里存在 MINIMAX_PLAN_API_KEY（别名 plan 能被工厂注册）
 
 用法：
     venv_cpu\\Scripts\\python.exe tests\\scripts\\llm\\verify_active_care_model_config.py
@@ -37,7 +37,7 @@ def check() -> int:
         failures += 1
         _out(msg)
 
-    expected = "cloud:deepseek:activecare:deepseek-v4-flash"
+    expected = "cloud:minimax:plan:MiniMax-M3.1-Flash"
 
     # 1. 读取 model_routing.yaml，定位 active_care_models 区段
     yaml_text = Path(ROOT, "config", "yaml", "sections", "model_routing.yaml").read_text(
@@ -102,19 +102,19 @@ def check() -> int:
         load_dotenv(ROOT / ".env")
     except Exception:  # noqa: BLE001 - 缺依赖时退回进程环境变量
         pass
-    if not os.getenv("DEEPSEEK_API_KEY_ACTIVECARE"):
-        _fail("缺少环境变量 DEEPSEEK_API_KEY_ACTIVECARE（会回退到 DEEPSEEK_API_KEY）")
+    if not os.getenv("MINIMAX_PLAN_API_KEY"):
+        _fail("缺少环境变量 MINIMAX_PLAN_API_KEY（M Plan 订阅 Key 未配置）")
     else:
         from config.integrated_config import get_settings
 
         alias = expected.split(":")[2]
-        keys = get_settings().model.cloud_provider_keys.get("deepseek", {})
+        keys = get_settings().model.cloud_provider_keys.get("minimax", {})
         if alias not in keys:
             _fail(f"别名 {alias!r} 未注册（现有: {sorted(keys)}），路由会回退到 default key")
-        elif keys[alias].api_key != os.getenv("DEEPSEEK_API_KEY_ACTIVECARE"):
-            _fail(f"别名 {alias!r} 的 api_key 与 DEEPSEEK_API_KEY_ACTIVECARE 不一致")
+        elif keys[alias].api_key != os.getenv("MINIMAX_PLAN_API_KEY"):
+            _fail(f"别名 {alias!r} 的 api_key 与 MINIMAX_PLAN_API_KEY 不一致")
         else:
-            _out(f"[OK] DEEPSEEK_API_KEY_ACTIVECARE 已注册为别名 {alias}")
+            _out(f"[OK] MINIMAX_PLAN_API_KEY 已注册为别名 {alias}")
 
     if failures:
         _out(f"汇总: {failures} 项检查失败")

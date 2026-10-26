@@ -22,11 +22,18 @@ object ChatTextProcessor {
      * 智能分段：剥时间戳 → 按 Markdown 结构分组 → 括号内标成撤回段、括号外按断句规则切分。
      *
      * @param text 原始文本
+     * @param stageDirectionEnabled 设置页「动作描写」开关；false 时不识别括号，全部按正文返回
      * @return 分段列表，空文本返回空列表
      */
-    fun smartSegmentText(text: String): List<TextSegment> {
+    fun smartSegmentText(
+        text: String,
+        stageDirectionEnabled: Boolean = true
+    ): List<TextSegment> {
         if (text.isBlank()) return emptyList()
-        return ReplySegmenter.segment(text).map { segment ->
+        return ReplySegmenter.segment(
+            text = text,
+            stageDirectionEnabled = stageDirectionEnabled
+        ).map { segment ->
             TextSegment(segment.text, segment.isStageDirection)
         }
     }

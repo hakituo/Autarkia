@@ -37,13 +37,15 @@ def _fail(msg: str):
     sys.exit(1)
 
 
-# ---------- 测试 1：连续随机选图，最近 LRU_SIZE 次内不重复 ----------
+# ---------- 测试 1：同一分类连续选图，最近 LRU_SIZE 次内不重复 ----------
+# 注意：纯随机 [MEME] 已废弃，选图必须指定分类名或画面描述，这里用真实分类验证 LRU。
+_CAT = media_tags.list_normal_meme_categories()[0]
 reset_recent_history()
 draws: list[str] = []
 for _ in range(_MEME_LRU_SIZE + 5):
-    p = pick_meme_image("random")
+    p = pick_meme_image(_CAT)
     if p is None:
-        _fail("random 选图返回 None，目录可能为空")
+        _fail(f"{_CAT} 选图返回 None，目录可能为空")
     draws.append(str(p))
 
 # 检查任意连续 _MEME_LRU_SIZE 张内没有重复
@@ -51,7 +53,7 @@ for i in range(len(draws)):
     window = draws[i : i + _MEME_LRU_SIZE]
     if len(set(window)) != len(window):
         _fail(f"LRU 窗口内出现重复: index={i}, window={window}")
-_ok(f"random 连续 {len(draws)} 次，LRU 窗口内无重复")
+_ok(f"{_CAT} 连续 {len(draws)} 次，LRU 窗口内无重复")
 
 
 # ---------- 测试 2：不同 category 共享 LRU ----------
@@ -120,7 +122,7 @@ if len(media_tags._recent_img_paths) != 0:
     _fail(f"reset 后 img LRU 非空: {list(media_tags._recent_img_paths)}")
 # 填充后再 reset，验证能完全清空
 for _ in range(3):
-    pick_meme_image("random")
+    pick_meme_image(_CAT)
 pick_gallery_images(2)
 if len(media_tags._recent_meme_paths) != 3 or len(media_tags._recent_img_paths) != 2:
     _fail("填充后 LRU 长度异常")
@@ -130,16 +132,14 @@ if len(media_tags._recent_meme_paths) != 0 or len(media_tags._recent_img_paths) 
 _ok("reset_recent_history 清空 meme + img LRU（含填充后场景）")
 
 
-# ---------- 测试 6：不存在的分类 fallback 到 random ----------
+# ---------- 测试 6：空值与 random 不做随机兜底 ----------
 reset_recent_history()
-# LLM 幻觉的不存在分类应 fallback 到全随机，不返回 None
-for cat in ("anime/白眼", "不存在的分类", "reality/假分类", "幻觉"):
+# 纯随机 [MEME] 已废弃：未指定分类名或画面描述时必须返回 None，不能偷偷发一张随机图
+for cat in ("", "   ", "random", "RANDOM"):
     p = pick_meme_image(cat)
-    if p is None:
-        _fail(f"分类 {cat!r} fallback 失败，返回 None")
-    elif not p.exists():
-        _fail(f"分类 {cat!r} fallback 返回不存在的文件: {p}")
-_ok("不存在分类（anime/白眼 等）fallback 到 random，不返回 None")
+    if p is not None:
+        _fail(f"分类 {cat!r} 应返回 None（不支持随机兜底），实际: {p}")
+_ok("空值 / random 均返回 None，不做随机兜底")
 
 
 print(f"\n全部 {_passed} 项验证通过")

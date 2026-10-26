@@ -95,6 +95,7 @@ async def handle_conversation(
                 save_history=save_history,
                 user_name=user_name,
                 length_preference=length_preference,
+                message_id=message_id,
             )
 
             effective_voice_id = requested_voice_id

@@ -98,7 +98,7 @@ class StudySummaryGenerator:
             if not isinstance(data, dict):
                 raise ValueError("LLM returned non-JSON")
             data["generated_at"] = get_current_time().isoformat()
-            data["source"] = "xiaoyou_study_summary"
+            data["source"] = "autarkia_study_summary"
         except Exception as e:
             logger.error(f"[Study Summary] 生成失败: {e}")
             data = {
@@ -117,7 +117,7 @@ class StudySummaryGenerator:
                 "emotional_state": "unknown",
                 "confidence_level": 5,
                 "generated_at": get_current_time().isoformat(),
-                "source": "xiaoyou_study_summary",
+                "source": "autarkia_study_summary",
                 "error": str(e),
             }
 

@@ -3,6 +3,9 @@ import json
 import pytest
 
 from core.agents.chat_agent_components.context_persona import select_message_tools
+from core.agents.chat_agent_components.streaming_pipeline.dynamic_context import (
+    FOOD_IMAGE_AUTO_RECORD_INSTRUCTION,
+)
 from core.services.health_sync import store
 from core.tools.nutrition_log_tool import RecordNutritionFromImageTool
 
@@ -14,6 +17,15 @@ def test_food_image_route_selects_nutrition_writer():
     )
 
     assert "record_nutrition_from_image" in selected
+
+
+def test_food_image_instruction_requires_food_confirmation():
+    """图片指令必须先要求判断是不是食物，再谈记录。"""
+    assert "确认是食物" in FOOD_IMAGE_AUTO_RECORD_INSTRUCTION
+    assert "image_is_food=true" in FOOD_IMAGE_AUTO_RECORD_INSTRUCTION
+    assert FOOD_IMAGE_AUTO_RECORD_INSTRUCTION.index("先判断") < (
+        FOOD_IMAGE_AUTO_RECORD_INSTRUCTION.index("record_nutrition_from_image")
+    )
 
 
 def _patch_nutrition_clock(monkeypatch, tmp_path):
@@ -90,16 +102,23 @@ def test_append_daily_nutrition_entries_preserves_other_sources(monkeypatch, tmp
     assert daily["water_intake_entries"] == [existing_water_entry]
 
 
-@pytest.mark.asyncio
-async def test_photo_nutrition_tool_marks_estimates_and_appends_timeline(monkeypatch):
+def _patch_tool_store(monkeypatch):
     recorded = []
     events = []
-    monkeypatch.setattr(store, "append_daily_nutrition_entries", lambda entries: recorded.extend(entries) or entries)
+    monkeypatch.setattr(
+        store, "append_daily_nutrition_entries", lambda entries: recorded.extend(entries) or entries
+    )
     monkeypatch.setattr(
         store,
         "append_manual_event",
         lambda event_type, **fields: events.append({"type": event_type, **fields}),
     )
+    return recorded, events
+
+
+@pytest.mark.asyncio
+async def test_photo_nutrition_tool_marks_estimates_and_appends_timeline(monkeypatch):
+    recorded, events = _patch_tool_store(monkeypatch)
     food = {
         "title": "鸡肉饭",
         "portion": "一份",
@@ -109,7 +128,7 @@ async def test_photo_nutrition_tool_marks_estimates_and_appends_timeline(monkeyp
         "confidence": "medium",
     }
 
-    result = await RecordNutritionFromImageTool()._run([food], meal_type="午餐")
+    result = await RecordNutritionFromImageTool()._run([food], meal_type="午餐", image_is_food=True)
 
     assert len(recorded) == 1
     assert recorded[0]["source"] == "ai_photo_estimate"
@@ -118,6 +137,48 @@ async def test_photo_nutrition_tool_marks_estimates_and_appends_timeline(monkeyp
     assert "估算值仅供参考" in result
     assert events[0]["type"] == "meal"
     assert events[0]["foods"] == ["鸡肉饭"]
+
+
+@pytest.mark.asyncio
+async def test_photo_nutrition_tool_writes_nothing_without_food_confirmation(monkeypatch):
+    """模型没确认「图片里是食物」时一律不落盘。"""
+    recorded, events = _patch_tool_store(monkeypatch)
+    food = {"title": "鸡肉饭", "portion": "一份", "calories": 620}
+
+    result = await RecordNutritionFromImageTool()._run([food], meal_type="午餐")
+
+    assert recorded == []
+    assert events == []
+    assert "未记录" in result
+
+
+@pytest.mark.asyncio
+async def test_photo_nutrition_tool_drops_non_food_entries(monkeypatch):
+    """图片描述当菜名 / 没有营养信息的条目被丢弃，正常食物照常写入。"""
+    recorded, events = _patch_tool_store(monkeypatch)
+    foods = [
+        {"title": "用户私密部位照片", "portion": "一张特写照片", "calories": 0},
+        {"title": "桌上的东西", "portion": "看不出份量", "calories": 0},
+        {"title": "鸡肉饭", "portion": "一份", "calories": 620, "protein": 32},
+    ]
+
+    result = await RecordNutritionFromImageTool()._run(foods, image_is_food=True)
+
+    assert [item["title"] for item in recorded] == ["鸡肉饭"]
+    assert events[0]["foods"] == ["鸡肉饭"]
+    assert "另有2项无法确认为食物" in result
+
+
+@pytest.mark.asyncio
+async def test_photo_nutrition_tool_writes_nothing_when_all_entries_rejected(monkeypatch):
+    recorded, events = _patch_tool_store(monkeypatch)
+    foods = [{"title": "聊天截图", "portion": "一张截图", "calories": 0}]
+
+    result = await RecordNutritionFromImageTool()._run(foods, image_is_food=True)
+
+    assert recorded == []
+    assert events == []
+    assert "未记录" in result
 
 
 def test_id_keyed_photo_entry_does_not_collide_with_samsung_entry():
@@ -133,8 +194,6 @@ def test_id_keyed_photo_entry_does_not_collide_with_samsung_entry():
     }
     samsung_entry = {**shared_fields, "calories": 180.0}
 
-    merged = store._merge_entries(
-        [photo_entry], [samsung_entry], keys=("time", "title")
-    )
+    merged = store._merge_entries([photo_entry], [samsung_entry], keys=("time", "title"))
 
     assert merged == [photo_entry, samsung_entry]

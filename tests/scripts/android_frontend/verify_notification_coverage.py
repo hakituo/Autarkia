@@ -14,7 +14,7 @@
 4. notification 分支解析后端的 target / session_id，深链不再只能靠启发式；
 5. 相关文件没有未使用 import。
 
-运行：d:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe tests/scripts/android_frontend/verify_notification_coverage.py
+运行：d:\\AI\\autarkia\\venv_core\\Scripts\\python.exe tests/scripts/android_frontend/verify_notification_coverage.py
 """
 
 import re

@@ -484,7 +484,9 @@ async def handle_message(
                 # 回滚/重生成分支下的聊天记录检索边界（仅在带 history_override 时生效）。
                 history_branch_token = (
                     set_chat_history_branch_scope(
-                        history_branch_ids, history_branch_not_after
+                        history_branch_ids,
+                        history_branch_not_after,
+                        conversation_id=normalized_conversation_id,
                     )
                     if history_override is not None
                     else None

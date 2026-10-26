@@ -167,9 +167,11 @@ class ShopRepositoryImpl @Inject constructor(
                 val effectText = if (!effects.isNullOrEmpty()) {
                     effects.entries.joinToString(", ") { "${it.key}+${it.value.toInt()}" }
                 } else ""
-                Result.success(response.message ?: "使用成功" + if (effectText.isNotEmpty()) " ($effectText)" else "")
+                val baseMessage = response.message ?: "使用成功"
+                Result.success(if (effectText.isEmpty()) baseMessage else "$baseMessage ($effectText)")
             } else {
-                Result.success(response.message ?: "使用失败")
+                // 业务失败要和网络失败走同一条分支，库存页才能显示红色提示
+                Result.failure(IllegalStateException(response.message ?: "使用失败"))
             }
         } catch (e: Exception) {
             Result.failure(e)

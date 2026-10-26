@@ -7,6 +7,7 @@
 **绝不加载真实模型**：``torch`` / ``faster_qwen3_tts`` / ``qwen_tts`` 一律以替身注入
 ``sys.modules``；不下载权重、不使用 GPU、不发起网络请求，文件 IO 落在 ``tmp_path``。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -33,10 +34,10 @@ class _RecordingLogger:
     def _bind(level):
         def _log(self, msg, *args, **kwargs):
             self.records.append((level, msg))
+
         return _log
 
-    debug, info, warning, error = (_bind("debug"), _bind("info"),
-                                   _bind("warning"), _bind("error"))
+    debug, info, warning, error = (_bind("debug"), _bind("info"), _bind("warning"), _bind("error"))
 
 
 class _SettingsStub:
@@ -56,8 +57,14 @@ class _RMStub:
         self.handlers.append(args)
 
 
-def _install_torch(monkeypatch, *, available=True, name="NVIDIA GeForce RTX 4090",
-                   capability=(8, 9), with_ipc_collect=True):
+def _install_torch(
+    monkeypatch,
+    *,
+    available=True,
+    name="NVIDIA GeForce RTX 4090",
+    capability=(8, 9),
+    with_ipc_collect=True,
+):
     """注入假 torch；返回 (empty_cache 调用记录, ipc_collect 调用记录)。"""
     empty, ipc = [], []
     cuda = types.SimpleNamespace(
@@ -68,8 +75,11 @@ def _install_torch(monkeypatch, *, available=True, name="NVIDIA GeForce RTX 4090
     )
     if with_ipc_collect:
         cuda.ipc_collect = lambda: ipc.append(1)
-    monkeypatch.setitem(sys.modules, "torch", types.SimpleNamespace(
-        cuda=cuda, bfloat16="bf16", float16="fp16", float32="fp32"))
+    monkeypatch.setitem(
+        sys.modules,
+        "torch",
+        types.SimpleNamespace(cuda=cuda, bfloat16="bf16", float16="fp16", float32="fp32"),
+    )
     return empty, ipc
 
 
@@ -116,8 +126,9 @@ def _install_qwen_tts(monkeypatch, *, exc=None):
 
 
 def _patch_config(monkeypatch, *, model="", model_dir="models", reference_audio=None):
-    monkeypatch.setattr(mod, "get_settings", lambda: _SettingsStub(
-        model=model, reference_audio=reference_audio))
+    monkeypatch.setattr(
+        mod, "get_settings", lambda: _SettingsStub(model=model, reference_audio=reference_audio)
+    )
     monkeypatch.setattr(mod, "get_config", lambda *a, **kw: model_dir)
 
 
@@ -205,8 +216,7 @@ class TestSpawnBatchTask:
 
 class TestResolveModelPath:
     def _patch(self, monkeypatch, tmp_path, *, model_hint="", model_dir="models"):
-        monkeypatch.setattr(mod, "get_settings",
-                            lambda: _SettingsStub(model=model_hint))
+        monkeypatch.setattr(mod, "get_settings", lambda: _SettingsStub(model=model_hint))
         monkeypatch.setattr(mod, "get_config", lambda *a, **kw: model_dir)
         monkeypatch.setattr(mod, "get_project_root", lambda: tmp_path)
 
@@ -236,19 +246,19 @@ class TestResolveModelPath:
         assert engine._resolve_model_path() == (str(target), True)
 
     @pytest.mark.parametrize("subdir", [(), ("models",), ("models", "tts")])
-    def test_hint_relative_found_at_various_depths(self, engine, monkeypatch, tmp_path,
-                                                   subdir):
+    def test_hint_relative_found_at_various_depths(self, engine, monkeypatch, tmp_path, subdir):
         target = tmp_path.joinpath(*subdir) / "myhint"
         target.mkdir(parents=True)
         self._patch(monkeypatch, tmp_path, model_hint="myhint")
         assert engine._resolve_model_path() == (str(target), True)
 
     @pytest.mark.parametrize("hint", ["", "default", "gpt_sovits", "qwen3", "QWEN3"])
-    def test_ignored_hint_values_use_default_candidates(self, engine, monkeypatch,
-                                                        tmp_path, hint):
+    def test_ignored_hint_values_use_default_candidates(self, engine, monkeypatch, tmp_path, hint):
         self._patch(monkeypatch, tmp_path, model_hint=hint)
         assert engine._resolve_model_path() == (
-            os.path.join(str(tmp_path), "models", "Qwen3-TTS-12Hz-0.6B-Base"), False)
+            os.path.join(str(tmp_path), "models", "Qwen3-TTS-12Hz-0.6B-Base"),
+            False,
+        )
 
     def test_default_candidate_found(self, engine, monkeypatch, tmp_path):
         target = tmp_path / "models" / "Qwen3-TTS-12Hz-0.6B-Base"
@@ -257,8 +267,7 @@ class TestResolveModelPath:
         assert engine._resolve_model_path() == (str(target), True)
 
     @pytest.mark.parametrize("model_dir", ["", None])
-    def test_empty_model_dir_falls_back_to_models(self, engine, monkeypatch, tmp_path,
-                                                  model_dir):
+    def test_empty_model_dir_falls_back_to_models(self, engine, monkeypatch, tmp_path, model_dir):
         target = tmp_path / "models" / "Qwen3-TTS"
         target.mkdir(parents=True)
         self._patch(monkeypatch, tmp_path, model_dir=model_dir)
@@ -284,8 +293,9 @@ class TestInitialize:
         rec = _RecordingLogger()
         monkeypatch.setattr(mod, "logger", rec)
         _patch_config(monkeypatch)
-        monkeypatch.setattr(engine, "_resolve_model_path",
-                            lambda: (str(tmp_path / "missing"), False))
+        monkeypatch.setattr(
+            engine, "_resolve_model_path", lambda: (str(tmp_path / "missing"), False)
+        )
         monkeypatch.setattr(mod, "_ensure_sox_mock", lambda: None)
         monkeypatch.setattr(mod, "get_resource_manager", None)
         _install_torch(monkeypatch, available=False)
@@ -293,16 +303,20 @@ class TestInitialize:
         await engine.initialize()
         assert any("model path not found" in m for m in rec.messages("warning"))
 
-    @pytest.mark.parametrize("name,capability,expected", [
-        ("NVIDIA GeForce RTX 5090", (10, 0), "Blackwell"),
-        ("NVIDIA H100", (9, 0), "Hopper"),
-        ("NVIDIA GeForce RTX 4090", (8, 9), "Ada Lovelace"),
-        ("NVIDIA GeForce RTX 4060", (8, 6), "Ada Lovelace"),
-        ("NVIDIA A100", (8, 0), "Ampere"),
-        ("NVIDIA T4", (7, 5), "Unknown"),
-    ])
-    async def test_faster_path_arch_detection(self, engine, prepared, monkeypatch,
-                                              name, capability, expected):
+    @pytest.mark.parametrize(
+        "name,capability,expected",
+        [
+            ("NVIDIA GeForce RTX 5090", (10, 0), "Blackwell"),
+            ("NVIDIA H100", (9, 0), "Hopper"),
+            ("NVIDIA GeForce RTX 4090", (8, 9), "Ada Lovelace"),
+            ("NVIDIA GeForce RTX 4060", (8, 6), "Ada Lovelace"),
+            ("NVIDIA A100", (8, 0), "Ampere"),
+            ("NVIDIA T4", (7, 5), "Unknown"),
+        ],
+    )
+    async def test_faster_path_arch_detection(
+        self, engine, prepared, monkeypatch, name, capability, expected
+    ):
         rec = _RecordingLogger()
         monkeypatch.setattr(mod, "logger", rec)
         monkeypatch.setattr(mod, "get_resource_manager", None)
@@ -317,16 +331,13 @@ class TestInitialize:
     async def test_registers_with_resource_manager(self, engine, prepared, monkeypatch):
         rm = _RMStub()
         monkeypatch.setattr(mod, "get_resource_manager", lambda: rm)
-        monkeypatch.setattr(mod, "ResourcePriority",
-                            types.SimpleNamespace(MEDIUM="medium"))
+        monkeypatch.setattr(mod, "ResourcePriority", types.SimpleNamespace(MEDIUM="medium"))
         _install_torch(monkeypatch)
         _install_faster(monkeypatch)
         await engine.initialize()
-        assert rm.handlers == [
-            ("gpu_memory", "medium", engine.handle_resource_pressure)]
+        assert rm.handlers == [("gpu_memory", "medium", engine.handle_resource_pressure)]
 
-    async def test_fallback_to_original_model_on_cuda(self, engine, prepared,
-                                                      monkeypatch):
+    async def test_fallback_to_original_model_on_cuda(self, engine, prepared, monkeypatch):
         rec = _RecordingLogger()
         monkeypatch.setattr(mod, "logger", rec)
         monkeypatch.setattr(mod, "get_resource_manager", None)
@@ -336,21 +347,25 @@ class TestInitialize:
         await engine.initialize()
         assert engine.current_device == "cuda"
         assert qwen_calls[0][1] == {
-            "device_map": "cuda:0", "dtype": "bf16", "attn_implementation": "sdpa"}
+            "device_map": "cuda:0",
+            "dtype": "bf16",
+            "attn_implementation": "sdpa",
+        }
         assert any("FasterQwen3-TTS不可用" in m for m in rec.messages("warning"))
 
-    async def test_fallback_to_original_model_on_cpu(self, engine, prepared,
-                                                     monkeypatch):
+    async def test_fallback_to_original_model_on_cpu(self, engine, prepared, monkeypatch):
         monkeypatch.setattr(mod, "get_resource_manager", None)
         _install_torch(monkeypatch, available=False)
         qwen_calls = _install_qwen_tts(monkeypatch)
         await engine.initialize()
         assert engine.current_device == "cpu"
         assert qwen_calls[0][1] == {
-            "device_map": "cpu", "dtype": "fp32", "attn_implementation": "sdpa"}
+            "device_map": "cpu",
+            "dtype": "fp32",
+            "attn_implementation": "sdpa",
+        }
 
-    async def test_all_loads_fail_cleans_up_and_raises(self, engine, prepared,
-                                                       monkeypatch):
+    async def test_all_loads_fail_cleans_up_and_raises(self, engine, prepared, monkeypatch):
         rec = _RecordingLogger()
         monkeypatch.setattr(mod, "logger", rec)
         monkeypatch.setattr(mod, "get_resource_manager", None)
@@ -363,11 +378,9 @@ class TestInitialize:
         assert (empty, ipc) == ([1], [1])
         assert any("所有TTS模型加载均失败" in m for m in rec.messages("error"))
 
-    async def test_all_loads_fail_without_cuda_skips_cleanup(self, engine, prepared,
-                                                             monkeypatch):
+    async def test_all_loads_fail_without_cuda_skips_cleanup(self, engine, prepared, monkeypatch):
         monkeypatch.setattr(mod, "get_resource_manager", None)
-        empty, ipc = _install_torch(monkeypatch, available=False,
-                                    with_ipc_collect=False)
+        empty, ipc = _install_torch(monkeypatch, available=False, with_ipc_collect=False)
         _install_qwen_tts(monkeypatch, exc=RuntimeError("qwen boom"))
         with pytest.raises(RuntimeError, match="qwen boom"):
             await engine.initialize()
@@ -391,8 +404,10 @@ class TestHandleResourcePressure:
         await engine.handle_resource_pressure("release")
         assert moved == [1]
 
-    @pytest.mark.parametrize("action,device,generating", [
-        ("release", "cpu", False), ("release", "cuda", True), ("recover", "cuda", False)])
+    @pytest.mark.parametrize(
+        "action,device,generating",
+        [("release", "cpu", False), ("release", "cuda", True), ("recover", "cuda", False)],
+    )
     async def test_noop_cases(self, engine, moved, action, device, generating):
         engine.current_device, engine._is_generating = device, generating
         await engine.handle_resource_pressure(action)
@@ -405,8 +420,7 @@ class TestMoveDevice:
         assert await engine.move_to_cpu() is True
 
     @pytest.mark.parametrize("available,expect_empty", [(True, [1]), (False, [])])
-    async def test_move_to_cpu_reload(self, engine, monkeypatch, tmp_path, available,
-                                      expect_empty):
+    async def test_move_to_cpu_reload(self, engine, monkeypatch, tmp_path, available, expect_empty):
         rec = _RecordingLogger()
         monkeypatch.setattr(mod, "logger", rec)
         engine.current_device, engine.model_path = "cuda", str(tmp_path)
@@ -415,8 +429,9 @@ class TestMoveDevice:
         assert await engine.move_to_cpu() is True
         assert engine.current_device == "cpu"
         assert empty == expect_empty
-        assert qwen_calls == [(str(tmp_path), {
-            "device_map": "cpu", "dtype": "fp32", "attn_implementation": "sdpa"})]
+        assert qwen_calls == [
+            (str(tmp_path), {"device_map": "cpu", "dtype": "fp32", "attn_implementation": "sdpa"})
+        ]
         assert any("不支持CPU模式" in m for m in rec.messages("info"))
 
     async def test_move_to_gpu_early_returns(self, engine, monkeypatch):
@@ -476,7 +491,8 @@ def _load_probe(monkeypatch, blocked_names):
 
     monkeypatch.setattr(builtins, "__import__", _blocked)
     spec = importlib.util.spec_from_file_location(
-        "_qwen3_tts_engine_import_probe", Path(mod.__file__))
+        "_qwen3_tts_engine_import_probe", Path(mod.__file__)
+    )
     probe = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(probe)
     return probe

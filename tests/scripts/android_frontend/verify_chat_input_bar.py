@@ -9,10 +9,11 @@
   `windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))`
   （原 imePadding + navigationBarsPadding 叠加会在三键导航下多留一条导航栏高度的空隙）；
 - ChatBottomBar / ChatMediaPickers / ChatScreen 收敛为只有相册入口；
-- ChatScreen 在整页 imePadding() **之前**读取键盘可见性，键盘弹出时滚动到最新消息
-  （子层读会被外层 imePadding 消费成 false，滚动会静默失效）。
+- ChatScreen 在整页 imePadding() **之前**读取键盘高度，把键盘可见性下发给消息列表；
+- ChatMessageList 在键盘可见期间**无条件**贴住最新消息（用户翻着历史点输入框也要被顶到底，
+  旧实现只在 followLatest 时才跟随，键盘弹出后末尾几条会被裁掉）。
 
-运行：d:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe tests/scripts/android_frontend/verify_chat_input_bar.py
+运行：d:\\AI\\autarkia\\venv_core\\Scripts\\python.exe tests/scripts/android_frontend/verify_chat_input_bar.py
 """
 
 import re
@@ -27,6 +28,7 @@ CHAT_INPUT_BARS = CHAT_DIR / "ChatInputBars.kt"
 CHAT_SCREEN = CHAT_DIR / "ChatScreen.kt"
 CHAT_MEDIA_PICKERS = CHAT_DIR / "ChatMediaPickers.kt"
 CHAT_MESSAGE_LIST = CHAT_DIR / "ChatMessageList.kt"
+CHAT_CONTENT_AREA = CHAT_DIR / "ChatContentArea.kt"
 
 IMPORT_RE = re.compile(r"^import\s+([\w.]+)(?:\s+as\s+(\w+))?\s*$")
 # Kotlin 属性委托（`val x by y`）会隐式调用 getValue/setValue，正文里搜不到名字，不算未使用
@@ -75,6 +77,7 @@ def main() -> int:
     chat_screen = CHAT_SCREEN.read_text(encoding="utf-8")
     media_pickers = CHAT_MEDIA_PICKERS.read_text(encoding="utf-8")
     message_list = CHAT_MESSAGE_LIST.read_text(encoding="utf-8")
+    content_area = CHAT_CONTENT_AREA.read_text(encoding="utf-8")
 
     # 1. 录像入口彻底下线
     results.append(
@@ -105,8 +108,9 @@ def main() -> int:
     )
     results.append(
         _check(
-            "onAttach = { mediaPickers.pickImage() }" in chat_screen,
-            "ChatScreen 把\"+\"接到打开相册",
+            "onToggleMore = toggleMorePanel" in chat_screen
+            and "mediaPickers.pickImages()" in chat_screen,
+            "ChatScreen 的\"+\"打开更多面板，面板内再接相册多选",
         )
     )
 
@@ -126,39 +130,61 @@ def main() -> int:
     )
 
     # 3b. 整页必须在键盘上方重新布局（只给输入栏加 padding 不够：列表不会缩短，最后几条被遮挡）
+    # 2026-10-23：根容器改为 BoxWithConstraints，按聊天页真实占用宽度算伴侣面板手势阈值
+    #（平板双栏下不是整屏宽）。imePadding 仍在整页根容器上，行为不变。
     results.append(
         _check(
-            "    Box(\n        modifier = Modifier\n            .fillMaxSize()\n            .imePadding()\n    ) {"
+            "    BoxWithConstraints(\n        modifier = Modifier\n            .fillMaxSize()\n            .imePadding()\n    ) {"
             in chat_screen,
             "ChatScreen 整页 imePadding（微信式把聊天页顶起来，列表随之缩短）",
         )
     )
 
     # 4. 键盘弹出时贴住最新消息
-    # 判断必须在整页 imePadding() 之前读取：imePadding 会消费 ime insets，
-    # 子树里的 WindowInsets.isImeVisible 恒为 false，滚动逻辑会静默失效。
+    # 键盘可见性只在 ChatScreen 根层（整页 imePadding 之前）读一次，再逐层下发给消息列表：
+    # 列表自己读 insets 拿不到与本次键盘动画同步的那一份值。
     results.append(
         _check(
-            "WindowInsets.isImeVisible" in chat_screen,
-            "ChatScreen 在 imePadding() 之前读取键盘可见性",
+            "val currentImeHeightPx = WindowInsets.ime.getBottom(density)" in chat_screen,
+            "ChatScreen 在 imePadding() 之前读取键盘高度",
         )
     )
     results.append(
         _check(
-            "WindowInsets.isImeVisible" not in message_list,
-            "ChatMessageList 内不再读 ime（会被外层 imePadding 消费成 false）",
+            "imeVisible = currentImeHeightPx > 0" in chat_screen,
+            "ChatScreen 把键盘可见性下发给内容区",
         )
     )
     results.append(
         _check(
-            "isImeVisible && uiState.messages.isNotEmpty()" in chat_screen,
-            "键盘弹出时滚动到最新消息（微信/QQ 行为）",
+            "imeVisible: Boolean" in content_area and "imeVisible = imeVisible" in content_area,
+            "ChatContentArea 透传键盘可见性到消息列表",
+        )
+    )
+    results.append(
+        _check(
+            "LaunchedEffect(sessionId, imeVisible)" in message_list
+            and "if (imeVisible) followLatest = true" in message_list,
+            "键盘可见期间无条件贴住最新消息（翻着历史点输入框也会被顶到底）",
+        )
+    )
+    results.append(
+        _check(
+            "WindowInsets.ime" not in message_list,
+            "ChatMessageList 不再自己读 ime（统一用 ChatScreen 下发的那一份）",
         )
     )
 
     # 5. 没有留下未使用 import
     unused: list[str] = []
-    for path in (INPUT_AREA, CHAT_INPUT_BARS, CHAT_SCREEN, CHAT_MEDIA_PICKERS, CHAT_MESSAGE_LIST):
+    for path in (
+        INPUT_AREA,
+        CHAT_INPUT_BARS,
+        CHAT_SCREEN,
+        CHAT_MEDIA_PICKERS,
+        CHAT_MESSAGE_LIST,
+        CHAT_CONTENT_AREA,
+    ):
         for line in find_unused_imports(path):
             unused.append(f"{path.name}: {line}")
     results.append(

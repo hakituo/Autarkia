@@ -3,6 +3,7 @@
 覆盖：错误回答产生 weak state、weak concept 被安排复习、复习成功推进、
 连续成功后不再出现在 weakness list，以及「三份状态不打架」。
 """
+
 from __future__ import annotations
 
 from core.services.study.student_state import get_student_state_manager
@@ -16,11 +17,7 @@ def _orch() -> TeachingOrchestrator:
 
 def _active_topics() -> set:
     report = get_weakness_tracker().get_weakness_report()
-    return {
-        item["topic"]
-        for items in report.get("by_subject", {}).values()
-        for item in items
-    }
+    return {item["topic"] for items in report.get("by_subject", {}).values() for item in items}
 
 
 def test_wrong_answer_creates_weak_state_and_projection(study_sandbox):

@@ -38,8 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.presentation.components.SectionCard
 import com.aveline.ai.mobile.presentation.persona.PersonaUiState
-import com.aveline.ai.mobile.presentation.theme.EmotionGreen
-import com.aveline.ai.mobile.presentation.theme.EmotionPurple
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
@@ -122,7 +121,7 @@ fun CompanionPersonaTab(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     CircularProgressIndicator(
-                        color = EmotionGreen,
+                        color = Accent,
                         modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp
                     )
@@ -201,9 +200,9 @@ private fun PersonaListItem(
     isSwitching: Boolean,
     onClick: () -> Unit
 ) {
-    val containerColor = if (isActive) EmotionGreen.copy(alpha = 0.12f) else Color(0x14000000)
-    val borderColor = if (isActive) EmotionGreen.copy(alpha = 0.3f) else Color(0x14FFFFFF)
-    val textColor = if (isActive) EmotionGreen.copy(alpha = 0.9f) else TextPrimary
+    val containerColor = if (isActive) Accent.copy(alpha = 0.12f) else Color(0x14000000)
+    val borderColor = if (isActive) Accent.copy(alpha = 0.3f) else Color(0x14FFFFFF)
+    val textColor = if (isActive) Accent.copy(alpha = 0.9f) else TextPrimary
 
     Card(
         onClick = onClick,
@@ -238,7 +237,7 @@ private fun PersonaListItem(
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = "当前人设",
-                    tint = EmotionGreen,
+                    tint = Accent,
                     modifier = Modifier.size(18.dp)
                 )
             }

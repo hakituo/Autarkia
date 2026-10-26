@@ -105,7 +105,20 @@ def sync_with_global_config(
                         if llm_model:
                             model = f"cloud:{global_provider}:{llm_model}"
                         else:
-                            model = f"cloud:{global_provider}:deepseek-v4-flash"
+                            # 最后兜底也走 YAML 的 provider_default_models，
+                            # 不在通道层写死具体型号。
+                            from config.model_config import get_provider_default_model
+
+                            provider_model = get_provider_default_model(
+                                global_provider, ""
+                            )
+                            if provider_model:
+                                model = f"cloud:{global_provider}:{provider_model}"
+                            else:
+                                logger.warning(
+                                    "无法解析默认云端模型：provider=%s 缺少 default_chat_model / provider_default_models",
+                                    global_provider,
+                                )
                     logger.info(f"注入全局云端模型配置: {model}")
 
     except Exception as e:

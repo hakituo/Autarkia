@@ -6,6 +6,7 @@ scope 归属解析。
 
 所有 IO 落 tmp_path，不触碰真实 companion_data；路径断言全部基于注入的临时根。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -73,7 +74,9 @@ def test_resolve_scope_from_active_persona_delegates(monkeypatch):
 def test_resolve_memory_user_id_delegates(monkeypatch):
     """resolve_memory_user_id 透传 conversation_id。"""
     calls = []
-    monkeypatch.setattr(dp, "_resolve_registered_memory_user_id", lambda c: calls.append(c) or "SENTINEL")
+    monkeypatch.setattr(
+        dp, "_resolve_registered_memory_user_id", lambda c: calls.append(c) or "SENTINEL"
+    )
     assert dp.resolve_memory_user_id("cid") == "SENTINEL"
     assert calls == ["cid"]
 
@@ -262,5 +265,13 @@ def test_split_daily_event_scope_delegates_source(monkeypatch):
 def test_split_daily_event_scope_real_and_empty():
     """两个字段都为空走默认；真实注册表下能解析出角色。"""
     assert dp._split_daily_event_scope("{}", default_scope="aveline") == "aveline"
-    assert dp._split_daily_event_scope(json.dumps({"conversation_id": "core_ling"}), default_scope="aveline") == "ling"
-    assert dp._split_daily_event_scope(json.dumps({"source": "ling"}), default_scope="aveline") == "ling"
+    assert (
+        dp._split_daily_event_scope(
+            json.dumps({"conversation_id": "core_ling"}), default_scope="aveline"
+        )
+        == "ling"
+    )
+    assert (
+        dp._split_daily_event_scope(json.dumps({"source": "ling"}), default_scope="aveline")
+        == "ling"
+    )

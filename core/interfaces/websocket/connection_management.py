@@ -212,6 +212,7 @@ class ConnectionManagementMixin:
         Args:
             websocket: 要移除的WebSocket连接
         """
+        removed = False
         async with self.connections_lock:
             if websocket in self.connections:
                 connection = self.connections[websocket]
@@ -231,6 +232,7 @@ class ConnectionManagementMixin:
                 connection.state = ConnectionState.CLOSED
                 del self.connections[websocket]
                 self.stats["active_connections"] = len(self.connections)
+                removed = True
 
                 logger.info(
                     f"Client disconnected: {connection.ip}, "
@@ -239,6 +241,18 @@ class ConnectionManagementMixin:
                     f"Duration: {connection.get_connection_duration():.2f}s, "
                     f"Messages: {connection.message_count}"
                 )
+
+        # 只从注册表删掉、不关 socket 会留下"服务端不可见、客户端仍以为在线"的
+        # 半开连接：服务端不再推送，客户端却继续发 ping，弱网下长期停在 ESTAB。
+        # 这里补一次带超时的 close，让对端能立刻感知并重连。
+        if removed and not self._is_starlette_websocket_closed(websocket):
+            try:
+                await asyncio.wait_for(
+                    websocket.close(code=1001, reason="connection removed"),
+                    timeout=1.0,
+                )
+            except Exception as exc:  # noqa: BLE001 - close 失败不影响注销结果
+                logger.debug(f"关闭被移除的连接失败: {exc}")
 
     def _is_starlette_websocket_closed(
         self, websocket: "websockets.WebSocketServerProtocol"

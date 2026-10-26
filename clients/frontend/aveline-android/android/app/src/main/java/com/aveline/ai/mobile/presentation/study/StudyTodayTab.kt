@@ -46,8 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aveline.ai.mobile.domain.models.PlanItem
 import com.aveline.ai.mobile.presentation.components.SectionCard
-import com.aveline.ai.mobile.presentation.theme.EmotionGreen
-import com.aveline.ai.mobile.presentation.theme.Primary
+import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
@@ -227,7 +226,7 @@ private fun TodayProgressCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Primary.copy(alpha = 0.09f))
+        colors = CardDefaults.cardColors(containerColor = Accent.copy(alpha = 0.09f))
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -271,7 +270,7 @@ private fun TodayProgressCard(
                     .fillMaxWidth()
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp)),
-                color = if (progress >= 1f) EmotionGreen else Primary,
+                color = Accent,
                 trackColor = Color(0x1AFFFFFF)
             )
 
@@ -388,7 +387,7 @@ private fun TodayTaskCard(
                     imageVector = if (done) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                     contentDescription = if (done) "已完成" else "标记完成",
                     tint = when {
-                        done -> EmotionGreen
+                        done -> Accent
                         skipped -> TextTertiary
                         else -> TextSecondary
                     },
@@ -423,7 +422,7 @@ private fun TodayTaskCard(
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = "开始学习",
-                        tint = Primary
+                        tint = Accent
                     )
                 }
             }

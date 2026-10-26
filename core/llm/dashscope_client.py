@@ -15,6 +15,8 @@ from core.utils.logger import get_logger
 from core.utils.debug_markers import ensure_debug_error_prefix
 from . import LLMModule
 from core.llm.openai_compat.client import LLMSessionMixin
+from core.llm.llm_logger import log_llm_usage
+from core.llm.openai_compat.caller_source import caller_source
 
 logger = get_logger("dashscope_client")
 
@@ -143,7 +145,9 @@ class DashScopeClient(LLMSessionMixin, LLMModule):
                     return
 
                 # 解析 SSE 流
-                async for chunk in self._parse_dashscope_sse(response.content):
+                async for chunk in self._parse_dashscope_sse(
+                    response.content, model=target_model
+                ):
                     if chunk:
                         yield chunk
         except Exception as e:
@@ -151,7 +155,7 @@ class DashScopeClient(LLMSessionMixin, LLMModule):
             yield {"error": str(e)}
 
     async def _parse_dashscope_sse(
-        self, response_content
+        self, response_content, model: str = ""
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """解析 DashScope 原生 SSE 流。
 
@@ -213,7 +217,16 @@ class DashScopeClient(LLMSessionMixin, LLMModule):
                     yield {"content": content}
 
                 if finish_reason:
-                    yield {"finish_reason": finish_reason, "usage": data.get("usage", {})}
+                    usage = data.get("usage") or {}
+                    if usage:
+                        log_llm_usage(
+                            "dashscope",
+                            model or "unknown",
+                            usage,
+                            extra={"mode": "stream"},
+                            source=caller_source(),
+                        )
+                    yield {"finish_reason": finish_reason, "usage": usage}
 
     def get_status(self) -> Dict[str, Any]:
         return self._build_base_status(provider="DashScope", llm_status={"instances_count": 1})
@@ -271,10 +284,20 @@ class DashScopeClient(LLMSessionMixin, LLMModule):
                         choice = data["output"]["choices"][0]
                         content = choice["message"]["content"]
                         finish_reason = choice.get("finish_reason")
+                        usage = data.get("usage") or {}
+                        if usage:
+                            # DashScope 原生格式用 input/output_tokens，日志侧会做别名归一
+                            log_llm_usage(
+                                "dashscope",
+                                target_model,
+                                usage,
+                                extra={"mode": "sync"},
+                                source=caller_source(),
+                            )
                         return {
                             "status": "success",
                             "text": content,
-                            "usage": data.get("usage", {}),
+                            "usage": usage,
                             "finish_reason": finish_reason,
                         }
                     elif "code" in data:

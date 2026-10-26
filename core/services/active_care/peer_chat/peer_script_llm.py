@@ -54,6 +54,7 @@ class PeerScriptLLMGenerator:
         role_states: Optional[Dict[str, str]] = None,
         avoid: Optional[list] = None,
         enforce_round_limit: bool = True,
+        participants: Optional[list] = None,
     ) -> list:
         """阶段3：通过 LLM 生成剧本（含 DeepSeek 回退 + 解析失败重试 + 质量过滤）
 
@@ -75,23 +76,48 @@ class PeerScriptLLMGenerator:
         )
         from core.services.active_care.peer_chat.peer_knowledge import (
             build_knowledge_buckets,
+            build_knowledge_buckets_multi,
             validate_peer_script,
+            validate_peer_script_multi,
         )
         from config.model_config import resolve_active_care_model_path
 
-        # 【知识防火墙】把双方状态 + 主人私聊素材按信息权限拆分为知识分桶：
+        member_ids = [
+            str(p).strip().lower() for p in (participants or []) if str(p).strip()
+        ]
+        if role_id not in member_ids:
+            member_ids.insert(0, role_id)
+        if peer_role_id and peer_role_id not in member_ids:
+            member_ids.append(peer_role_id)
+        member_ids = list(dict.fromkeys(member_ids))
+        multi = len(member_ids) > 2
+
+        from core.services.dual_role.personas import get_role_names
+
+        names_by_role = {rid: get_role_names(rid)["cn_name"] for rid in member_ids}
+
+        # 【知识防火墙】把状态 + 主人私聊素材按信息权限拆分为知识分桶：
         # 各自与主人的私聊只归各自知道，跨关系内容被保密过滤；剧本生成器虽能看到
-        # 双方状态，但最高规则约束角色只能说自己权限内的话（Validator 做兜底校验）。
-        knowledge = build_knowledge_buckets(
-            role_id=role_id,
-            peer_role_id=peer_role_id,
-            role_name=role_name,
-            peer_name=peer_name,
-            bio_state=context.get("bio_state"),
-            peer_bio_state=context.get("peer_bio_state"),
-            master_history_by_role=context.get("master_history_by_role") or {},
-            time_str=context.get("time_str") or "",
-        )
+        # 全部状态，但最高规则约束角色只能说自己权限内的话（Validator 做兜底校验）。
+        if multi:
+            knowledge = build_knowledge_buckets_multi(
+                participants=member_ids,
+                names_by_role=names_by_role,
+                bio_state_by_role=context.get("bio_state_by_role") or {},
+                master_history_by_role=context.get("master_history_by_role") or {},
+                time_str=context.get("time_str") or "",
+            )
+        else:
+            knowledge = build_knowledge_buckets(
+                role_id=role_id,
+                peer_role_id=peer_role_id,
+                role_name=role_name,
+                peer_name=peer_name,
+                bio_state=context.get("bio_state"),
+                peer_bio_state=context.get("peer_bio_state"),
+                master_history_by_role=context.get("master_history_by_role") or {},
+                time_str=context.get("time_str") or "",
+            )
 
         # 【缓存优化】static/dynamic 分离：system message 跨请求稳定，命中 DeepSeek Prompt Caching
         prompt_result = build_script_generation_prompt(
@@ -109,6 +135,8 @@ class PeerScriptLLMGenerator:
             peer_bio_state=context["peer_bio_state"],
             knowledge=knowledge,
             avoid=avoid,
+            participants=member_ids if multi else None,
+            names_by_role=names_by_role if multi else None,
         )
 
         llm = get_llm_module()
@@ -190,17 +218,18 @@ class PeerScriptLLMGenerator:
             return []
         except Exception as llm_err:
             logger.warning("Active Care: peer_chat LLM调用失败 (model_path=%s): %s", model_path, llm_err)
-            # 回退到直接 DeepSeekClient
-            from core.llm.openai_compat.deepseek_client import DeepSeekClient
-            import os as _os
-            api_key = _os.getenv("DEEPSEEK_API_KEY_QQBOT1") or _os.getenv("DEEPSEEK_API_KEY")
-            if not api_key:
-                raise RuntimeError(f"peer_chat LLM 调用失败且无回退 API Key: {llm_err}") from llm_err
-            fallback_llm = DeepSeekClient(api_key=api_key, model="deepseek-v4-flash", thinking_enabled=False)
-            raw = await fallback_llm.chat(
-                messages,
-                temperature=0.9,
-                max_tokens=800,
+            # 兜底路由来自 model_routing.fallback_models.peer_chat_script，
+            # 不再在这里硬编码 DeepSeekClient + 供应商 key。
+            from config.model_config import get_fallback_model_for_peer_chat_script
+
+            fallback_model = get_fallback_model_for_peer_chat_script("")
+            if not fallback_model or fallback_model == model_path:
+                raise RuntimeError(
+                    f"peer_chat LLM 调用失败且未配置可用兜底路由: {llm_err}"
+                ) from llm_err
+            logger.warning("Active Care: peer_chat 剧本回退到 %s", fallback_model)
+            raw = await llm.chat(
+                messages, temperature=0.9, max_new_tokens=800, model_path=fallback_model
             )
 
         # 原文预览很长，默认不落盘（debug.peer_chat 打开才输出）

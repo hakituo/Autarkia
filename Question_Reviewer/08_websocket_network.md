@@ -429,3 +429,40 @@
 *   **验证**:
     1. `venv_core/Scripts/python.exe tests/scripts/project_audit/verify_project_audit_2026_09_05.py 通过。`
     2. `Ruff F821 与修改文件定向检查通过。`
+
+### QR-20261024-MOBILE-WS-FLAP 安卓端 WebSocket 高频断连：5G 高速率档位重传 + 连接管理缺陷（已修，2.4G 稳定） (2026-10-24)
+*   **问题描述**: 安卓 App（三星 S24U，SM-S9280）在局域网直连后端（192.0.2.x，同一小米路由 zouhong_5G）时 WebSocket 极不稳定：一天 159 次建连、160 次 (1006) 断开，活跃时段 40~90 秒断一次；服务端同一用户经常出现 2~3 条并发连接，手机侧残留 CLOSE-WAIT/LAST-ACK 套接字，OkHttp 报 connection was leaked。用户体感为「连着但收不到消息」「动不动重连」。
+*   **复现步骤**:
+    1. 统计 logs/2026/10/24/server.log 与 autarkia_main.log：建连/断开次数、断开码分布、连接存活时长（中位数 95.5s）
+    2. 对照实验：向运行中的服务端发起一个只读不回的 WS 客户端，64s 被服务端以 1001 'Connection timed out' 正常关闭——证明服务端主动关闭可识别，而当天手机侧 0 次 1001、160 次 1006
+    3. 对照实验：心跳正常的模拟客户端（ping/pong 对称）连续 300s 零断开
+    4. adb 无线调试抓手机侧：12:30:34 出现 SocketTimeoutException failed to connect to 192.0.2.227:8000 after 30000ms（TCP 30s 建不起来）
+    5. 两端 TCP 状态对照：服务端对手机连接 FIN-WAIT-1 且 21907 字节未 ACK，手机侧同一四元组仍 ESTAB——「服务器→手机」单向黑洞
+    6. 同步对照 ping：同 45s 窗口内，服务器→网关 avg 1.4ms（max 17.9），服务器→手机 avg 18.3ms（max 123，23/225 包 >50ms）
+    7. nmcli 扫描周边 5GHz AP：同信道(157)仅 1 个 -89dBm 邻居，全部邻居 ≤ -75dBm——排除邻居信道干扰
+    8. 手机 cmd wifi status：RSSI -48dBm、780Mbps（VHT80 高 MCS），但 retriedTxPackets/successfulTxPackets ≈ 8.5%（30s 采样）～15%（累计）
+    9. 决定性对照：手机从 5G zouhong_5G 改连 2.4G zouhong 后，9 分钟+ 零断连（此前 40~90 秒一次）；RTT 均值升到 49ms 但 0% 丢包、TCP 稳定
+*   **预期行为**:
+    1. 局域网直连下 WebSocket 长稳；偶发断连能被快速感知并自动重连，不留僵尸连接
+*   **实际行为**:
+    1. 5G 下 40~90 秒断一次且客户端最长 30s 才感知；服务端留存服务端不可见、客户端以为在线的半开连接；同用户并发 2~3 条连接
+*   **根因**:
+    1. 【链路层·主因】5GHz 链路协商在 VHT80 高 MCS（780Mbps），高阶调制对瞬时信噪比极敏感：手机移动/握持/身体遮挡使 SNR 瞬时下降，AP 按高 MCS 发帧大量失败，重传率 8~15%，重传堆积拖垮 TCP。2.4G 速率上限低、编码冗余大，同样衰落打不坏帧——换 2.4G 立即稳定（9 分钟+零断连，代价是 RTT 49ms）
+    2. 【客户端·放大器】connect(forceReconnect=true) 只在 URL 变化时 close 旧 socket：同 URL 强制重连（回前台/设置页）留下无人使用的连接——心跳只走 webSocketRef、onMessage 被归属校验丢弃，服务端要等 60s 心跳超时回收
+    3. 【客户端·放大器】回服务端 ping 的 pong 用 webSocketRef.get() 发送而非收到 ping 的那条连接，旧连接永远不回 pong，必然被服务端踢掉
+    4. 【客户端·放大器】MainActivity ON_RESUME 无条件 connect(forceReconnect=true)，每次回前台新增一条连接
+    5. 【客户端·盲区】心跳只发 ping 不检测入站静默，OkHttp 只在写失败时报错，链路单向黑洞时客户端最长 30s 假在线
+    6. 【服务端·放大器】remove_connection 只从注册表删连接不 close socket，广播发送失败后留下服务端不可见、客户端以为在线的半开连接
+*   **修复方案**:
+    1. WebSocketManager.connect：重建前 webSocketRef.getAndSet(null) 并 close(1000, url_changed|reconnect)，同 URL 强制重连也关旧连接（commit 3bbd95e0）
+    2. WebSocketManager.onOpen：被替换的 socket close(1000, superseded)
+    3. WebSocketManager.parseMessage 增加 webSocket 参数，pong 回到收到 ping 的那条连接（commit 3bbd95e0）
+    4. MainViewModel.reconnect：已连接时只补发 reconnect 同步，不再重建 socket（commit 3bbd95e0）
+    5. connection_management.remove_connection：注销后锁外补 wait_for(close(1001), 1s)（commit 3bbd95e0）
+    6. WebSocketManager 心跳循环加入站静默检测：超 max(interval,15)*3 秒无入站帧判定假在线，close(1000, heartbeat_timeout) 后指数退避重连（commit af7f7888）
+    7. connection.py：1006 断连日志从 WARNING 降为 INFO（commit af7f7888）
+*   **验证**:
+    1. `venv_cpu/bin/python -m pytest -q（CI 同款，6172 passed；2 条存量失败与本问题无关）`
+    2. `tests/unit/test_websocket_remove_connection.py 新增 4 条回归`
+    3. `换 2.4G 后实测：13:21:51 之后 9 分钟+ 零断连、零新建连接`
+    4. `Android 侧改动待 Android Studio 编译验证`

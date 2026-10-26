@@ -20,7 +20,8 @@ import com.aveline.ai.mobile.presentation.navigation.graph.wellbeingScreen
  * - Companion: AI 伴侣(状态 / 人设 / 记忆)
  * - Study: 学习(概览 / 计划 / 日记 / 笔记 / 文件 / 词汇)
  * - Life: 日常生活(健康 / 饮水 / 日程 / 餐食)
- * - Food: 食物商店(购买 + 食用)
+ * - Food: 商城(全部 / 食物 / 礼物 / 玩具 / 书籍 / 服饰 / 科技 / 奢侈品)
+ * - Inventory: 库存(非食物商品，可送出)
  * - Settings: 设置(常规 / 权限 / 隐私 / 数据 / 高级)
  * - Wellbeing: 数字健康(应用使用时长限额)
  */
@@ -31,6 +32,7 @@ object Routes {
     const val STUDY = "study"
     const val LIFE = "life"
     const val FOOD = "food"
+    const val INVENTORY = "inventory"
     const val SETTINGS = "settings"
     const val WELLBEING = "wellbeing"
 
@@ -76,7 +78,7 @@ fun NavGraphBuilder.avelineNavGraph(
     companionRedirect(navController)
     studyScreen()
     lifeScreen()
-    mallScreen()
+    mallScreen(navController)
     settingsScreen()
     wellbeingScreen(navController)
 }

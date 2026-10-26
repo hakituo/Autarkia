@@ -27,89 +27,139 @@ import core.services.active_care.core.executor as executor_mod
 import core.services.active_care.core.proactive_checker as checker_mod
 import core.services.active_care.peer_chat.peer_chat_scheduler as peer_sched_mod
 
+
 class _StubLazy:
     """惰性构造替身（consecutive_non_responses 供 setter 读取）。"""
+
     consecutive_non_responses = 0
-    def __init__(self, *a, **k): pass
+
+    def __init__(self, *a, **k):
+        pass
+
 
 class _StubLock:
     """可配置 acquire 行为的锁替身。"""
+
     def __init__(self, acquire_exc=None):
         self.acquire_exc, self._locked = acquire_exc, False
+
     async def acquire(self):
         if self.acquire_exc is not None:
             raise self.acquire_exc
         self._locked = True
         return True
-    def release(self): self._locked = False
-    def locked(self): return self._locked
+
+    def release(self):
+        self._locked = False
+
+    def locked(self):
+        return self._locked
+
 
 class _StubChecker:
     """覆盖门面所依赖 checker 全部接口的替身。"""
+
     def __init__(self):
         self.__dict__.update(
-            next_decision_ts=0.0, _next_llm_decision_ts=0.0, last_skip_reason=None,
-            last_check_phase=None, last_intent="none", perform_check_calls=[],
-            perform_check_exc=None, set_next_calls=[], set_next_exc=None,
-            _next_decision_ts_by_persona={}, _next_llm_decision_ts_by_persona={},
-            _persona_keys=[], _persona_next=0.0, _earliest=0.0,
+            next_decision_ts=0.0,
+            _next_llm_decision_ts=0.0,
+            last_skip_reason=None,
+            last_check_phase=None,
+            last_intent="none",
+            perform_check_calls=[],
+            perform_check_exc=None,
+            set_next_calls=[],
+            set_next_exc=None,
+            _next_decision_ts_by_persona={},
+            _next_llm_decision_ts_by_persona={},
+            _persona_keys=[],
+            _persona_next=0.0,
+            _earliest=0.0,
         )
+
     async def perform_check(self, is_startup=False):
         self.perform_check_calls.append(is_startup)
         if self.perform_check_exc is not None:
             raise self.perform_check_exc
+
     async def set_next_decision_ts(self, ts, source=None, profile_filename=None):
         if self.set_next_exc is not None:
             raise self.set_next_exc
         self.set_next_calls.append((ts, source, profile_filename))
-    def get_next_decision_ts_for_persona(self, f): return self._persona_next
-    def get_all_persona_keys(self): return list(self._persona_keys)
-    def _get_earliest_next_decision_ts(self): return self._earliest
+
+    def get_next_decision_ts_for_persona(self, f):
+        return self._persona_next
+
+    def get_all_persona_keys(self):
+        return list(self._persona_keys)
+
+    def _get_earliest_next_decision_ts(self):
+        return self._earliest
+
 
 class _StubStorage:
     def __init__(self, scope="aveline", raise_get=False, raise_save=False):
         self.scope, self.raise_get = scope, raise_get
         self.raise_save, self.saved = raise_save, []
+
     async def get_proactive_state(self):
         if self.raise_get:
             raise RuntimeError("get boom")
         return {}
+
     async def save_proactive_state(self, payload, scope=None):
         if self.raise_save:
             raise RuntimeError("save boom")
         self.saved.append((payload, scope))
-    def resolve_scope_from_profile_filename(self, f): return self.scope
+
+    def resolve_scope_from_profile_filename(self, f):
+        return self.scope
+
 
 class _StubSleep:
     def __init__(self, raise_enter=False):
         self.entered, self.exited, self.raise_enter = [], [], raise_enter
+
     async def enter_low_disturbance_mode(self, **kw):
         if self.raise_enter:
             raise RuntimeError("enter boom")
         self.entered.append(kw)
-    async def exit_low_disturbance_mode(self, **kw): self.exited.append(kw)
+
+    async def exit_low_disturbance_mode(self, **kw):
+        self.exited.append(kw)
+
 
 class _StubDelayedScheduler:
     def __init__(self, pending=None, raise_pending=False):
         self.pending, self.raise_pending = list(pending or []), raise_pending
+
     def get_pending_tasks(self):
         if self.raise_pending:
             raise RuntimeError("pending boom")
         return list(self.pending)
 
+
 class _FalsyExecutor:
     """布尔值为假的 executor 替身（覆盖短路分支）。"""
-    def __bool__(self): return False
+
+    def __bool__(self):
+        return False
+
 
 class _UpgradeChecker:
     """升级路径使用的 ProactiveChecker 替身。"""
+
     behavior = "ok"  # ok | raise | hang
-    def __init__(self, **kwargs): self.kwargs = kwargs
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
     async def initialize(self):
         if type(self).behavior == "raise":
             raise ValueError("upgrade init boom")
         if type(self).behavior == "hang":
             await asyncio.Event().wait()
+
 
 def _patch_lazy_sources(monkeypatch):
     """把 5 个 __init__ 期间会被访问的惰性源类替换为替身。"""
@@ -118,6 +168,7 @@ def _patch_lazy_sources(monkeypatch):
     monkeypatch.setattr(sched_logic_mod, "ActiveCareSchedulerLogic", _StubLazy)
     monkeypatch.setattr(decision_mod, "ActiveCareDecision", _StubLazy)
     monkeypatch.setattr(executor_mod, "ActiveCareExecutor", _StubLazy)
+
 
 def _make_service(monkeypatch, *, checker=None, scope="aveline"):
     """构造一个外部接口相关下游全部替换为替身的服务实例。"""
@@ -130,34 +181,47 @@ def _make_service(monkeypatch, *, checker=None, scope="aveline"):
     svc._user_response_handler = SimpleNamespace(reset_interaction_state=AsyncMock())
     return svc
 
+
 def _fake_logger(monkeypatch):
     """把门面模块的 logger 换成 MagicMock 并返回。"""
     fake = MagicMock()
     monkeypatch.setattr(service_mod, "logger", fake)
     return fake
 
+
 def _errors(fake):
     return [str(c) for c in fake.error.call_args_list]
+
 
 def _executor(ts_by_persona=None):
     """executor 替身（只需 _last_trigger_ts_by_persona）。"""
     return SimpleNamespace(_last_trigger_ts_by_persona=dict(ts_by_persona or {}))
+
 
 @pytest.fixture()
 def reset_singleton(monkeypatch):
     """隔离模块级单例，避免跨用例串味。"""
     monkeypatch.setattr(service_mod, "_active_care_service", None)
 
+
 def _make_upgrade_target(**overrides):
     """构造升级路径所需的单例对象（SimpleNamespace 版）。"""
     defaults = dict(
-        _enable_proactive_checker=False, checker=None, _running=False,
-        _pending_init_tasks=set(), storage=object(), context=object(),
-        scheduler_logic=object(), decision=object(), executor=object(),
-        _peer_chat_scheduler=object(), settings=object(),
+        _enable_proactive_checker=False,
+        checker=None,
+        _running=False,
+        _pending_init_tasks=set(),
+        storage=object(),
+        context=object(),
+        scheduler_logic=object(),
+        decision=object(),
+        executor=object(),
+        _peer_chat_scheduler=object(),
+        settings=object(),
     )
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
+
 
 async def test_check_active_care_all_branches(monkeypatch):
     fake = _fake_logger(monkeypatch)
@@ -197,6 +261,7 @@ async def test_check_active_care_all_branches(monkeypatch):
         await svc.check_active_care()
     assert svc._proactive_lock.locked() is False
 
+
 def test_get_runtime_status_branches(monkeypatch):
     checker = _StubChecker()
     checker.next_decision_ts = time.time() + 500
@@ -217,7 +282,10 @@ def test_get_runtime_status_branches(monkeypatch):
     assert status["running"] is True and status["checker_enabled"] is True
     assert status["enable_proactive_checker"] is False
     assert status["tasks"] == {
-        "proactive": True, "startup": False, "maintenance": False, "watchdog": False
+        "proactive": True,
+        "startup": False,
+        "maintenance": False,
+        "watchdog": False,
     }
     assert (status["last_intent"], status["last_skip_reason"]) == ("care", "throttled")
     assert status["last_check_phase"] == "idle" and status["delayed_tasks_pending"] == 2
@@ -240,6 +308,7 @@ def test_get_runtime_status_branches(monkeypatch):
     assert status3["expected_wakeup_in_seconds"] == 0
     assert status3["loop_phase_seconds"] == 0
 
+
 async def test_on_user_interaction_branches(monkeypatch):
     fake = _fake_logger(monkeypatch)
     svc = _make_service(monkeypatch)
@@ -260,6 +329,7 @@ async def test_on_user_interaction_branches(monkeypatch):
     )
     await svc.on_user_interaction("p.md")
     assert _errors(fake)
+
 
 async def test_notify_workspace_reminder_and_plan_branches(monkeypatch):
     fake = _fake_logger(monkeypatch)
@@ -294,6 +364,7 @@ async def test_notify_workspace_reminder_and_plan_branches(monkeypatch):
     await svc.notify_workspace_reminder_updated(trigger_ts=time.time() + 100)
     assert fake.warning.called and svc._wakeup_event.is_set() is False
 
+
 async def test_set_sleep_mode_pause_and_mode_switch(monkeypatch):
     fake = _fake_logger(monkeypatch)
     checker = _StubChecker()
@@ -326,10 +397,12 @@ async def test_set_sleep_mode_pause_and_mode_switch(monkeypatch):
     await svc.on_mode_switch("work", "rest")
     assert fake.info.called
 
+
 def _patch_assistant_env(monkeypatch, gap=600):
     """固定随机数与 min_gap 配置，保证断言确定性。"""
     monkeypatch.setattr(service_mod, "get_active_care_config", lambda *a, **k: gap)
     monkeypatch.setattr(random, "randint", lambda a, b: 120)
+
 
 async def test_on_assistant_message_sent_with_persona(monkeypatch):
     _patch_assistant_env(monkeypatch)
@@ -346,9 +419,11 @@ async def test_on_assistant_message_sent_with_persona(monkeypatch):
     assert svc._executor._last_trigger_ts_by_persona == {"aveline": 100.0, "": 100.0}
     # 当前 persona 正常推迟 min_gap；其他 persona 以 stagger 错开（当前 scope 被跳过）
     assert (700.0, "assistant_message_sent", "aveline.md") in checker.set_next_calls
-    assert (checker._next_decision_ts_by_persona["ye"] > 0
-            and checker._next_decision_ts_by_persona["ye"]
-            == checker._next_llm_decision_ts_by_persona["ye"])
+    assert (
+        checker._next_decision_ts_by_persona["ye"] > 0
+        and checker._next_decision_ts_by_persona["ye"]
+        == checker._next_llm_decision_ts_by_persona["ye"]
+    )
     assert checker.next_decision_ts == 5000.0
     assert checker._next_llm_decision_ts == 5000.0
     # persona 存档 + 全局存档各一次
@@ -365,6 +440,7 @@ async def test_on_assistant_message_sent_with_persona(monkeypatch):
     await svc2.on_assistant_message_sent(timestamp=100.0, profile_filename="aveline.md")
     assert checker2.set_next_calls == []
     assert checker2._next_decision_ts_by_persona["ye"] == 1e18
+
 
 async def test_on_assistant_message_sent_without_persona(monkeypatch):
     _patch_assistant_env(monkeypatch)
@@ -385,6 +461,7 @@ async def test_on_assistant_message_sent_without_persona(monkeypatch):
     assert checker2.set_next_calls == []
     assert svc2._executor._last_trigger_ts_by_persona == {}
 
+
 async def test_on_assistant_message_sent_skips_gap_and_save_failure(monkeypatch):
     _patch_assistant_env(monkeypatch)
     fake = _fake_logger(monkeypatch)
@@ -392,9 +469,7 @@ async def test_on_assistant_message_sent_skips_gap_and_save_failure(monkeypatch)
     svc = _make_service(monkeypatch, checker=None)
     svc._executor = SimpleNamespace()
     await svc.on_assistant_message_sent(timestamp=100.0)
-    assert svc._storage.saved == [
-        ({"last_sent_ts": 100.0, "last_attempt_ts": 100.0}, None)
-    ]
+    assert svc._storage.saved == [({"last_sent_ts": 100.0, "last_attempt_ts": 100.0}, None)]
     # executor 为假值 → 短路跳过（再追加一次全局存档）
     svc._executor = _FalsyExecutor()
     await svc.on_assistant_message_sent(timestamp=100.0)
@@ -419,6 +494,7 @@ async def test_on_assistant_message_sent_skips_gap_and_save_failure(monkeypatch)
     await svc4.on_assistant_message_sent(timestamp=100.0, profile_filename="x.md")
     assert svc4._storage.saved == [] and fake.warning.called
 
+
 def test_get_active_care_service_creates_and_early_return(monkeypatch, reset_singleton):
     _patch_lazy_sources(monkeypatch)
     monkeypatch.setattr(peer_sched_mod, "init_peer_chat_scheduler", lambda **kw: MagicMock())
@@ -431,6 +507,7 @@ def test_get_active_care_service_creates_and_early_return(monkeypatch, reset_sin
     monkeypatch.setattr(service_mod, "_active_care_service", existing)
     result = service_mod.get_active_care_service(enable_proactive_checker=True)
     assert result is existing and existing._enable_proactive_checker is False
+
 
 def test_get_active_care_service_upgrade_creates_checker(monkeypatch, reset_singleton):
     monkeypatch.setattr(checker_mod, "ProactiveChecker", _UpgradeChecker)
@@ -448,6 +525,7 @@ def test_get_active_care_service_upgrade_creates_checker(monkeypatch, reset_sing
     service_mod.get_active_care_service(enable_proactive_checker=True)
     assert existing2._pending_init_tasks == set()
     assert any("无事件循环" in str(c) for c in fake.warning.call_args_list)
+
 
 async def test_get_active_care_service_upgrade_task_callbacks(monkeypatch, reset_singleton):
     """有事件循环时创建初始化任务；cancelled 与 exception 两条 _on_done 分支。"""
@@ -473,6 +551,7 @@ async def test_get_active_care_service_upgrade_task_callbacks(monkeypatch, reset
     await asyncio.gather(*pending2, return_exceptions=True)
     assert existing2._pending_init_tasks == set() and fake.error.called
 
+
 def test_get_active_care_service_upgrade_peer_chat_branches(monkeypatch, reset_singleton):
     monkeypatch.setattr(checker_mod, "ProactiveChecker", _UpgradeChecker)
     fake = _fake_logger(monkeypatch)
@@ -487,9 +566,11 @@ def test_get_active_care_service_upgrade_peer_chat_branches(monkeypatch, reset_s
     monkeypatch.setattr(service_mod, "_active_care_service", existing2)
     service_mod.get_active_care_service(enable_proactive_checker=True)
     assert existing2._peer_chat_scheduler is peer and peer.start.call_count == 1
+
     # 初始化失败 → 记录 warning，保持 None
     def _boom(**kw):
         raise RuntimeError("peer upgrade boom")
+
     monkeypatch.setattr(peer_sched_mod, "init_peer_chat_scheduler", _boom)
     existing3 = _make_upgrade_target(_running=False, _peer_chat_scheduler=None)
     monkeypatch.setattr(service_mod, "_active_care_service", existing3)

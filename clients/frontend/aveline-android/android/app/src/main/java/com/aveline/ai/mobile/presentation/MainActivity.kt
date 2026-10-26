@@ -14,6 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.runtime.Composable
@@ -24,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.State
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -49,14 +51,16 @@ import com.aveline.ai.mobile.services.discovery.ServerDiscoveryManager
 import com.aveline.ai.mobile.services.endpoint.EndpointResolver
 import com.aveline.ai.mobile.services.health.StartupHealthSyncManager
 import com.aveline.ai.mobile.services.worker.DataSyncManager
+import com.aveline.ai.mobile.presentation.adaptive.readableContentMaxWidth
+import com.aveline.ai.mobile.presentation.components.AdaptiveAppShell
 import com.aveline.ai.mobile.presentation.components.BreathingBackground
 import com.aveline.ai.mobile.presentation.components.ConnectionState
 import com.aveline.ai.mobile.presentation.components.DrawerContent
-import com.aveline.ai.mobile.presentation.components.PullableNavigationDrawer
 import com.aveline.ai.mobile.presentation.components.rememberPullableDrawerState
 import com.aveline.ai.mobile.presentation.navigation.NavArgs
 import com.aveline.ai.mobile.presentation.navigation.Routes
 import com.aveline.ai.mobile.presentation.navigation.avelineNavGraph
+import com.aveline.ai.mobile.presentation.navigation.graph.buildChatRoute
 import com.aveline.ai.mobile.presentation.theme.AvelineTheme
 import com.aveline.ai.mobile.utils.AppForegroundTracker
 import com.google.firebase.messaging.FirebaseMessaging
@@ -351,7 +355,6 @@ fun AvelineApp(
     val currentRoute = navBackStackEntry?.destination?.route
         ?.substringBefore("?")
         ?: Routes.CONVERSATIONS
-
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -447,9 +450,8 @@ fun AvelineApp(
         mainViewModel.toggleSessionPin(sessionId, isPinned)
     }
 
-    PullableNavigationDrawer(
-        state = drawerState,
-        scrimColor = Color(0xCC020617),
+    AdaptiveAppShell(
+        drawerState = drawerState,
         onDismissRequest = {
             scope.launch { drawerState.close() }
         },
@@ -482,17 +484,26 @@ fun AvelineApp(
             BreathingBackground(
                 modifier = Modifier.fillMaxSize(),
                 emotion = effectiveEmotion,
-                emotionColors = mainUiState.emotionColors,
                 backgroundAlpha = 1f
             )
-            NavHost(
-                navController = navController,
-                startDestination = Routes.CONVERSATIONS
+            // 普通模块页在大屏上居中限宽：表格 / 卡片铺满 1000dp+ 时行长过宽，
+            // 消息页与聊天页自己处理分栏和消息宽度，不在这里限宽。
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.TopCenter
             ) {
-                avelineNavGraph(
+                NavHost(
                     navController = navController,
-                    onMenuClick = onMenuClick
-                )
+                    startDestination = Routes.CONVERSATIONS,
+                    modifier = Modifier
+                        .widthIn(max = readableContentMaxWidth(currentRoute))
+                        .fillMaxSize()
+                ) {
+                    avelineNavGraph(
+                        navController = navController,
+                        onMenuClick = onMenuClick
+                    )
+                }
             }
 
             // 助手胶囊**不再**挂在这里。

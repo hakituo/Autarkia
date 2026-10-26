@@ -52,12 +52,18 @@ def daily(tmp_path, monkeypatch):
 def test_record_study_same_session_overwrites_and_keeps_first_time(daily):
     manager, clock = daily
     manager.record_study(
-        "英语词汇", "背单词 5分钟（复习）", session_id="t1", minutes=5,
+        "英语词汇",
+        "背单词 5分钟（复习）",
+        session_id="t1",
+        minutes=5,
         source=VOCAB_TIMER_SOURCE,
     )
     clock.advance(7)
     manager.record_study(
-        "英语词汇", "背单词 12分钟（复习）", session_id="t1", minutes=12,
+        "英语词汇",
+        "背单词 12分钟（复习）",
+        session_id="t1",
+        minutes=12,
         source=VOCAB_TIMER_SOURCE,
     )
 
@@ -73,7 +79,10 @@ def test_record_study_same_session_overwrites_and_keeps_first_time(daily):
 def test_record_study_different_sessions_append_and_mark_context_only(daily):
     manager, _clock = daily
     manager.record_study(
-        "英语词汇", "背单词 3分钟", session_id="t1", minutes=3,
+        "英语词汇",
+        "背单词 3分钟",
+        session_id="t1",
+        minutes=3,
         source=VOCAB_TIMER_SOURCE,
     )
     manager.record_study("英语词汇", "复习用时 30 分钟", count_in_total=False)

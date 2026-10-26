@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import time
-import traceback
 
 from fastapi import WebSocket
 
 from core.utils.logger import get_logger
+from core.utils.websocket_logging import is_websocket_disconnect_error
 
 logger = get_logger(__name__)
 
@@ -60,13 +60,11 @@ class WebSocketMessageRouterMixin:
                 await self._handle_device_command_result(message)
             elif self.websocket_manager:
                 await self.websocket_manager.handle_message(websocket, message)
-        except Exception as exc:  # noqa: BLE001
-            error_text = str(exc)
-            if "close message has been sent" in error_text or "not connected" in error_text.lower():
-                logger.debug("连接关闭竞态导致消息处理跳过：%s", error_text)
+        except Exception as exc:
+            if is_websocket_disconnect_error(exc):
+                logger.debug("连接已断开，跳过消息处理：%s", type(exc).__name__)
             else:
-                logger.error("处理消息时出错：%s", exc)
-                logger.error(traceback.format_exc())
+                logger.exception("处理消息时出错：%s", type(exc).__name__)
 
     async def _handle_device_command_result(self, message: dict) -> None:
         try:

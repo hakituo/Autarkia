@@ -7,7 +7,7 @@ r"""验证数字健康超限关怀的两层抑制：冷却落盘 + 对话中不�
   缺 active care 主循环里那层「用户刚说过话就别插嘴」的门控。
 
 运行：
-    D:\projects\xiaoyou\venv_core\Scripts\python.exe -m tests.scripts.active_care.verify_digital_wellbeing_care_throttle
+    D:\AI\autarkia\venv_core\Scripts\python.exe -m tests.scripts.active_care.verify_digital_wellbeing_care_throttle
 """
 
 from __future__ import annotations

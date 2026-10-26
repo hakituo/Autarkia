@@ -152,9 +152,7 @@ class TestPlanItemAddRoute(_RouteTestCase):
         journal = _FakeJournal(_FakePlan([]))
         resp = await self._call(
             journal,
-            lambda: add_plan_item(
-                PlanItemAddRequest(date="2026-09-11", time="", title="灵活任务")
-            ),
+            lambda: add_plan_item(PlanItemAddRequest(date="2026-09-11", time="", title="灵活任务")),
         )
 
         self.assertEqual(resp["status"], "success")
@@ -164,9 +162,7 @@ class TestPlanItemAddRoute(_RouteTestCase):
         journal = _FakeJournal()
         blank = await self._call(
             journal,
-            lambda: add_plan_item(
-                PlanItemAddRequest(date="2026-09-11", time="08:00", title="  ")
-            ),
+            lambda: add_plan_item(PlanItemAddRequest(date="2026-09-11", time="08:00", title="  ")),
         )
         bad_date = await self._call(
             journal,

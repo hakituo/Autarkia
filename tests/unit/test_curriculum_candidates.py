@@ -24,9 +24,7 @@ def _progress(
     next_review_at: str = "",
 ) -> CurriculumProgress:
     display = name or (
-        "牛顿运动定律"
-        if module_id.endswith("newton")
-        else module_id.rsplit(".", 1)[-1]
+        "牛顿运动定律" if module_id.endswith("newton") else module_id.rsplit(".", 1)[-1]
     )
     return CurriculumProgress(
         module=CurriculumModule(
@@ -64,9 +62,10 @@ def test_complete_ready_module_becomes_curriculum_candidate() -> None:
 
 
 def test_unknown_locked_module_does_not_jump_prerequisites() -> None:
-    assert CurriculumCandidateProvider().build(
-        [_progress(missing=("physics.mechanics.kinematics",))]
-    ) == []
+    assert (
+        CurriculumCandidateProvider().build([_progress(missing=("physics.mechanics.kinematics",))])
+        == []
+    )
 
 
 def test_learning_module_can_continue_when_prerequisite_history_is_sparse() -> None:
@@ -84,9 +83,12 @@ def test_learning_module_can_continue_when_prerequisite_history_is_sparse() -> N
 
 
 def test_mastered_concept_module_is_not_scheduled() -> None:
-    assert CurriculumCandidateProvider().build(
-        [_progress(status=ConceptStatus.MASTERED.value, mastery=0.9)]
-    ) == []
+    assert (
+        CurriculumCandidateProvider().build(
+            [_progress(status=ConceptStatus.MASTERED.value, mastery=0.9)]
+        )
+        == []
+    )
 
 
 def test_llm_preference_only_boosts_whitelisted_candidate() -> None:

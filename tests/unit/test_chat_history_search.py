@@ -238,9 +238,7 @@ def test_search_in_store_falls_back_when_index_unavailable(history_root, monkeyp
     tool = SearchChatHistoryTool()
     params = _search_params({"query": "女生", "limit": 20, "scope": "sfw"})
 
-    monkeypatch.setattr(
-        SearchChatHistoryTool, "_usable_index", staticmethod(lambda _root: None)
-    )
+    monkeypatch.setattr(SearchChatHistoryTool, "_usable_index", staticmethod(lambda _root: None))
     assert {item["event_id"] for item in tool._search_in_store(**params)} == {
         "cur1",
         "side1",
@@ -309,17 +307,11 @@ def test_peer_search_index_matches_file_scan(tmp_path, monkeypatch):
     }
 
     reset_history_index_registry()
-    indexed = tool._peer_search_indexed(
-        search_roots=roots, match_keywords=keywords, **common
-    )
-    scanned = tool._scan_events(
-        search_roots=roots, scope="sfw", file_filter=file_filter, **common
-    )
+    indexed = tool._peer_search_indexed(search_roots=roots, match_keywords=keywords, **common)
+    scanned = tool._scan_events(search_roots=roots, scope="sfw", file_filter=file_filter, **common)
 
     assert indexed is not None
-    assert [item["event_id"] for item in indexed] == [
-        item["event_id"] for item in scanned
-    ]
+    assert [item["event_id"] for item in indexed] == [item["event_id"] for item in scanned]
     assert {item["event_id"] for item in indexed} == {"pa1", "pa2", "pb1"}
     assert "pb2" not in {item["event_id"] for item in indexed}
 

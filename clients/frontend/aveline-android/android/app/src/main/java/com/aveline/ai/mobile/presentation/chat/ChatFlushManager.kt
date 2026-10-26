@@ -41,7 +41,14 @@ class ChatFlushManager(
     private val chatRepository: ChatRepository,
     private val generateMessageId: () -> String,
     private val getCurrentSessionId: () -> String?,
-    private val flushIntervalMs: Long
+    private val flushIntervalMs: Long,
+    /**
+     * 设置页「动作描写」开关的实时读取。
+     *
+     * false 时括号不再触发气泡切分，也不再有 retraction 气泡：括号作为普通字符
+     * 留在正文里，和「不渲染括号」的设置语义一致。
+     */
+    private val isStageDirectionEnabled: () -> Boolean = { true }
 ) {
     /** 单条流式 delta */
     private data class StreamDelta(val messageId: String, val delta: String, val emotion: String?)
@@ -284,6 +291,8 @@ class ChatFlushManager(
         // streamTypingStates 跨协程访问(clear 可能在 switchSession 中调用),getOrPut 需加锁
         val state = synchronized(stateLock) { streamTypingStates.getOrPut(messageId) { StreamTypingState() } }
         val pendingText = StringBuilder()
+        // 一次 delta 内开关不会变：抓一次快照，避免逐字符回调
+        val stageDirectionEnabled = isStageDirectionEnabled()
 
         // 把累积的文本一次性追加到当前气泡,然后清空累积区
         fun flushPendingAppend() {
@@ -326,7 +335,7 @@ class ChatFlushManager(
                         state.sentenceIndex += 1
                     }
                 }
-                ch == '(' || ch == '（' -> {
+                (ch == '(' || ch == '（') && stageDirectionEnabled -> {
                     // 左括号结束当前气泡(不追加括号),进入回收段
                     flushPendingAppend()
                     if (state.currentMessageId != null) {
@@ -335,7 +344,7 @@ class ChatFlushManager(
                     }
                     state.parenDepth += 1
                 }
-                ch == ')' || ch == '）' -> {
+                (ch == ')' || ch == '）') && stageDirectionEnabled -> {
                     // 右括号结束当前气泡,退出回收段（只退一层，留够嵌套的余量）
                     flushPendingAppend()
                     if (state.currentMessageId != null) {
@@ -358,8 +367,9 @@ class ChatFlushManager(
                         state.currentMessageId = bubbleId
 
                         // 括号内被句号/省略号切出来的每一段都算撤回样式，
-                        // 这里不清零层数，右括号才是唯一的出口
-                        val isRetraction = state.parenDepth > 0
+                        // 这里不清零层数，右括号才是唯一的出口。
+                        // 开关关闭时即便层数还有残留（流式中途改设置）也不产出撤回气泡。
+                        val isRetraction = stageDirectionEnabled && state.parenDepth > 0
 
                         val messageType = if (isRetraction) "retraction" else "text"
                         createNewMessage(bubbleId, ch.toString(), messageType, emotion)

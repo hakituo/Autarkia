@@ -46,7 +46,7 @@ jobs:
         # code_sync.py 只用标准库，系统 python3 即可。
         run: |
           set -euo pipefail
-          cd /home/user/xiaoyou-core
+          cd /home/user/Autarkia
           python3 scripts/sync/code_sync.py pull
 
       - name: 执行部署脚本
@@ -57,7 +57,7 @@ jobs:
 
         run: |
           set -euo pipefail
-          repo="/home/user/xiaoyou-core"
+          repo="/home/user/Autarkia"
           cd "$repo"
 
           if [ ! -f scripts/deploy/deploy_linux.sh ]; then

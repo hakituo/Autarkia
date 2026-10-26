@@ -38,8 +38,7 @@ def _make_repo(root: Path) -> None:
     _write(root / ".env.example", "SECRET=")
     _write(root / "config" / "qweather_private_key.pem", "pem")
     _write(
-        root / "core" / "character" / "configs" / "extra" / "2026" / "09"
-        / "distilled_profile.md",
+        root / "core" / "character" / "configs" / "extra" / "2026" / "09" / "distilled_profile.md",
         "d",
     )
 
@@ -140,8 +139,7 @@ def test_backup_files_whitelist(tmp_path):
     assert not (files / ".env.example").exists()
     assert (files / "config" / "qweather_private_key.pem").is_file()
     assert (
-        files / "core" / "character" / "configs" / "extra" / "2026" / "09"
-        / "distilled_profile.md"
+        files / "core" / "character" / "configs" / "extra" / "2026" / "09" / "distilled_profile.md"
     ).is_file()
 
 

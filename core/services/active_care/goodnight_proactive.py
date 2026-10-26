@@ -32,7 +32,7 @@ from core.services.dual_role.personas import get_qq_profile_filename as _get_qq_
 from core.utils.logger import get_logger
 from core.utils.time_utils import today_str
 
-# 必须用 get_logger，否则日志只走 root logger（仅 console handler），不写入 xiaoyou_main.log
+# 必须用 get_logger，否则日志只走 root logger（仅 console handler），不写入 autarkia_main.log
 logger = get_logger(__name__)
 
 # 角色 ID → 人设文件名映射。

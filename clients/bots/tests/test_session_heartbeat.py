@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from clients.bots.qq.session.connection import SessionConnectionManager
-from clients.bots.qq.session.session import XiaoyouSession
+from clients.bots.qq.session.session import AutarkiaSession
 
 
 class _FakeAdapter:
@@ -19,7 +19,7 @@ class _FakeAdapter:
 
 class TestQQSessionHeartbeat(unittest.IsolatedAsyncioTestCase):
     async def test_handle_server_heartbeat_replies_ping_payload(self):
-        session = XiaoyouSession("default_user", _FakeAdapter())
+        session = AutarkiaSession("default_user", _FakeAdapter())
         fake_ws = AsyncMock()
         session.ws = fake_ws
 
@@ -33,7 +33,7 @@ class TestQQSessionHeartbeat(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload.get("platform"), "qq")
 
     async def test_handle_server_heartbeat_ignores_non_ping(self):
-        session = XiaoyouSession("default_user", _FakeAdapter())
+        session = AutarkiaSession("default_user", _FakeAdapter())
         fake_ws = AsyncMock()
         session.ws = fake_ws
 
@@ -78,8 +78,8 @@ class _ReconnectTestSession:
         self.queue = asyncio.Queue()
         self.adapter = _FakeAdapter()
         self._cfg = SimpleNamespace(
-            xiaoyou_ws_url="ws://127.0.0.1:8000/api/v1/ws",
-            xiaoyou_access_token="",
+            autarkia_ws_url="ws://127.0.0.1:8000/api/v1/ws",
+            autarkia_access_token="",
             master_qq_id=master_qq_id,
         )
         self._start_time = time.time()
@@ -164,7 +164,7 @@ class TestQQSessionReconnect(unittest.IsolatedAsyncioTestCase):
         session._connection_failure_since = time.time()
 
         await manager.notify_connection_issue(
-            ws_url=session._cfg.xiaoyou_ws_url,
+            ws_url=session._cfg.autarkia_ws_url,
             err=ConnectionRefusedError("Connection refused"),
         )
 

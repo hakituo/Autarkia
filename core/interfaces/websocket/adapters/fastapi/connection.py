@@ -131,7 +131,10 @@ class WebSocketConnectionMixin:
                 try:
                     message = await websocket.receive_json()
                 except WebSocketDisconnect as exc:
-                    log = logger.info if exc.code in (1000, 1001) else logger.warning
+                    # 1006（对端无关闭帧消失）在局域网是常态：弱网抖动 / 系统回收连接
+                    # 都是这个码，服务端无法也无需区分细节，记 INFO 即可；
+                    # 其余异常码（协议错误、策略关闭等）仍保持 WARNING。
+                    log = logger.info if exc.code in (1000, 1001, 1006) else logger.warning
                     log(
                         "WebSocket disconnected for user %s: (%s, '%s')",
                         user_id,

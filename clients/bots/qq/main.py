@@ -63,12 +63,12 @@ class QQAdapter:
         self.logger = self._init_logger()
 
         # 核心服务
-        self.http_client = HttpClient(self.cfg.xiaoyou_http_base_url, self.cfg.xiaoyou_access_token,
+        self.http_client = HttpClient(self.cfg.autarkia_http_base_url, self.cfg.autarkia_access_token,
                                       self.cfg.http_timeout_seconds, self.logger)
         self.health_checker = HealthChecker(self.http_client, self.logger)
         self.config_manager = ConfigManager(self.http_client, self.cfg, self.logger)
         self.voice_service = VoiceService(self.http_client, str(self.cfg.role_id or "").strip(),
-                                          self.cfg.role_name or "", self.cfg.xiaoyou_access_token, self.logger)
+                                          self.cfg.role_name or "", self.cfg.autarkia_access_token, self.logger)
         self.bionic_profile_service = BionicProfileService(self.http_client, self.cfg, self.logger)
 
         # 兼容旧代码的属性
@@ -328,7 +328,7 @@ class QQAdapter:
     async def _preflight_check(self):
         await self.health_checker.preflight_check(
             config_file=CONFIG_FILE, napcat_ws_url=self.cfg.napcat_ws_url,
-            xiaoyou_ws_url=self.cfg.xiaoyou_ws_url, xiaoyou_http_base_url=self.cfg.xiaoyou_http_base_url)
+            autarkia_ws_url=self.cfg.autarkia_ws_url, autarkia_http_base_url=self.cfg.autarkia_http_base_url)
 
     async def _sync_config_from_backend(self):
         await self.config_manager.sync_from_backend(

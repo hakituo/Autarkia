@@ -1,20 +1,25 @@
-"""验证聊天页语音输入（ASR）是"边说边出字"的流式体验，而不是说完才出结果。
+"""验证聊天页语音输入是「边说边出字、点完成立刻落字」的实时体验。
 
-需求：
-1. 录音过程中把 ASR 的流式中间结果实时上屏（转写条），不用等说完；
-2. 断句（endpoint）后已识别的内容不能丢，停止录音时要拿到完整文本。
+需求（2026-10-25 设计稿「Aveline Android Controls」）：
+1. 录音过程中把 ASR 的流式中间结果实时上屏，输入栏原位显示，不用等说完；
+2. 点「完成」时立刻把已经上屏的文本落进输入框，不等收尾解码；
+3. 收尾解码 / 模型加载不得占主线程（否则就是"点完停止愣几秒"）；
+4. 断句（endpoint）后已识别的内容不能丢，最终结果只替换「完成」时提交的那一段。
 
 对应实现：
-- SherpaNcnnAsrEngine：新增 committedText 累积已断句文本，partialText 恒为
-  "已确认句 + 当前句"；endpoint 命中时**先累积再 reset**（顺序反了这句就丢了）；
-  stopListening 结果改用 combineText 拼接，不再只返回最后一句；
-- VoiceInputManager：开录前清空上一轮中间态；partialText/amplitude 转发协程并入
-  同一个 job（原来每次开录都新起一组 collector，属于协程泄漏）；
-- ChatInputBars：新增 ChatVoiceTranscribingBar（波形 + 实时文本 + 停止按钮）；
-- ChatScreen：录音中 / Processing 阶段渲染转写条，绑定 voicePartialText / voiceAmplitude；
-- ChatVoiceInputController：最终结果落进输入框后清空 voicePartialText。
+- SherpaNcnnAsrEngine：committedText 累积已断句文本，partialText 恒为
+  "已确认句 + 当前句"；endpoint 命中时**先累积再 reset**；
+  stopListening 不再同步 flush，改为 IO 协程（等录音循环退出后再 inputFinished），
+  结果通过 state 发出；
+- VoiceInputManager：开录前清空中间态、collector 不泄漏；模型加载与首次开录都挪到后台，
+  并提供 isModelLoaded() 供启动路径判断；
+- InputArea / ChatVoiceInputPanel：输入栏原位切成语音态（实时文本 + 波形 + 计时 +
+  取消/完成），不再另挂转写横幅；
+- ChatVoiceInputController：点「完成」先把 voicePartialText 落进输入框，最终结果回来
+  只替换这一段；
+- ChatVoiceInputController：最终结果落进输入框后清空中间态并 reset 单例。
 
-运行：d:\\AI\\xiaoyou-core\\venv_core\\Scripts\\python.exe tests/scripts/android_frontend/verify_asr_streaming.py
+运行：venv_cpu/Scripts/python.exe tests/scripts/android_frontend/verify_asr_streaming.py
 """
 
 import re
@@ -26,12 +31,25 @@ APP_MAIN = ROOT / "clients/frontend/aveline-android/android/app/src/main/java/co
 SHERPA_ENGINE = APP_MAIN / "services/SherpaNcnnAsrEngine.kt"
 VOICE_MANAGER = APP_MAIN / "services/VoiceInputManager.kt"
 CHAT_DIR = APP_MAIN / "presentation/chat"
+INPUT_AREA = APP_MAIN / "presentation/components/InputArea.kt"
 CHAT_INPUT_BARS = CHAT_DIR / "ChatInputBars.kt"
+VOICE_PANEL = CHAT_DIR / "ChatVoiceInputPanel.kt"
 CHAT_SCREEN = CHAT_DIR / "ChatScreen.kt"
-# 底部区域（含转写条接线）在 2026-09-24 从 ChatScreen 拆到 ChatBottomArea.kt，检查点跟着搬家
+# 底部区域（含输入栏接线）在 2026-09-24 从 ChatScreen 拆到 ChatBottomArea.kt，检查点跟着搬家
 CHAT_BOTTOM_AREA = CHAT_DIR / "ChatBottomArea.kt"
 CHAT_VOICE_CONTROLLER = CHAT_DIR / "ChatVoiceInputController.kt"
 CHAT_VIEW_MODEL = CHAT_DIR / "ChatViewModel.kt"
+VOICE_RELATED_FILES = (
+    SHERPA_ENGINE,
+    VOICE_MANAGER,
+    INPUT_AREA,
+    CHAT_INPUT_BARS,
+    VOICE_PANEL,
+    CHAT_SCREEN,
+    CHAT_BOTTOM_AREA,
+    CHAT_VOICE_CONTROLLER,
+    CHAT_VIEW_MODEL,
+)
 
 IMPORT_RE = re.compile(r"^import\s+([\w.]+)(?:\s+as\s+(\w+))?\s*$")
 # Kotlin 属性委托（`val x by y`）会隐式调用 getValue/setValue，正文里搜不到名字，不算未使用
@@ -72,12 +90,14 @@ def main() -> int:
     results: list[tuple[bool, str]] = []
 
     print("\n" + "=" * 70)
-    print("聊天页 ASR 流式输出验证")
+    print("聊天页 ASR 实时输出验证")
     print("=" * 70)
 
     engine = SHERPA_ENGINE.read_text(encoding="utf-8")
     manager = VOICE_MANAGER.read_text(encoding="utf-8")
+    input_area = INPUT_AREA.read_text(encoding="utf-8")
     bars = CHAT_INPUT_BARS.read_text(encoding="utf-8")
+    panel = VOICE_PANEL.read_text(encoding="utf-8")
     screen = CHAT_SCREEN.read_text(encoding="utf-8")
     bottom_area = CHAT_BOTTOM_AREA.read_text(encoding="utf-8")
     controller = CHAT_VOICE_CONTROLLER.read_text(encoding="utf-8")
@@ -97,21 +117,12 @@ def main() -> int:
             "partialText 输出的是「已确认句 + 当前句」的完整流式文本",
         )
     )
-
-    # endpoint 必须先累积再 reset：reset 之后 recognizer.text 会变空
     commit_pos = engine.find("committedText = combineText(text)")
     reset_pos = engine.find("recognizer?.reset(recreate = false)", commit_pos)
     results.append(
         _check(
             commit_pos != -1 and reset_pos != -1 and commit_pos < reset_pos,
             "endpoint 命中时先累积当前句、后 reset（顺序反了会丢句）",
-        )
-    )
-
-    results.append(
-        _check(
-            "combineText(recognizer?.text ?: \"\")" in engine,
-            "stopListening 返回完整文本（已确认句 + 最后一句），不再只剩最后一句",
         )
     )
     results.append(
@@ -121,11 +132,42 @@ def main() -> int:
         )
     )
 
-    # 2. VoiceInputManager：中间态清理 + collector 不泄漏
+    # 2. 收尾解码不能占主线程
+    stop_start = engine.find("fun stopListening()")
+    stop_body = engine[stop_start : engine.find("fun cancel()", stop_start)]
     results.append(
         _check(
-            "开录前清空上一轮的中间态" in manager,
-            "VoiceInputManager 开录前清空 partialText/amplitude（避免降级通道带回上次文本）",
+            stop_start != -1
+            and "engineScope.launch" in stop_body
+            and "inputFinished()" in stop_body,
+            "stopListening 把收尾解码放进 IO 协程（不再在主线程 flush）",
+        )
+    )
+    results.append(
+        _check(
+            "pendingRecord?.join()" in stop_body,
+            "收尾解码前先等录音循环退出，避免和 acceptSamples 并发进 native",
+        )
+    )
+    results.append(
+        _check(
+            "if (_state.value != AsrState.Processing) return@launch" in stop_body,
+            "cancel 之后不再把迟到的识别结果抛回 UI",
+        )
+    )
+
+    # 3. 模型加载 / 开录路径不卡主线程
+    results.append(
+        _check(
+            "scope.launch { sherpaNcnnEngine.initialize() }" in manager,
+            "VoiceInputManager 在后台预热 ASR 模型（不是点麦克风时才在主线程加载）",
+        )
+    )
+    results.append(
+        _check(
+            "sherpaNcnnEngine.isModelLoaded()" in manager
+            and manager.count("sherpaStartJob") >= 3,
+            "首次开录改成后台加载完再启动，并可在加载期间被 stop/cancel 取消",
         )
     )
     results.append(
@@ -136,54 +178,72 @@ def main() -> int:
         )
     )
 
-    # 3. UI 层：流式中间结果显示到转写条
+    # 4. UI 层：输入栏原位语音态 + 实时文本
     results.append(
         _check(
-            "fun ChatVoiceTranscribingBar(" in bars,
-            "ChatInputBars 提供语音实时转写条 ChatVoiceTranscribingBar",
+            "voicePanel: (@Composable () -> Unit)? = null" in input_area
+            and "voicePanel()" in input_area,
+            "InputArea 支持用 voicePanel 原位替换输入区（不另挂横幅）",
         )
     )
     results.append(
         _check(
-            "AudioWaveform(" in bars and "partialText.isNotBlank()" in bars,
-            "转写条展示实时文本并带音量波形",
+            "fun ChatVoiceInputPanel(" in panel
+            and "partialText.isNotBlank()" in panel
+            and "VoiceWaveBars(" in panel,
+            "ChatVoiceInputPanel 实时展示 ASR 中间文本并带音量波形",
         )
     )
     results.append(
         _check(
-            "ChatVoiceTranscribingBar(" in bottom_area
-            and "partialText = uiState.voicePartialText" in bottom_area
-            and "amplitude = uiState.voiceAmplitude" in bottom_area
+            "onCancel = onVoiceCancel" in bars
+            and "onFinish = onVoiceFinish" in bars
+            and "ChatVoiceInputPanel(" in bars,
+            "ChatBottomBar 录音时切到语音面板，取消/完成各自接线",
+        )
+    )
+    results.append(
+        _check(
+            "ChatVoiceTranscribingBar" not in bottom_area
+            and "ChatVoiceTranscribingBar" not in bars,
+            "旧的转写横幅已移除，不再有「录音中 + 收尾识别」两套提示",
+        )
+    )
+    results.append(
+        _check(
+            "voicePartialText = uiState.voicePartialText" in bottom_area
+            and "voiceAmplitude = uiState.voiceAmplitude" in bottom_area
             and "ChatBottomArea(" in screen,
-            "聊天页把 voicePartialText / voiceAmplitude 接到转写条（流式上屏）",
+            "聊天页把 voicePartialText / voiceAmplitude 接到输入栏（实时上屏）",
         )
     )
     results.append(
         _check(
-            "uiState.isRecording" in bottom_area
-            and "uiState.voiceInputState is VoiceInputState.Processing" in bottom_area,
-            "录音中与收尾识别阶段都显示转写条",
-        )
-    )
-    results.append(
-        _check(
-            "onStop = onStopVoice" in bottom_area
-            and "onStopVoice = { viewModel.stopVoiceRecording() }" in screen,
-            "转写条可直接停止录音（与点麦克风是同一个动作）",
+            "onVoiceFinish = { viewModel.stopVoiceRecording() }" in screen
+            and "onVoiceCancel = { viewModel.cancelVoiceRecording() }" in screen,
+            "面板「完成」= 停止录音，「取消」= 丢弃本轮",
         )
     )
 
-    # 4. 最终结果落地后清掉中间态，且 Singleton 状态归零（防旧文本重放回输入框）
+    # 5. 「完成」立刻落字，最终结果只替换提交过的那一段
     results.append(
         _check(
-            "voicePartialText = \"\"" in controller,
-            "ChatVoiceInputController 在 Result 后清空 voicePartialText",
+            "val partial = current.voicePartialText.trim()" in controller
+            and "appendVoiceText(it.inputText, partial)" in controller,
+            "stopRecording 先把已实时上屏的文本落进输入框，再停引擎",
         )
     )
     results.append(
         _check(
-            "voiceInputManager.reset()" in controller,
-            "Result 消费后立即重置 VoiceInputManager（Singleton StateFlow 不归零会重放旧识别文本）",
+            "replaceCommittedText(it.inputText, committed, state.text)" in controller,
+            "最终结果只替换「完成」时提交的那一段（不覆盖用户随后补的字）",
+        )
+    )
+    results.append(
+        _check(
+            "voicePartialText = \"\"" in controller
+            and "voiceInputManager.reset()" in controller,
+            "Result 消费后清空中间态并重置单例（防止旧识别文本重放回输入框）",
         )
     )
     results.append(
@@ -199,9 +259,9 @@ def main() -> int:
         )
     )
 
-    # 5. 没有留下未使用 import
+    # 6. 没有留下未使用 import
     unused: list[str] = []
-    for path in (SHERPA_ENGINE, VOICE_MANAGER, CHAT_INPUT_BARS, CHAT_SCREEN, CHAT_BOTTOM_AREA, CHAT_VOICE_CONTROLLER, CHAT_VIEW_MODEL):
+    for path in VOICE_RELATED_FILES:
         for line in find_unused_imports(path):
             unused.append(f"{path.name}: {line}")
     results.append(
@@ -222,7 +282,7 @@ def main() -> int:
         for msg in failed:
             print(f"  {msg}")
         return 1
-    print("全部通过：录音中实时上屏中间文本，断句不丢字，停止后完整文本落进输入框。")
+    print("全部通过：边说边出字，点完成立刻落字，收尾解码不再卡主线程。")
     return 0
 
 

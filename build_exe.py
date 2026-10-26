@@ -69,7 +69,7 @@ for mod in hidden_imports:
 args = (
     [
         "main.py",
-        "--name=XiaoyouCore",
+        "--name=Autarkia",
         "--onedir",
         "--windowed",
         "--clean",

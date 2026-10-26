@@ -57,6 +57,7 @@ from memory.core.analysis_ops import (
 # 替身对象
 # ---------------------------------------------------------------------------
 
+
 class _FakeRWLock:
     """记录读/写锁获取次数的读写锁替身。"""
 
@@ -255,6 +256,7 @@ def _make_prep(**overrides):
 # 纯工具函数
 # ---------------------------------------------------------------------------
 
+
 def test_ensure_analysis_meta_creates_and_reuses():
     """缺失或类型错误时新建 dict，已存在时原样复用。"""
     metadata = {}
@@ -374,6 +376,7 @@ def test_build_bert_shadow_input_full_and_minimal():
 # BERT 影子分析
 # ---------------------------------------------------------------------------
 
+
 def test_run_bert_shadow_analysis_ok(monkeypatch):
     """正常结果：字段被清洗，status=ok，延迟为有限值。"""
     analyzer = _install_fake_bert(
@@ -429,6 +432,7 @@ def test_run_bert_shadow_analysis_non_dict_result(monkeypatch):
 # 待分析计数 / 取待分析项
 # ---------------------------------------------------------------------------
 
+
 def test_count_pending_analysis_counter_and_scan():
     """有 O(1) 计数器时直接返回；否则遍历 metadata 统计。"""
     assert count_pending_analysis(_FakeManager(pending_count=5)) == 5
@@ -482,12 +486,16 @@ def test_get_pending_analysis_items_filters_sorts_limits():
 # attach_ai_shadow_result / count_ai_shadow_results
 # ---------------------------------------------------------------------------
 
+
 def test_attach_ai_shadow_result_missing_memory():
     """目标记忆不存在或非 dict 时返回 False。"""
     manager = _FakeManager({"m1": "not-a-dict"})
-    assert attach_ai_shadow_result(
-        manager, "m1", ai_topics=["t"], ai_category="food", ai_confidence=0.5
-    ) is False
+    assert (
+        attach_ai_shadow_result(
+            manager, "m1", ai_topics=["t"], ai_category="food", ai_confidence=0.5
+        )
+        is False
+    )
     assert manager.save_count == 0
 
 
@@ -543,9 +551,12 @@ def test_attach_ai_shadow_result_history_rotation():
     }
     memory = {"metadata": {"ai_shadow": prev}, "weight": 1.0}
     manager = _FakeManager({"m1": memory}, ai_shadow_count=0)
-    assert attach_ai_shadow_result(
-        manager, "m1", ai_topics=["new"], ai_category="drink", ai_confidence=0.9
-    ) is True
+    assert (
+        attach_ai_shadow_result(
+            manager, "m1", ai_topics=["new"], ai_category="drink", ai_confidence=0.9
+        )
+        is True
+    )
     # 已有 ai_shadow -> 不再递增计数器
     assert manager._ai_shadow_count == 0
     history = memory["metadata"]["ai_shadow"]["history"]
@@ -559,9 +570,10 @@ def test_attach_ai_shadow_result_non_dict_metadata():
     """metadata 非 dict 时被替换为新的 dict，仍能成功写入。"""
     memory = {"metadata": None}
     manager = _FakeManager({"m1": memory})
-    assert attach_ai_shadow_result(
-        manager, "m1", ai_topics=[], ai_category="", ai_confidence=0.0
-    ) is True
+    assert (
+        attach_ai_shadow_result(manager, "m1", ai_topics=[], ai_category="", ai_confidence=0.0)
+        is True
+    )
     assert memory["metadata"]["ai_shadow"]["category"] == "uncategorized"
     assert manager.save_count == 1
 
@@ -584,6 +596,7 @@ def test_count_ai_shadow_results_counter_and_scan():
 # ---------------------------------------------------------------------------
 # 打分函数
 # ---------------------------------------------------------------------------
+
 
 def test_compute_rule_score():
     """主题数强度 + 分类强度按权重加和。"""
@@ -711,6 +724,7 @@ def test_assess_risk_level_branches():
 # ---------------------------------------------------------------------------
 # _apply_fusion_action
 # ---------------------------------------------------------------------------
+
 
 def test_apply_fusion_action_override():
     """达到覆盖阈值且允许覆盖时改写字段并记录快照。"""
@@ -909,6 +923,7 @@ def test_apply_fusion_action_reject():
 # _write_fusion_metadata
 # ---------------------------------------------------------------------------
 
+
 def test_write_fusion_metadata_writes_all_blocks():
     """融合元数据同时落到 analysis_meta、metadata 顶层与 ai_shadow。"""
     memory = {"metadata": {}, "topics": ["a"], "category": "food"}
@@ -978,6 +993,7 @@ def test_write_fusion_metadata_non_dict_metadata():
 # ---------------------------------------------------------------------------
 # apply_ai_shadow_adjudication
 # ---------------------------------------------------------------------------
+
 
 def test_apply_ai_shadow_adjudication_no_candidates():
     """无候选时返回零统计，且不触发保存。"""
@@ -1054,9 +1070,7 @@ def test_apply_ai_shadow_adjudication_reject_rollback_and_rule_blocked():
         category="drink",
         weight=5.0,
         ai_shadow={"topics": [], "category": "uncategorized", "confidence": 0.0},
-        analysis_meta={
-            "override_snapshot": {"topics": ["s"], "category": "food", "weight": 2.0}
-        },
+        analysis_meta={"override_snapshot": {"topics": ["s"], "category": "food", "weight": 2.0}},
     )
     blocked_mem = _make_memory(
         "m_blocked",
@@ -1179,6 +1193,7 @@ def test_apply_ai_shadow_adjudication_supplement_and_threshold_clamp():
 # _prepare_pending_analysis
 # ---------------------------------------------------------------------------
 
+
 def test_prepare_pending_analysis_empty_content():
     """内容为空时返回 skip 标记。"""
     manager = _FakeManager()
@@ -1238,13 +1253,12 @@ def test_prepare_pending_analysis_uncategorized_and_no_emotion():
 # _apply_pending_analysis_result
 # ---------------------------------------------------------------------------
 
+
 def test_apply_pending_analysis_result_empty_content():
     """空内容：清 pending、减计数、写错误态。"""
     memory = {"metadata": {"analysis_pending": True}}
     manager = _FakeManager({"m1": memory}, pending_count=3)
-    ok = _apply_pending_analysis_result(
-        manager, "m1", memory, {"empty_content": True}, {}, 42.0
-    )
+    ok = _apply_pending_analysis_result(manager, "m1", memory, {"empty_content": True}, {}, 42.0)
     assert ok is False
     assert manager._pending_analysis_count == 2
     metadata = memory["metadata"]
@@ -1259,9 +1273,10 @@ def test_apply_pending_analysis_result_empty_content_non_dict_metadata():
     """空内容但 metadata 非 dict 时安全返回 False。"""
     memory = {"metadata": [1, 2]}
     manager = _FakeManager({"m1": memory})
-    assert _apply_pending_analysis_result(
-        manager, "m1", memory, {"empty_content": True}, {}, 1.0
-    ) is False
+    assert (
+        _apply_pending_analysis_result(manager, "m1", memory, {"empty_content": True}, {}, 1.0)
+        is False
+    )
     assert memory["metadata"] == [1, 2]
 
 
@@ -1317,9 +1332,7 @@ def test_apply_pending_analysis_result_ok_path():
     assert "m1" not in manager.category_index["uncategorized"]
     assert "m1" in manager.category_index["food"]
     assert manager.topic_weights["a"] == pytest.approx(0.15)
-    assert manager.emotion_memory_map["happy"] == [
-        {"memory_id": "m1", "relevance_score": 0.8}
-    ]
+    assert manager.emotion_memory_map["happy"] == [{"memory_id": "m1", "relevance_score": 0.8}]
     assert manager.keyword_dirty == ["m1"]
 
 
@@ -1328,9 +1341,7 @@ def test_apply_pending_analysis_result_non_ok_status():
     memory = {"metadata": {}, "category": "food", "weight": 1.0}
     manager = _FakeManager({"m1": memory}, ai_shadow_count=0)
     prep = _make_prep(category="food", old_category="food", emotions=[], search_keywords=[])
-    ok = _apply_pending_analysis_result(
-        manager, "m1", memory, prep, {"status": "skipped"}, 5.0
-    )
+    ok = _apply_pending_analysis_result(manager, "m1", memory, prep, {"status": "skipped"}, 5.0)
     assert ok is True
     metadata = memory["metadata"]
     assert metadata["analysis_meta"]["state"] == "rule_done"
@@ -1342,6 +1353,7 @@ def test_apply_pending_analysis_result_non_ok_status():
 # ---------------------------------------------------------------------------
 # process_pending_analysis
 # ---------------------------------------------------------------------------
+
 
 def test_apply_pending_analysis_result_non_dict_metadata():
     """正常路径但 metadata 非 dict 时被替换为新的 dict。"""
@@ -1470,17 +1482,19 @@ def test_process_pending_analysis_skips_non_dict_memory(monkeypatch):
 # 常量/配置健全性（防止顺手改坏被别处依赖的默认值）
 # ---------------------------------------------------------------------------
 
+
 def test_fusion_config_defaults_are_consistent():
     """默认配置权重之和为 1，且补充阈值不高于覆盖阈值。"""
     config = FusionConfig()
     assert config == DEFAULT_FUSION_CONFIG
-    assert round(
-        config.s_rule + config.s_ai + config.s_consistency + config.s_stability, 6
-    ) == 1.0
-    assert round(
-        config.consistency_topic + config.consistency_category + config.consistency_discourse,
-        6,
-    ) == 1.0
+    assert round(config.s_rule + config.s_ai + config.s_consistency + config.s_stability, 6) == 1.0
+    assert (
+        round(
+            config.consistency_topic + config.consistency_category + config.consistency_discourse,
+            6,
+        )
+        == 1.0
+    )
     assert analysis_ops.DISCOURSE_WEIGHT_PENALTIES["QUESTION"] == -0.4
     assert "QUESTION" in analysis_ops.BLOCKED_DISCOURSE_LABELS
     assert "profile" in analysis_ops.RISK_MEMORY_TYPES

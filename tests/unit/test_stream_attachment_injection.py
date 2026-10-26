@@ -120,8 +120,7 @@ def test_multiple_images_upgrade_to_image_url_parts(tmp_path, monkeypatch, no_ag
 
     messages, _ = _build(
         _Agent(),
-        "[图片: /output/image/uploads/a.png]\n"
-        "[图片: /output/image/uploads/b.jpg]\n看看这两张",
+        "[图片: /output/image/uploads/a.png]\n" "[图片: /output/image/uploads/b.jpg]\n看看这两张",
     )
 
     content = messages[-1]["content"]
@@ -197,8 +196,8 @@ def test_new_attachment_turn_keeps_history_image_too(tmp_path, monkeypatch, no_a
     assert current_parts[0]["text"] == "再看这张"
 
 
-def test_history_images_beyond_limit_stay_text(tmp_path, monkeypatch, no_agenda):
-    """超过张数上限的旧图不再还原，避免请求体无限膨胀。"""
+def test_history_images_all_restored_without_limit(tmp_path, monkeypatch, no_agenda):
+    """历史图片默认不设张数上限：窗口内所有图都还原，不再只留最近 3 张。"""
     for name in ("a.png", "b.png", "c.png", "d.png"):
         _image_uploads(tmp_path, monkeypatch, name)
     history = [
@@ -214,12 +213,11 @@ def test_history_images_beyond_limit_stay_text(tmp_path, monkeypatch, no_agenda)
 
     messages, _ = _build(_HistoryAgent(history), "第五句")
 
-    # 默认最多 3 张：最旧的 a 保持纯文本，b/c/d 还原成附件
-    # （history 从 user 开始，没有 system，所以下标是 0/2/4/6）
-    assert isinstance(messages[0]["content"], str)
-    assert isinstance(messages[2]["content"], list)
-    assert isinstance(messages[4]["content"], list)
-    assert isinstance(messages[6]["content"], list)
+    # history 从 user 开始，没有 system，所以图片消息下标是 0/2/4/6
+    for index in (0, 2, 4, 6):
+        content = messages[index]["content"]
+        assert isinstance(content, list)
+        assert content[-1]["type"] == "image_url"
 
 
 def test_history_image_missing_file_stays_text(tmp_path, monkeypatch, no_agenda):
