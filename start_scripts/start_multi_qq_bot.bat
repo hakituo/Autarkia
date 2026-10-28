@@ -3,7 +3,7 @@ chcp 65001 >nul
 setlocal EnableExtensions EnableDelayedExpansion
 
 echo =======================================================
-echo       Xiaoyou Multi QQ Bot (Aveline + Ling)
+echo       Autarkia Multi QQ Bot (Aveline + Ling)
 echo =======================================================
 echo.
 
@@ -112,7 +112,7 @@ if not exist "%MULTI_SCRIPT%" (
     exit /b 1
 )
 
-start "Xiaoyou-MultiQQ" cmd /k "cd /d !BASE_DIR! && !PYTHON_EXE! !MULTI_SCRIPT!"
+start "Autarkia-MultiQQ" cmd /k "cd /d !BASE_DIR! && !PYTHON_EXE! !MULTI_SCRIPT!"
 
 echo.
 echo =======================================================

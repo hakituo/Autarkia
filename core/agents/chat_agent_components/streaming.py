@@ -35,6 +35,7 @@ from .streaming_pipeline import (
     resolve_model_path,
     retry_visible_response,
 )
+from .thinking_mode import get_request_thinking
 
 logger = get_logger("ChatAgent")
 
@@ -282,6 +283,11 @@ async def stream_chat_impl(
             llm_kwargs["web_search_enabled"] = True
         if api_key:
             llm_kwargs["api_key"] = api_key
+        # 按请求开关思考模式（安卓「模型」页的开关）。None 表示客户端没表态，
+        # 不传这个 kwarg，继续沿用 DeepSeekClient 构造时的后端配置。
+        thinking_enabled = get_request_thinking()
+        if thinking_enabled is not None:
+            llm_kwargs["thinking_enabled"] = thinking_enabled
 
         try:
             async for chunk in agent.llm_module.stream_chat(

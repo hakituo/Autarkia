@@ -26,6 +26,7 @@ from typing import Iterable, Optional
 
 MAIN_REF = "refs/heads/main"
 SYNC_REMOTE = "autarkia-sync"
+#: 兼容旧引用；pull 现在按来源各用一个 ref，避免后一次 fetch 覆盖前一次
 SYNC_REF = f"refs/remotes/{SYNC_REMOTE}/main"
 
 #: 环境变量新名优先、旧名兼容（Linux /etc/environment 可能仍是旧写法）
@@ -112,14 +113,18 @@ def current_branch(repo: Path) -> str:
     return git_out(repo, "rev-parse", "--abbrev-ref", "HEAD")
 
 
-def fetch_from(repo: Path, source: Path) -> bool:
-    """从本地路径 fetch 对方的 main，落到 ``refs/remotes/autarkia-sync/main``。"""
+def fetch_from(repo: Path, source: Path, ref: str = SYNC_REF) -> bool:
+    """从本地路径 fetch 对方的 main，落到指定的远端跟踪引用。
+
+    ``ref`` 由调用方按来源区分：peer 与 hub 各用一个，否则拉完 hub 会把
+    peer 的结果冲掉，日志里先「无法快进」再「已是最新」，自相矛盾。
+    """
     proc = run_git(
         repo,
         "fetch",
         "--no-tags",
         str(source),
-        f"+{MAIN_REF}:{SYNC_REF}",
+        f"+{MAIN_REF}:{ref}",
         safe=[source],
     )
     if proc.returncode != 0:
@@ -129,13 +134,26 @@ def fetch_from(repo: Path, source: Path) -> bool:
     return True
 
 
-def merge_fast_forward(repo: Path) -> int:
-    """把 SYNC_REF 快进到当前分支；不能快进时如实说明原因。"""
+def blocked_files(repo: Path, target: str) -> list[str]:
+    """列出真正挡住快进的文件：对端要改、本机又有未提交改动的交集。
+
+    直接打印整份 ``git status`` 没用 —— 双系统并存时本机常有上百个无关改动，
+    真正挡路的往往只有一两个，混在里头看不出来。
+    """
+    incoming = set(git_out(repo, "diff", "--name-only", "HEAD", target).splitlines())
+    if not incoming:
+        return []
+    local = set(git_out(repo, "diff", "--name-only", "HEAD").splitlines())
+    return sorted(incoming & local)
+
+
+def merge_fast_forward(repo: Path, ref: str = SYNC_REF) -> int:
+    """把 ``ref`` 快进到当前分支；不能快进时如实说明原因。"""
     head = rev(repo, "HEAD")
     if not head:
         print("[INFO] 本机仓库还没有提交，跳过合并")
         return RC_OK
-    target = rev(repo, SYNC_REF)
+    target = rev(repo, ref)
     if not target:
         print("[INFO] 对端还没有 main 分支，跳过")
         return RC_OK
@@ -150,12 +168,17 @@ def merge_fast_forward(repo: Path) -> int:
         print(git_out(repo, "log", "--oneline", "--max-count=5", f"{head}..{target}"))
         return RC_PENDING
 
-    proc = run_git(repo, "merge", "--ff-only", SYNC_REF)
+    proc = run_git(repo, "merge", "--ff-only", ref)
     if proc.returncode != 0:
         print("[WARN] 无法快进：本地改动挡住了这次合并，提交或还原后下次自动重试")
-        blocked = git_out(repo, "status", "--porcelain", "--untracked-files=no")
-        if blocked:
-            print(blocked)
+        blocked = blocked_files(repo, target)
+        for path in blocked:
+            print(f"       挡住：{path}")
+        if not blocked:
+            # 交集为空说明挡路的不是已跟踪改动（如未跟踪文件与对端新文件同名），
+            # 这时只能给出 git 自己的最后一句。
+            detail = (proc.stderr or proc.stdout).strip().splitlines()
+            print(f"       {detail[-1] if detail else '未知原因'}")
         return RC_PENDING
     print(f"[PASS] 已快进 {head[:7]} -> {target[:7]}")
     return RC_OK
@@ -169,8 +192,8 @@ def do_pull(repo: Path, hub: Path, peer: Optional[Path]) -> int:
         return RC_OK
 
     sources = [
-        path
-        for path in (peer, hub)
+        (label, path)
+        for label, path in (("peer", peer), ("hub", hub))
         if path is not None and path.exists() and path.resolve() != repo.resolve()
     ]
     if not sources:
@@ -178,7 +201,7 @@ def do_pull(repo: Path, hub: Path, peer: Optional[Path]) -> int:
         return RC_OK
 
     pending = False
-    for source in sources:
+    for label, source in sources:
         # 先确认它真是 git 仓库：分区挂错 / 路径写错时不能报成「没有 main 分支」，
         # 那会让人以为同步正常、只是对端还没提交。
         if run_git(source, "rev-parse", "--git-dir").returncode != 0:
@@ -187,10 +210,12 @@ def do_pull(repo: Path, hub: Path, peer: Optional[Path]) -> int:
         if not rev(source, MAIN_REF):
             print(f"[INFO] {source} 还没有 main 分支，跳过")
             continue
-        if not fetch_from(repo, source):
+        # 每个来源一个 ref：共用一个的话，hub 拉完会把 peer 的 fetch 结果冲掉。
+        ref = f"refs/remotes/{SYNC_REMOTE}/{label}"
+        if not fetch_from(repo, source, ref):
             continue
         print(f"[INFO] 已从 {source} 获取提交")
-        if merge_fast_forward(repo) == RC_PENDING:
+        if merge_fast_forward(repo, ref) == RC_PENDING:
             pending = True
     return RC_PENDING if pending else RC_OK
 

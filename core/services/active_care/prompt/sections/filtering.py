@@ -135,6 +135,8 @@ _DYNAMIC_TASK_OPTIONAL.update(
             {"authoritative_calendar", "tone_reference_text", "role_activity_anchor"}
         ),
         "focus_nudge": frozenset({"authoritative_calendar", "out_of_context_guard"}),
+        # 轻问候开场只要人设语气，不带任何话题类上下文（免得开场白里漏出要聊的事）
+        "agenda_opener": frozenset({"tone_reference_text"}),
     }
 )
 _SECTION_KEYWORDS: Dict[str, Tuple[str, ...]] = {

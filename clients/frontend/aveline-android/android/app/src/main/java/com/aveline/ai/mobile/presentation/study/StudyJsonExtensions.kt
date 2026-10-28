@@ -58,3 +58,21 @@ internal fun JsonObject.double(key: String): Double? {
     if (element !is JsonPrimitive) return null
     return element.doubleOrNull
 }
+
+/**
+ * 从 workspace study panel 响应解析今日学习分钟数。
+ *
+ * study_panel.today 是权威口径（含背单词前台计时）；workspace_snapshot.portrait
+ * 是旧版快照路径，仅作兼容兜底。字段缺失时返回 0。
+ */
+internal fun parseTodayStudyMinutes(response: JsonObject): Int {
+    val data = response["data"] as? JsonObject ?: response
+    val studyToday = (data["study_panel"] as? JsonObject)
+        ?.get("today") as? JsonObject
+    val studyPortrait = ((data["workspace_snapshot"] as? JsonObject)
+        ?.get("portrait") as? JsonObject)
+        ?.get("study") as? JsonObject
+    return studyToday?.int("total_minutes")
+        ?: studyPortrait?.int("total_minutes")
+        ?: 0
+}

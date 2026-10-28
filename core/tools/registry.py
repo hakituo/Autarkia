@@ -471,6 +471,20 @@ def register_all_tools(registry: ToolRegistry):
     except ImportError as e:
         logger.warning("[register] 工具 import 失败: %s", e)
 
+    # === 梗概原话展开工具（search_memory 梗概不够、需要原话时才用）===
+    try:
+        from core.tools.expand_memory_tool import ExpandMemoryTool
+        registry.register(ExpandMemoryTool())
+    except ImportError as e:
+        logger.warning("[register] 工具 import 失败: %s", e)
+
+    # === 开场议程结束工具（只在有未结束议程的轮次挂上）===
+    try:
+        from core.tools.close_agenda_tool import CloseAgendaTool
+        registry.register(CloseAgendaTool())
+    except ImportError as e:
+        logger.warning("[register] 工具 import 失败: %s", e)
+
     # === 聊天历史搜索工具 ===
     try:
         from core.tools.search_chat_history_tool import SearchChatHistoryTool

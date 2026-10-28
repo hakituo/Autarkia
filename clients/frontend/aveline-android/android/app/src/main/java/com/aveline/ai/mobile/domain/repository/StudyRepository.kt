@@ -105,20 +105,11 @@ interface StudyRepository {
         scope: String = "book"
     ): Result<JsonObject>
 
-    /** 获取复习总览（今日待复习数、连续天数、记忆曲线等） */
+    /** 获取复习总览（今日待复习数、连续天数、已掌握等） */
     suspend fun getReviewOverview(): Result<JsonObject>
-
-    /** 获取记忆保持曲线数据 */
-    suspend fun getMemoryCurve(): Result<JsonObject>
 
     /** 获取高错词列表 */
     suspend fun getMistakes(): Result<JsonObject>
-
-    /** 手动记录当天背了多少个单词 */
-    suspend fun addManualStudy(count: Int, date: String? = null): Result<JsonObject>
-
-    /** 获取手动背诵统计 */
-    suspend fun getManualStudyStats(days: Int = 7, date: String? = null): Result<JsonObject>
 
     /** 获取词书统计:可用词书列表与当前词书 */
     suspend fun getVocabBookStats(): Result<JsonObject>

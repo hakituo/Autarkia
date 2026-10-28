@@ -55,7 +55,9 @@ def _wmm(user_id: str = "default", persona: str = None):
 async def list_memories(
     user_id: str = Query("default", description="用户 ID"),
     persona: Optional[str] = Query(None, description="人格文件名（如 core_aveline.json），传入后按角色隔离记忆"),
-    limit: int = Query(50, ge=1, le=500, description="返回条数上限"),
+    limit: int = Query(50, ge=1, le=500, description="单页返回条数上限"),
+    offset: int = Query(0, ge=0, description="跳过的条数，用于滚动懒加载"),
+    sort: str = Query("weight", description="排序：weight/newest/oldest/accessed/important"),
     min_weight: Optional[float] = Query(None, description="按最小权重过滤"),
     category: Optional[str] = Query(None, description="按分类过滤"),
     emotion: Optional[str] = Query(None, description="按情绪过滤 / 加权"),
@@ -65,18 +67,22 @@ async def list_memories(
 
     原 /memory/weighted（带 category/emotion 过滤）与 /memory（固定 limit=50）
     两个重复入口已合并为本端点，统一用 query 参数过滤。
+    客户端按 offset + limit 分页拉取，返回 total / has_more 供滚动加载判断。
     """
     try:
         manager = await asyncio.to_thread(_wmm, user_id, persona)
-        analysis_limit = max(32, min(256, int(limit) * 4))
-        await asyncio.to_thread(manager.process_pending_analysis, analysis_limit)
+        if offset == 0:
+            analysis_limit = max(32, min(256, int(limit) * 4))
+            await asyncio.to_thread(manager.process_pending_analysis, analysis_limit)
         exclude_categories = (
             None if include_thinking or (category == "thinking") else ["thinking"]
         )
-        memories = await asyncio.to_thread(
-            manager.get_weighted_memories,
+        memories, total = await asyncio.to_thread(
+            manager.get_weighted_memories_page,
             min_weight=min_weight,
             limit=limit,
+            offset=offset,
+            sort_by=sort,
             category=category,
             emotion=emotion,
             exclude_categories=exclude_categories,
@@ -84,6 +90,9 @@ async def list_memories(
         return {
             "status": "success",
             "data": memories,
+            "total": total,
+            "offset": offset,
+            "has_more": offset + len(memories) < total,
             "timestamp": time.time(),
         }
     except Exception as e:

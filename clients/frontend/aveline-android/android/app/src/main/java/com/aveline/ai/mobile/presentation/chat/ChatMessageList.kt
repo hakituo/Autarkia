@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -184,7 +185,10 @@ private fun LoadedMessageList(
         if (latestItemIndex < 0) return
         programmaticFollowInProgress = true
         try {
-            listState.scrollToItem(latestItemIndex)
+            // 对齐的是最后一条的「底部」：scrollToItem 默认把条目顶边贴到 viewport 顶部，
+            // 最后一条比 viewport 高时（长回复 + 键盘弹出）会停在它的开头、末尾被键盘挡住。
+            // 给一个很大的偏移，LazyColumn 测量时会钳到内容末尾，正好贴底。
+            listState.scrollToItem(latestItemIndex, scrollOffset = SCROLL_TO_BOTTOM_OFFSET)
             followLatest = true
         } finally {
             programmaticFollowInProgress = false
@@ -317,6 +321,7 @@ private fun LoadedMessageList(
                 }
             }
             .onSizeChanged { listViewportHeightPx = it.height },
+        contentPadding = PaddingValues(bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         items(
@@ -467,3 +472,6 @@ private fun EmptyChatState(
         )
     }
 }
+
+/** 足够大、又不会在 LazyColumn 内部加减时溢出的偏移，用来把最后一条滚到底边。 */
+private const val SCROLL_TO_BOTTOM_OFFSET = Int.MAX_VALUE / 4

@@ -13,7 +13,9 @@ import com.aveline.ai.mobile.domain.models.Message
  * @property selectedTopic 选中的话题过滤（后端 category 大量为 uncategorized，改用 topics 归组）
  * @property sortOrder 排序方式
  * @property stats 记忆统计
- * @property isLoading 是否加载中
+ * @property isLoading 首屏是否加载中
+ * @property isLoadingMore 是否正在加载下一页
+ * @property hasMore 是否还有下一页
  * @property error 错误信息
  * @property showDeleteConfirm 是否显示删除确认
  * @property memoryToDelete 待删除的记忆
@@ -31,6 +33,8 @@ data class MemoryUiState(
     val sortOrder: MemorySortOrder = MemorySortOrder.NEWEST_FIRST,
     val stats: MemoryStats? = null,
     val isLoading: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val hasMore: Boolean = false,
     val error: String? = null,
     val showDeleteConfirm: Boolean = false,
     val memoryToDelete: Memory? = null,

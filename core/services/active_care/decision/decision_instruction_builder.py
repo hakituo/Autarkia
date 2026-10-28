@@ -1,13 +1,12 @@
 """主动关怀决策指令构建模块
 
 从 decision.py 拆分而来，包含：
-- 日常作息探针指令构建
-- 行为指引文本构建（画像/任务/模式/时段等约束）
+- 行为指引文本构建（任务/模式/时段等约束）
 
 关键词映射与覆盖检测已迁移到 portrait_keyword_map 模块统一管理。
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from core.utils.logger import get_logger
 from core.services.active_care.decision.portrait_keyword_map import (
@@ -17,45 +16,8 @@ from core.services.active_care.decision.portrait_keyword_map import (
 logger = get_logger("ACTIVE_CARE_DECISION")
 
 
-def _build_daily_routine_probe_instruction(
-    portrait_items: List[str], is_probe_enabled: bool
-) -> str:
-    """构建日常作息探针指令"""
-    if not is_probe_enabled:
-        return ""
-    items = [str(x).strip() for x in (portrait_items or []) if str(x).strip()]
-    if not items:
-        return (
-            "\n当前轮可做轻量作息确认，但一次只问一个点，不要连续追问。"
-            '\n若没有明确缺失项，禁止追问\u201c昨晚几点睡\u201d。'
-        )
-    first_target = items[0]
-    target_map = {
-        "wakeup": "起床",
-        "sleep": "睡眠",
-        "meal": "饮食",
-        "activity": "活动",
-        "study": "学习",
-        "mood": "心情",
-        "health": "健康",
-    }
-    target_text = target_map.get(first_target, first_target)
-    ban_sleep_probe = first_target != "sleep"
-    sleep_rule = (
-        '\n已存在睡眠记录时，禁止追问\u201c昨晚几点睡\u201d。'
-        if ban_sleep_probe
-        else '\n若你已在上下文看到明确睡眠时刻/时长，不要再次追问\u201c昨晚几点睡\u201d，改为基于已知事实表达关心。'
-    )
-    return (
-        f"\n当前优先级为生活画像补齐。此轮只围绕「{target_text}」这一项发问，不要扩展到其他画像项。"
-        "\n禁止连续催办学习任务或任务进度。"
-        f"{sleep_rule}"
-    )
-
-
 def _build_specific_instruction(
     base_instruction: str,
-    portrait_priority: List[str],
     task_probe: Dict[str, Any],
     focus_stage: str,
     quiet_mode_active: bool,
@@ -66,7 +28,7 @@ def _build_specific_instruction(
     now_hour: int,
     context: Dict[str, Any],
 ) -> str:
-    """构建行为指引文本，整合画像/任务/模式/时段等约束"""
+    """构建行为指引文本，整合任务/模式/时段等约束"""
     from core.services.active_care.shared.prompt_helpers import build_quiet_mode_instruction
 
     instruction = base_instruction
@@ -75,25 +37,11 @@ def _build_specific_instruction(
     # 检测用户最近是否明确表示已起床/已吃饭等，避免矛盾追问
     user_already_covered = _detect_user_already_covered(context)
 
-    if portrait_priority and should_probe:
-        # 过滤掉用户已经聊过的话题
-        filtered_portrait = [p for p in portrait_priority if p not in user_already_covered]
-        if filtered_portrait:
-            first_target = str(filtered_portrait[0]).strip()
-            instruction += (
-                f"\n当前优先级为生活画像补齐。此轮只追问一个画像项：{first_target}，不要切换到任务催办或学习催办。"
-            )
-        else:
-            # 所有画像项用户都已聊过，不需要追问
-            instruction += "\n用户已在最近对话中提及所有缺失画像项，不需要追问作息/饮食等，自然聊天即可。"
-    if task_probe and not portrait_priority and should_probe:
+    # 画像补齐指令（「此轮只追问一个画像项」）已于 2026-10-28 移除。
+    if task_probe and should_probe:
         task_title = str(task_probe.get("task_title") or "").strip()
         if task_title:
             instruction += f"\n优先询问每日任务进展，重点任务：{task_title}。"
-    if focus_stage == "daily_routine":
-        instruction += _build_daily_routine_probe_instruction(
-            portrait_priority, should_probe
-        )
 
     if not should_probe:
         instruction += "\n注意：用户刚刚和你互动过。请自然延续之前的对话氛围，**严禁**像查户口一样询问作息或任务！只聊轻松的话题。"

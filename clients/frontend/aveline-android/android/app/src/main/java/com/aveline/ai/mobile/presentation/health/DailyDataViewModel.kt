@@ -420,35 +420,6 @@ class DailyDataViewModel @Inject constructor(
         }
     }
 
-    /**
-     * 手动更新今日作息(睡觉/起床时间)。
-     *
-     * 用于用户修正不准确的自动记录, 更新成功后自动刷新 Daily Data。
-     *
-     * @param sleep 睡觉时间 HH:MM, 为空表示不修改
-     * @param wakeup 起床时间 HH:MM, 为空表示不修改
-     */
-    fun updateSchedule(sleep: String?, wakeup: String?) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, message = null, error = null) }
-            healthRepository.recordDailySchedule(
-                buildJsonObject {
-                    if (!sleep.isNullOrBlank()) put("sleep", sleep)
-                    if (!wakeup.isNullOrBlank()) put("wakeup", wakeup)
-                }
-            ).onSuccess { response ->
-                _uiState.update {
-                    it.copy(message = response.string("message").ifBlank { "作息已更新" })
-                }
-                refreshData()
-            }.onFailure { error ->
-                _uiState.update {
-                    it.copy(isLoading = false, error = error.message ?: "更新作息失败")
-                }
-            }
-        }
-    }
-
     fun clearError() {
         _uiState.update { it.copy(error = null, message = null) }
     }

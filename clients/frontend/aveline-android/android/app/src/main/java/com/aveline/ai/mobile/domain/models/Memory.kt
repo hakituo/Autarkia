@@ -127,6 +127,22 @@ enum class MemorySortOrder {
     MOST_IMPORTANT
 }
 
+/** 加权记忆懒加载的单页条数（与后端 limit 上限一致） */
+const val MEMORY_PAGE_SIZE = 500
+
+/**
+ * 加权记忆的一页数据。
+ *
+ * @property memories 本页记忆
+ * @property total 后端过滤后的总条数
+ * @property hasMore 是否还有下一页
+ */
+data class MemoryPage(
+    val memories: List<Memory> = emptyList(),
+    val total: Int = 0,
+    val hasMore: Boolean = false
+)
+
 data class MemoryStats(
     val totalCount: Int = 0,
     val dailyCount: Int = 0,

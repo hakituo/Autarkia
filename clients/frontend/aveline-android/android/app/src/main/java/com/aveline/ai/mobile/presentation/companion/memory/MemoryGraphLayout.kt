@@ -40,9 +40,18 @@ internal data class GraphPlacedNode(
     val ring: Int
 )
 
+/**
+ * 一次布局的完整结果。
+ *
+ * [center] 与 [compassRadius] 是给画布画「罗盘」用的：三圈虚线环、六条扇区分隔线
+ * 和外圈扇区名都要靠这两个值确定位置。之前这两个数只存在于布局内部，
+ * 画布拿不到，所以罗盘一直画不出来。
+ */
 internal data class GraphPlacement(
     val nodes: List<GraphPlacedNode>,
-    val edges: List<GraphEdgeInput>
+    val edges: List<GraphEdgeInput>,
+    val center: GraphPoint = GraphPoint(0f, 0f),
+    val compassRadius: Float = 0f
 ) {
     /** 命中测试：返回点击位置命中的节点 id，没命中返回 null */
     fun nodeAt(x: Float, y: Float, slop: Float = 10f): String? {
@@ -68,10 +77,19 @@ internal object MemoryGraphLayout {
     internal val SECTORS: List<String> =
         listOf("event", "turn", "continuation", "parent", "related", "topic")
 
-    /** 第 1/2/3 跳的环半径占可用半径的比例 */
-    private val RING_RATIOS = listOf(0.46f, 0.74f, 0.96f)
+    /** 扇区名（画在外圈，用户一眼能读出「它在后续方向的第二环」） */
+    internal val SECTOR_LABELS: List<String> =
+        listOf("事件", "对话", "后续", "前因", "相关", "话题")
 
-    private const val EDGE_PADDING = 18f
+    /** 第 1/2/3 跳的环半径占可用半径的比例 */
+    internal val RING_RATIOS: List<Float> = listOf(0.46f, 0.74f, 0.96f)
+
+    /** 画布边缘留白：从 18 加到 30，给外圈的扇区名留位置 */
+    private const val EDGE_PADDING = 30f
+
+    /** 地标层的轨道留白：52，同样是为了放得下两行标签 */
+    private const val ANCHOR_ORBIT_PADDING = 52f
+
     private const val MIN_NODE_RADIUS = 5f
     private const val MAX_NODE_RADIUS = 13f
     private const val SEED_RADIUS_BONUS = 4f
@@ -151,7 +169,9 @@ internal object MemoryGraphLayout {
         val ids = placed.mapTo(HashSet()) { it.id }
         return GraphPlacement(
             nodes = placed,
-            edges = edges.filter { it.sourceId in ids && it.targetId in ids }
+            edges = edges.filter { it.sourceId in ids && it.targetId in ids },
+            center = center,
+            compassRadius = maxRadius
         )
     }
 
@@ -163,7 +183,7 @@ internal object MemoryGraphLayout {
 
         val centerX = width.coerceAtLeast(1f) / 2f
         val centerY = height.coerceAtLeast(1f) / 2f
-        val orbit = minOf(centerX, centerY) - 30f
+        val orbit = (minOf(centerX, centerY) - ANCHOR_ORBIT_PADDING).coerceAtLeast(24f)
         val ordered = nodes.sortedWith(
             compareByDescending<GraphNodeInput> { it.weight }.thenBy { it.id }
         )
@@ -182,7 +202,12 @@ internal object MemoryGraphLayout {
                 ring = 0
             )
         }
-        return GraphPlacement(nodes = placed, edges = emptyList())
+        return GraphPlacement(
+            nodes = placed,
+            edges = emptyList(),
+            center = GraphPoint(centerX, centerY),
+            compassRadius = orbit
+        )
     }
 
     private fun sectorIndexOf(relation: String): Int {

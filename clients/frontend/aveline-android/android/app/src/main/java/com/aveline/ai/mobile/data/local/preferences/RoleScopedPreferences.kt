@@ -155,6 +155,26 @@ class RoleScopedPreferences @Inject constructor(
     fun clearModelId(role: String) = clearModel(role)
 
     /**
+     * 角色级「思考模式」开关。
+     *
+     * null 表示这个角色没表态过：发消息时不带这个字段，沿用后端配置
+     * （settings.model.llm.thinking_enabled，默认开）。不能用 false 兜底，
+     * 否则升级上来的老用户会被静默关掉思考模式。
+     */
+    fun getThinking(role: String): Boolean? {
+        val key = thinkingKey(role)
+        return if (prefs.contains(key)) prefs.getBoolean(key, true) else null
+    }
+
+    fun setThinking(role: String, enabled: Boolean?) {
+        if (role.isBlank()) return
+        val editor = prefs.edit()
+        val key = thinkingKey(role)
+        if (enabled == null) editor.remove(key) else editor.putBoolean(key, enabled)
+        editor.apply()
+    }
+
+    /**
      * 新角色首次创建本地会话时使用的稳定 ID。
      *
      * 正常升级路径会优先复用该角色当前 persona 的旧 `web_{persona}` session，保住已有
@@ -186,6 +206,7 @@ class RoleScopedPreferences @Inject constructor(
     private fun sessionKey(role: String): String = "session:${roleDigest(canonicalRoleId(role))}"
     private fun modelIdKey(role: String): String = "model:${roleDigest(canonicalRoleId(role))}"
     private fun modelRouteKey(role: String): String = "model_route:${roleDigest(canonicalRoleId(role))}"
+    private fun thinkingKey(role: String): String = "thinking:${roleDigest(canonicalRoleId(role))}"
 
     private fun roleDigest(role: String): String {
         val normalized = role.trim().lowercase(Locale.ROOT)

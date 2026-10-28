@@ -1,13 +1,15 @@
 package com.aveline.ai.mobile.presentation.companion
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,147 +22,88 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.Mood
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.aveline.ai.mobile.domain.models.LifeStatus
-import com.aveline.ai.mobile.presentation.components.SectionCard
+import com.aveline.ai.mobile.domain.models.Emotion
 import com.aveline.ai.mobile.presentation.status.ui.StatusUiState
-import com.aveline.ai.mobile.presentation.theme.EmotionPalette
 import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.Danger
-import com.aveline.ai.mobile.presentation.theme.LifeEnergy
-import com.aveline.ai.mobile.presentation.theme.LifeHappiness
-import com.aveline.ai.mobile.presentation.theme.LifeHealth
-import com.aveline.ai.mobile.presentation.theme.LifeHunger
-import com.aveline.ai.mobile.presentation.theme.SelectionSurface
-import com.aveline.ai.mobile.presentation.theme.StatusOffline
-import com.aveline.ai.mobile.presentation.theme.StatusOnline
+import com.aveline.ai.mobile.presentation.theme.Line
+import com.aveline.ai.mobile.presentation.theme.Sand
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 import kotlinx.coroutines.flow.StateFlow
 
+/** 分段情绪条由亮到暗的四档灰阶（设计稿用同色系渐变代替多色糖果条） */
+private val EmotionRamp = listOf(
+    TextPrimary,
+    TextSecondary,
+    Color(0xFF5C5B57),
+    Color(0xFF3A3A3C)
+)
+
 /**
  * Companion 状态 Tab。
  *
- * 展示 AI 生命状态(健康/饥饿/幸福/能量)、当前情绪、连接状态。
+ * 三块内容，都没有卡片外壳：生命状态四条细线、情绪一句话 + 分段灰阶条、
+ * 页底一行连接状态。原来四张 SectionCard 的标题和副标题（「WebSocket 连接状态」
+ * 这类开发视角的说明）全部去掉，信息本身一个没少。
  *
  * @param uiState 状态页 UI 状态
- * @param clockFlow 系统时钟流（单独传，不放进 [StatusUiState]；只在卡片内部订阅，
- *        避免每秒把整棵面板重组一遍）
- * @param onRefresh 刷新回调
+ * @param clockFlow 系统时钟流（只在页底那一行订阅，避免每秒把整页重组）
+ * @param onRefresh 刷新 / 重试回调
  */
 @Composable
 fun CompanionStatusTab(
     uiState: StatusUiState,
     clockFlow: StateFlow<String>,
-    onRefresh: () -> Unit,
-    onWake: () -> Unit,
-    onInterrupt: () -> Unit,
-    onSkip: () -> Unit
+    onRefresh: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = CompanionGutter),
+        contentPadding = PaddingValues(top = 22.dp, bottom = 24.dp)
     ) {
-        // 错误信息 + 重试按钮
-        item {
-            uiState.error?.let { errorMsg ->
-                ErrorBanner(
-                    message = errorMsg,
-                    onRetry = onRefresh
-                )
+        uiState.error?.takeIf { it.isNotBlank() }?.let { message ->
+            item(key = "status-error") {
+                ErrorBanner(message = message, onRetry = onRefresh)
+                Spacer(modifier = Modifier.height(20.dp))
             }
         }
 
-        item {
-            SectionCard(
-                title = "此刻",
-                icon = Icons.Outlined.Schedule,
-                subtitle = "当前活动与实际回复方式"
-            ) {
-                ActivityControlContent(
-                    lifeStatus = uiState.lifeStatus,
-                    isLoading = uiState.isActionRunning,
-                    actionMessage = uiState.actionMessage,
-                    onWake = onWake,
-                    onInterrupt = onInterrupt,
-                    onSkip = onSkip
-                )
-            }
+        item(key = "life-status") {
+            LifeStatusBlock(uiState)
         }
 
-        // 生命状态卡片:健康 / 饥饿 / 幸福 / 能量
-        item {
-            SectionCard(
-                title = "生命状态",
-                icon = Icons.Outlined.FavoriteBorder,
-                subtitle = "健康 · 饥饿 · 幸福 · 能量"
-            ) {
-                if (uiState.isLoading && uiState.lifeStatus == null) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = Accent)
-                    }
-                } else {
-                    LifeStatusContent(lifeStatus = uiState.lifeStatus)
-                }
-            }
+        item(key = "emotion") {
+            EmotionBlock(emotion = uiState.emotion, mix = uiState.emotionMix)
         }
 
-        // 情绪卡片:当前情绪 + 混合比例
-        item {
-            SectionCard(
-                title = "情绪",
-                icon = Icons.Outlined.Mood,
-                subtitle = "当前情绪与混合比例"
-            ) {
-                EmotionContent(
-                    emotionPrimary = uiState.emotion.primary,
-                    emotionIntensity = uiState.emotion.intensity,
-                    emotionMix = uiState.emotionMix
-                )
-            }
-        }
-
-        // 连接卡片:WebSocket 连接状态 + 系统时钟
-        item {
-            SectionCard(
-                title = "连接",
-                icon = Icons.Outlined.Cloud,
-                subtitle = "WebSocket 连接状态"
-            ) {
-                ConnectionContent(
-                    connected = uiState.connected,
-                    clockFlow = clockFlow
-                )
-            }
+        item(key = "connection") {
+            ConnectionLine(
+                connected = uiState.connected,
+                clockFlow = clockFlow,
+                onRetry = onRefresh
+            )
         }
     }
 }
@@ -217,46 +160,36 @@ private fun ErrorBanner(
     }
 }
 
-/**
- * 生命状态内容:4 个指标进度条。
- */
+/** 生命状态：四条 3dp 细线，任何一种低于 30% 时数字和线一起变沙金 */
 @Composable
-private fun LifeStatusContent(lifeStatus: LifeStatus?) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        LifeMetricRow(
-            label = "健康",
-            value = lifeStatus?.health ?: 0f,
-            color = LifeHealth
-        )
-        LifeMetricRow(
-            label = "饥饿",
-            value = lifeStatus?.hunger ?: 0f,
-            color = LifeHunger
-        )
-        LifeMetricRow(
-            label = "幸福",
-            value = lifeStatus?.happiness ?: 0f,
-            color = LifeHappiness
-        )
-        LifeMetricRow(
-            label = "能量",
-            value = lifeStatus?.energy ?: 0f,
-            color = LifeEnergy
-        )
+private fun LifeStatusBlock(uiState: StatusUiState) {
+    if (uiState.isLoading && uiState.lifeStatus == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = Accent, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+        }
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LifeMetricRow(label = "健康", value = uiState.lifeStatus?.health ?: 0f)
+        LifeMetricRow(label = "饥饿", value = uiState.lifeStatus?.hunger ?: 0f)
+        LifeMetricRow(label = "幸福", value = uiState.lifeStatus?.happiness ?: 0f)
+        LifeMetricRow(label = "能量", value = uiState.lifeStatus?.energy ?: 0f)
     }
 }
 
-/**
- * 单个生命指标行:标签 + 进度条 + 百分比。
- */
 @Composable
-private fun LifeMetricRow(
-    label: String,
-    value: Float,
-    color: Color
-) {
-    val percent = (value * 100).toInt().coerceIn(0, 100)
-    Column {
+private fun LifeMetricRow(label: String, value: Float) {
+    val fraction = value.coerceIn(0f, 1f)
+    val percent = (fraction * 100).toInt()
+    val ink = if (percent < CompanionLowStatusPercent) Sand else TextPrimary
+
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -264,337 +197,196 @@ private fun LifeMetricRow(
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                 color = TextSecondary
             )
             Text(
                 text = "$percent%",
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                color = TextPrimary
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFeatureSettings = "tnum"
+                ),
+                color = ink
             )
         }
-        Spacer(modifier = Modifier.height(6.dp))
-        LinearProgressIndicator(
-            progress = { value.coerceIn(0f, 1f) },
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(7.dp)
-                .clip(RoundedCornerShape(4.dp)),
-            color = color,
-            trackColor = Color.White.copy(alpha = 0.055f)
-        )
-    }
-}
-
-/**
- * 与后端 `DO_NOT_DISTURB_ACTIVITIES` 对齐的不可打扰活动集合。
- *
- * 这些活动期间后端只接受「唤醒」，行内不能给出无效的「打断」（会被后端退回
- * `sleeping_use_wake`）；此前漏了 overslept_recovery，会误给「打断/跳过」。
- */
-private val DO_NOT_DISTURB_ACTIVITIES = setOf(
-    "sleeping",
-    "napping",
-    "waking_up",
-    "overslept_recovery"
-)
-
-@Composable
-private fun ActivityControlContent(
-    lifeStatus: LifeStatus?,
-    isLoading: Boolean,
-    actionMessage: String?,
-    onWake: () -> Unit,
-    onInterrupt: () -> Unit,
-    onSkip: () -> Unit
-) {
-    val activity = lifeStatus?.activity.orEmpty().ifBlank { "idle" }
-    val sleeping = lifeStatus?.isSleeping == true || activity in DO_NOT_DISTURB_ACTIVITIES
-    // 活动文案与生活细节一律用后端下发的字段，本地映射只在没有日程（后端未下发）时兜底。
-    val activityLabel = lifeStatus?.dailyPlan?.activityLabel.orEmpty()
-        .ifBlank { companionActivityLabel(activity) }
-    val activityDetail = lifeStatus?.dailyPlan?.activityDetail.orEmpty()
-    val replyMode = lifeStatus?.replyMode ?: "immediate"
-    val statusColor = when {
-        sleeping -> LifeEnergy
-        replyMode == "silent" -> LifeHunger
-        replyMode == "delayed" -> LifeHappiness
-        else -> LifeHealth
-    }
-    // 起床洗漱 / 睡过头缓神是「已经醒了」的过渡态：标题已经写「正在起床洗漱」，
-    // 副标题就不能再落到“睡眠中”，否则同一张卡片自相矛盾。
-    val statusHint = when {
-        activity == "napping" -> "午休中，消息暂不回复"
-        activity == "waking_up" -> "刚起床洗漱，消息暂不回复"
-        activity == "overslept_recovery" -> "刚睡醒正在缓神，消息暂不回复"
-        sleeping -> "睡眠中，消息暂不回复"
-        replyMode == "silent" -> "专注中，消息会留到活动结束后处理"
-        replyMode == "delayed" -> formatReplyDelay(lifeStatus)
-        else -> "会正常回复"
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+                .height(3.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.White.copy(alpha = 0.08f))
         ) {
             Box(
                 modifier = Modifier
-                    .size(9.dp)
-                    .clip(CircleShape)
-                    .background(statusColor.copy(alpha = 0.9f))
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = activityLabel,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = TextPrimary
-                )
-                if (activityDetail.isNotBlank()) {
-                    Text(
-                        text = activityDetail,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-                Text(
-                    text = statusHint,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextTertiary
-                )
-            }
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    color = statusColor,
-                    strokeWidth = 2.dp
-                )
-            }
-        }
-
-        if (!isLoading && sleeping) {
-            CompanionControlButton(label = "唤醒", onClick = onWake)
-        } else if (!isLoading && replyMode == "silent") {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CompanionControlButton(
-                    label = "打断",
-                    onClick = onInterrupt,
-                    modifier = Modifier.weight(1f)
-                )
-                CompanionControlButton(
-                    label = "跳过活动",
-                    onClick = onSkip,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        actionMessage?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = LifeHealth
+                    .fillMaxWidth(fraction)
+                    .fillMaxHeight()
+                    .background(ink)
             )
         }
     }
 }
 
-@Composable
-private fun CompanionControlButton(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
-        color = SelectionSurface,
-        contentColor = TextPrimary,
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
-        )
-    }
-}
-
-private fun formatReplyDelay(lifeStatus: LifeStatus?): String {
-    val minSeconds = lifeStatus?.replyDelayMinSeconds
-    val maxSeconds = lifeStatus?.replyDelayMaxSeconds
-    return if (minSeconds != null && maxSeconds != null) {
-        "会延迟约 ${minSeconds}–${maxSeconds} 秒回复"
-    } else {
-        "会稍后回复"
-    }
-}
-
-internal fun companionActivityLabel(activity: String): String = when (activity) {
-    "sleeping" -> "正在睡觉"
-    "waking_up" -> "正在起床洗漱"
-    "breakfast" -> "正在吃早餐"
-    "lunch" -> "正在吃午餐"
-    "dinner" -> "正在吃晚餐"
-    "cooking" -> "正在做饭"
-    "studying" -> "正在学习"
-    "reading" -> "正在阅读"
-    "housework" -> "正在做家务"
-    "napping" -> "正在午休"
-    "walking" -> "正在散步"
-    "phone_scrolling" -> "正在刷手机"
-    "gardening" -> "正在打理植物"
-    "exercising" -> "正在运动"
-    "gaming" -> "正在玩游戏"
-    "self_care" -> "正在护肤整理"
-    "makeup" -> "正在化妆"
-    "creative_hobby" -> "正在做自己的兴趣"
-    "shopping" -> "正在外出购物"
-    "staying_up_late" -> "正在熬夜"
-    "late_snack" -> "正在吃夜宵"
-    "overslept_recovery" -> "刚睡醒，正在缓神"
-    "sleep_recovery" -> "正在恢复精神"
-    "peer_chat" -> "正在聊天"
-    "idle" -> "正在放松"
-    else -> "当前状态"
-}
+/** 情绪的分段：一条灰阶条最多四段，按占比从亮到暗 */
+private data class EmotionSegment(val label: String, val ratio: Float, val color: Color)
 
 /**
- * 情绪内容:主情绪进度条 + 混合比例(标题行已在 SectionCard 中展示)。
+ * 情绪：一句话 + 一条分段灰阶条 + 百分比。
+ *
+ * 原来的做法是主情绪一条进度条，混合比例再来 N 条——同一个信息被画了两次，
+ * 而且用了整套高饱和情绪色。这里合成一条，颜色只表示「占比从高到低」。
  */
 @Composable
-private fun EmotionContent(
-    emotionPrimary: String,
-    emotionIntensity: Float,
-    emotionMix: Map<String, Float>
-) {
-    val primaryColor = EmotionPalette.of(emotionPrimary)
+private fun EmotionBlock(emotion: Emotion, mix: Map<String, Float>) {
+    val segments = remember(emotion, mix) { buildEmotionSegments(emotion, mix) }
 
-    // 主情绪占比
     Column {
+        HorizontalDivider(color = Line, thickness = 1.dp)
+        Spacer(modifier = Modifier.height(16.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom
         ) {
             Text(
-                text = emotionPrimary,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
+                text = "情绪",
+                style = MaterialTheme.typography.labelMedium,
+                color = TextTertiary
             )
             Text(
-                text = "强度 ${(emotionIntensity * 100).toInt()}%",
-                style = MaterialTheme.typography.labelSmall,
+                text = emotionSummary(emotion, mix),
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium
+                ),
                 color = TextPrimary
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        LinearProgressIndicator(
-            progress = { emotionIntensity.coerceIn(0f, 1f) },
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp)),
-            color = primaryColor,
-            trackColor = Color.White.copy(alpha = 0.05f)
-        )
-    }
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp)),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            segments.forEach { segment ->
+                EmotionSegmentBar(segment)
+            }
+        }
 
-    // 情绪混合比例
-    if (emotionMix.isNotEmpty()) {
-        Spacer(modifier = Modifier.height(12.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            emotionMix.forEach { (name, ratio) ->
-                val mixColor = EmotionPalette.of(name)
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(name, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-                        Text("${(ratio * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = TextPrimary)
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    LinearProgressIndicator(
-                        progress = { ratio.coerceIn(0f, 1f) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp)),
-                        color = mixColor,
-                        trackColor = Color.White.copy(alpha = 0.05f)
-                    )
-                }
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            segments.forEach { segment ->
+                Text(
+                    text = "${segment.label} ${(segment.ratio * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
+                    color = TextTertiary,
+                    maxLines = 1
+                )
             }
         }
     }
 }
 
-/**
- * 连接内容:WebSocket 连接状态 + 系统时钟。
- *
- * 时钟在这里单独订阅：每秒只重组这一小块，而不是整棵伴侣详情面板。
- */
 @Composable
-private fun ConnectionContent(
-    connected: Boolean,
-    clockFlow: StateFlow<String>
-) {
-    val clock by clockFlow.collectAsStateWithLifecycle()
-    val statusColor = if (connected) StatusOnline else StatusOffline
-    val statusText = if (connected) "已连接" else "未连接"
+private fun RowScope.EmotionSegmentBar(segment: EmotionSegment) {
+    Box(
+        modifier = Modifier
+            .weight(segment.ratio.coerceAtLeast(0.02f))
+            .fillMaxHeight()
+            .background(segment.color)
+    )
+}
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "WebSocket",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
-            Surface(
-                color = statusColor.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(statusColor)
-                    )
-                    Text(
-                        text = statusText,
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = statusColor
-                    )
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "系统时钟",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
-            Text(
-                text = clock.ifBlank { "--:--:--" },
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+private fun buildEmotionSegments(emotion: Emotion, mix: Map<String, Float>): List<EmotionSegment> {
+    val ordered = mix.entries
+        .filter { it.value > 0.02f }
+        .sortedByDescending { it.value }
+        .take(EmotionRamp.size)
+    if (ordered.isEmpty()) {
+        return listOf(
+            EmotionSegment(
+                label = companionEmotionLabel(emotion.primary),
+                ratio = emotion.intensity.coerceIn(0.05f, 1f),
                 color = TextPrimary
             )
+        )
+    }
+    return ordered.mapIndexed { index, entry ->
+        EmotionSegment(
+            label = companionEmotionLabel(entry.key),
+            ratio = entry.value.coerceIn(0.02f, 1f),
+            color = EmotionRamp[index]
+        )
+    }
+}
+
+/** 「平静，带一点想念」：主情绪 + 占比够高的次情绪拼成一句话 */
+private fun emotionSummary(emotion: Emotion, mix: Map<String, Float>): String {
+    val primary = companionEmotionLabel(emotion.primary)
+    val secondary = mix.entries
+        .filter { !it.key.equals(emotion.primary, ignoreCase = true) && it.value >= 0.15f }
+        .maxByOrNull { it.value }
+        ?: return primary
+    return "$primary，带一点${companionEmotionLabel(secondary.key)}"
+}
+
+/**
+ * 连接状态：页底一行小字。
+ *
+ * 原来是一整张「WebSocket 连接状态」卡；连接正常时它不该占任何视觉重量，
+ * 所以压到页底，断线才变危险色并给出重试。
+ */
+@Composable
+private fun ConnectionLine(
+    connected: Boolean,
+    clockFlow: StateFlow<String>,
+    onRetry: () -> Unit
+) {
+    val clock by clockFlow.collectAsStateWithLifecycle()
+    val ink = if (connected) TextTertiary else Danger
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 24.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(5.dp)
+                .clip(CircleShape)
+                .background(if (connected) Accent else Danger)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = if (connected) "已连接" else "未连接",
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+            color = ink
+        )
+        if (!connected) {
+            Text(
+                text = " · 重试",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                color = Danger,
+                modifier = Modifier
+                    .clickable(onClick = onRetry)
+                    .padding(vertical = 2.dp)
+            )
         }
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = clock.ifBlank { "--:--:--" },
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontSize = 11.5.sp,
+                fontFeatureSettings = "tnum"
+            ),
+            color = TextTertiary.copy(alpha = 0.7f)
+        )
     }
 }

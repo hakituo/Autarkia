@@ -356,6 +356,7 @@ class ActiveCareExecutor(ActiveCareCompatMixin):
                 return TriggerMessageResult(
                     delivered=True,
                     outcome=TriggerOutcome.DELIVERED,
+                    content=str(post_processed.get("content") or ""),
                 )
             return TriggerMessageResult(
                 delivered=False,

@@ -41,12 +41,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.domain.models.Session
 import com.aveline.ai.mobile.presentation.navigation.Routes
+import com.aveline.ai.mobile.presentation.study.formatStudyMinutes
 import com.aveline.ai.mobile.presentation.theme.Line
 import com.aveline.ai.mobile.presentation.theme.SelectionSurface
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
+import com.aveline.ai.mobile.presentation.theme.TextTertiary
 
 enum class ConnectionState {
     CONNECTED, CONNECTING, DISCONNECTED
@@ -82,7 +85,7 @@ val drawerItems = listOf(
         title = "生活",
         icon = Icons.Outlined.CalendarToday,
         selectedIcon = Icons.Filled.CalendarToday,
-        contentDescription = "生活(健康/饮水/日程/餐食)"
+        contentDescription = "生活(健康/饮水/餐食)"
     ),
     DrawerItem(
         route = Routes.FOOD,
@@ -115,6 +118,10 @@ fun DrawerContent(
     @Suppress("UNUSED_PARAMETER") connectionState: ConnectionState,
     @Suppress("UNUSED_PARAMETER") sessions: List<Session>,
     @Suppress("UNUSED_PARAMETER") currentSessionId: String?,
+    /** 各 persona 主动消息未读总数，0 时不显示行尾提示 */
+    unreadCount: Int = 0,
+    /** 今日学习目标还差多少分钟，null 时不显示行尾提示 */
+    studyRemainingMinutes: Int? = null,
     onNavigate: (String) -> Unit,
     @Suppress("UNUSED_PARAMETER") onSessionClick: (String) -> Unit,
     @Suppress("UNUSED_PARAMETER") onNewSession: () -> Unit,
@@ -159,6 +166,14 @@ fun DrawerContent(
                     DrawerNavigationItem(
                         item = item,
                         isSelected = isSelected,
+                        hint = when (item.route) {
+                            Routes.CONVERSATIONS ->
+                                if (unreadCount > 0) "$unreadCount 条未读" else null
+                            Routes.STUDY -> studyRemainingMinutes
+                                ?.takeIf { it > 0 }
+                                ?.let { "还差 ${formatStudyMinutes(it)}" }
+                            else -> null
+                        },
                         // 设置与其他顶层栏目必须共用同一导航入口。若设置单独直接
                         // navigate，之后恢复其他栏目时会连同设置页一起恢复，导致
                         // 返回栈顶仍停留在设置页。
@@ -175,6 +190,7 @@ fun DrawerContent(
 fun DrawerNavigationItem(
     item: DrawerItem,
     isSelected: Boolean,
+    hint: String?,
     onClick: () -> Unit
 ) {
     val backgroundColor = if (isSelected) SelectionSurface else Color.Transparent
@@ -203,6 +219,16 @@ fun DrawerNavigationItem(
             style = MaterialTheme.typography.labelLarge,
             color = contentColor
         )
+        if (hint != null) {
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = hint,
+                fontSize = 12.5f.sp,
+                color = TextTertiary,
+                maxLines = 1,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
     }
 }
 

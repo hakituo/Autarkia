@@ -153,6 +153,26 @@ def test_offline_role_prefix_is_long_stable_and_role_specific():
     assert build_offline_role_prefix("not_a_role") == ""
 
 
+def test_offline_role_prefix_does_not_cache_transient_failures(monkeypatch):
+    from core.agents.chat_agent_components.persona_system.prompt import (
+        offline_persona_prefix as module,
+    )
+
+    module.clear_offline_role_prefix_cache()
+    attempts = {"count": 0}
+
+    def flaky(scope: str, user_name: str) -> str:
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise RuntimeError("transient read failure")
+        return "恢复后的前缀"
+
+    monkeypatch.setattr(module, "_build", flaky)
+    assert module.build_offline_role_prefix("aveline") == ""
+    assert module.build_offline_role_prefix("aveline") == "恢复后的前缀"
+    module.clear_offline_role_prefix_cache()
+
+
 def test_extract_reports_skip_when_model_says_nothing_reusable():
     item = _segments()[0]
     result = asyncio.run(_extractor(_Scheduler(_reply(skip="no_reusable_info"))).extract(item))
@@ -161,8 +181,10 @@ def test_extract_reports_skip_when_model_says_nothing_reusable():
 
 def test_extract_raises_on_empty_response_so_job_is_retried():
     item = _segments()[0]
+    scheduler = _Scheduler([""], [""], [""])  # 支持思考开关的路由会重试 3 次，仍空才抛
     with pytest.raises(EpisodeParseError):
-        asyncio.run(_extractor(_Scheduler([""])).extract(item))
+        asyncio.run(_extractor(scheduler).extract(item))
+    assert 1 <= len(scheduler.calls) <= 3
 
 
 def test_sensitive_rejection_switches_to_role_fallback_model():

@@ -21,6 +21,10 @@ val StatusOnline     = Accent
 val StatusConnecting = Color(0xFFD6BF94)
 val StatusOffline    = Danger
 
+// ── Study 阶段 / 优先级专用色：与 Accent 同一明度带，替换天蓝与 Emerald ──
+val Mist             = Color(0xFFB4C4CF)   // 长休息（雾蓝）
+val Sand             = Color(0xFFD6BF94)   // 高优先标记（沙金）
+
 // ── 生活面板（保留原值） ──
 val LifeHealth    = Color(0xFF86A99A)
 val LifeHunger    = Color(0xFFC0A36E)
@@ -28,6 +32,9 @@ val LifeHappiness = Color(0xFFB18FA2)
 val LifeEnergy    = Color(0xFF809EAE)
 
 val AvelineRadius = 14.dp
+
+/** 页面被上层盖住时压暗用的遮罩底色（透明度由转场决定）。 */
+val Scrim = Color(0xFF000000)
 
 // ── 旧名兼容：先映射到新值，逐个页面替换后删除 ──
 @Deprecated("用 Accent") val Primary = Accent

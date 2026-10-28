@@ -19,8 +19,9 @@ tests/
 ├── tools/              # 工具相关测试
 ├── unit/               # pytest 单元测试（主力回归测试）
 ├── utils/              # 工具函数测试
+├── support/            # conftest 显式导入的共享 fixture（非测试代码，不被收集）
 ├── README.md           # 本文件
-└── conftest.py         # pytest 配置与共享 fixture
+└── conftest.py         # pytest 配置与钩子
 ```
 
 ---
@@ -177,7 +178,7 @@ venv_core\Scripts\python.exe tests\scripts\verify_tests_cleanup.py
 
 1. **禁止一次性 verify_*.py 蔓延**：历史 fix 验证脚本不要新增到 tests/ 下。如需验证某个 fix，直接写到 `tests/unit/test_*.py` 作为长期回归测试，或在 `Question_Reviewer/` 中文字记录。
 
-2. **禁止 tests/ 根目录散落 .py**：除 `conftest.py` 外，所有 .py 文件必须放入 `unit/`、`diagnostics/`、`scripts/` 等子目录。
+2. **禁止 tests/ 根目录散落 .py**：除 `conftest.py` 外，所有 .py 文件必须放入 `unit/`、`diagnostics/`、`scripts/` 等子目录；被 conftest 显式导入的共享 fixture 放 `support/`（口径真源见 `.trae/rules/RULES.md` §3）。
 
 3. **禁止 tests/scripts/ 顶层堆放一次性脚本**：`tests/scripts/` 顶层只允许白名单内的长期工具（见 `audit_tests.py` 的 `ALLOWED_SCRIPTS_TOPLEVEL`）。一次性数据脚本请放入正式 `scripts/` 目录的语义子目录。
 

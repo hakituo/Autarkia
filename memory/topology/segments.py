@@ -62,6 +62,9 @@ class Segment:
     boundary_reason: str
     topology_status: str = "complete"
     char_count: int = 0
+    #: 分段器 v2：会话内话题切点之后的段，提取时附带的上一段末尾事件（只供理解，不算来源）
+    context_event_ids: List[str] = field(default_factory=list)
+    segmenter_version: str = SEGMENTER_VERSION
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -75,6 +78,8 @@ class Segment:
             "boundary_reason": self.boundary_reason,
             "topology_status": self.topology_status,
             "char_count": self.char_count,
+            "context_event_ids": list(self.context_event_ids),
+            "segmenter_version": self.segmenter_version,
         }
 
 
@@ -101,8 +106,10 @@ def group_turns(events: Iterable[NormalizedEvent]) -> List[Turn]:
     return turns
 
 
-def compute_segment_id(tree_id: str, event_ids: Iterable[str]) -> str:
-    basis = "|".join([SEGMENTER_VERSION, str(tree_id or ""), *[str(item) for item in event_ids]])
+def compute_segment_id(
+    tree_id: str, event_ids: Iterable[str], *, version: str = SEGMENTER_VERSION
+) -> str:
+    basis = "|".join([str(version), str(tree_id or ""), *[str(item) for item in event_ids]])
     return "seg_" + hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
 
 

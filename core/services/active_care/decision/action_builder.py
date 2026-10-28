@@ -37,17 +37,11 @@ def build_available_actions(
     if aveline_is_sick or aveline_energy < 30:
         available_actions.append("bio_complaint")
 
-    # 使用 priority_focus 中已过滤的 portrait_priority
-    filtered_portrait = priority_focus.get("portrait_priority") or []
-    covered_topics = priority_focus.get("covered_topics") or []
-
-    if filtered_portrait and any(item in filtered_portrait for item in ["wakeup", "sleep", "meal"]):
-        available_actions.append("user_health_reminder")
-        if covered_topics:
-            logger.info(
-                f"Active Care: user_health_reminder 基于过滤后画像, "
-                f"filtered_portrait={filtered_portrait}, covered={covered_topics}"
-            )
+    # 画像补齐不再开放 user_health_reminder（2026-10-28 移除查岗式追问）。
+    # 今日推送排序里有计划 / 学习复习候选时才开放 planned_topic，
+    # 否则排第一的计划项永远选不上（实测近三天 28 次排序 27 次被丢弃）。
+    if priority_focus.get("has_planned_topic"):
+        available_actions.append("planned_topic")
 
     if priority_focus.get("must_probe") and "curious_question" not in available_actions:
         available_actions.append("curious_question")

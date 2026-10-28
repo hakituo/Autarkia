@@ -180,7 +180,8 @@ class ChatRepositoryImpl @Inject constructor(
         model: String,
         profileFilename: String?,
         historyOverride: List<Message>?,
-        branchContext: ChatBranchContext?
+        branchContext: ChatBranchContext?,
+        thinking: Boolean?
     ): Flow<StreamEvent> = callbackFlow {
         // 流式开关：BuildConfig.STREAMING_ENABLED=false 时退化为一次性请求，
         // 把结果包装成 StreamEvent 发出，上层 ChatViewModel 无需改动。
@@ -193,7 +194,8 @@ class ChatRepositoryImpl @Inject constructor(
                     stream = false,
                     history_override = historyOverride?.map { it.toHistoryOverrideMessage() },
                     branch_metadata = branchContext?.toRequestMetadata(),
-                    profile_filename = profileFilename
+                    profile_filename = profileFilename,
+                    thinking = thinking
                 )
                 // sendMessage 直接返回 MessageResponse（suspend，非 Response<T>）
                 val msg = apiService.sendMessage(request).toDomainModel(sessionId)
@@ -218,7 +220,8 @@ class ChatRepositoryImpl @Inject constructor(
                 stream = true,  // 后端读 body.stream 走 SSE
                 history_override = historyOverride?.map { it.toHistoryOverrideMessage() },
                 branch_metadata = branchContext?.toRequestMetadata(),
-                profile_filename = profileFilename
+                profile_filename = profileFilename,
+                thinking = thinking
             )
             // 使用流式专用 ApiService（HEADERS 级别日志，不缓冲响应体）
             val response = streamingApiService.sendMessageStreaming(request)

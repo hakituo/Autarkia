@@ -48,7 +48,7 @@ if exist "%BASE_DIR%\start_scripts\start_forge.bat" (
 timeout /t 2 /nobreak > nul
 
 :: 3. Start the main program (direct launch)
-echo [3/4] Starting Xiaoyou main program...
+echo [3/4] Starting Autarkia main program...
 start "Autarkia Main" /D "%BASE_DIR%" cmd /k ""%PYTHON_EXE%" main.py"
 
 :: Wait 2 seconds
@@ -61,7 +61,7 @@ set "FRONTEND_DIR=%BASE_DIR%\clients\frontend\aveline-web"
 if exist "%FRONTEND_DIR%" (
     if exist "%BASE_DIR%\start_scripts\start_web.bat" (
         echo [INFO] Starting frontend dev server...
-        start "Xiaoyou Web" "%BASE_DIR%\start_scripts\start_web.bat"
+        start "Autarkia Web" "%BASE_DIR%\start_scripts\start_web.bat"
         goto FINISH
     ) else (
         echo [WARNING] start_web.bat not found - skipping frontend startup.

@@ -1,6 +1,5 @@
 package com.aveline.ai.mobile.presentation.study.vocab
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
@@ -23,9 +21,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,22 +28,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.presentation.components.controls.AvelineButton
 import com.aveline.ai.mobile.presentation.components.controls.AvelineButtonVariant
-import com.aveline.ai.mobile.presentation.components.controls.AvelineSegmented
-import com.aveline.ai.mobile.presentation.study.MemoryCurvePoint
-import com.aveline.ai.mobile.presentation.study.NEW_WORDS_BATCH_SIZE_OPTIONS
-import com.aveline.ai.mobile.presentation.study.REVIEW_BATCH_SIZE_OPTIONS
+import com.aveline.ai.mobile.presentation.study.VocabLaunch
 import com.aveline.ai.mobile.presentation.study.VocabUiState
-import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.Line
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
-import kotlin.math.roundToInt
 
 @Composable
 internal fun EntryButtons(
     reviewCount: Int,
     newCount: Int,
+    /** 正在启动的会话：对应按钮立即转圈，重复点击由管理器拦下。 */
+    launching: VocabLaunch?,
     onStartReview: () -> Unit,
     onStartNewWords: () -> Unit
 ) {
@@ -63,13 +55,15 @@ internal fun EntryButtons(
                     onClick = onStartReview,
                     modifier = Modifier.weight(1.4f),
                     variant = AvelineButtonVariant.Primary,
-                    icon = Icons.Default.PlayArrow
+                    icon = Icons.Default.PlayArrow,
+                    loading = launching == VocabLaunch.REVIEW
                 )
                 AvelineButton(
                     text = "背新词",
                     onClick = onStartNewWords,
                     modifier = Modifier.weight(1f),
-                    variant = AvelineButtonVariant.Secondary
+                    variant = AvelineButtonVariant.Secondary,
+                    loading = launching == VocabLaunch.NEW_WORDS
                 )
             }
         }
@@ -79,7 +73,8 @@ internal fun EntryButtons(
                 onClick = onStartReview,
                 modifier = Modifier.fillMaxWidth(),
                 variant = AvelineButtonVariant.Primary,
-                icon = Icons.Default.PlayArrow
+                icon = Icons.Default.PlayArrow,
+                loading = launching == VocabLaunch.REVIEW
             )
         }
         else -> {
@@ -88,7 +83,8 @@ internal fun EntryButtons(
                 onClick = onStartNewWords,
                 modifier = Modifier.fillMaxWidth(),
                 variant = AvelineButtonVariant.Primary,
-                enabled = newCount > 0
+                enabled = newCount > 0,
+                loading = launching == VocabLaunch.NEW_WORDS
             )
         }
     }
@@ -222,112 +218,5 @@ private fun StatColumn(
         }
         Spacer(modifier = Modifier.height(3.dp))
         Text(text = label, fontSize = 12.sp, color = TextTertiary)
-    }
-}
-
-@Composable
-internal fun MemoryCurveSection(points: List<MemoryCurvePoint>) {
-    Text(text = "记忆保持预测", fontSize = 12.5.sp, color = TextTertiary)
-    Spacer(modifier = Modifier.height(8.dp))
-    Canvas(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(80.dp)
-    ) {
-        val bottom = size.height - 1f
-        drawLine(
-            color = Line,
-            start = Offset(0f, bottom),
-            end = Offset(size.width, bottom),
-            strokeWidth = 1f
-        )
-        if (points.size < 2) return@Canvas
-        val top = 4f
-        val chartHeight = bottom - top
-        val path = Path()
-        var lastX = 0f
-        var lastY = bottom
-        points.forEachIndexed { index, point ->
-            val x = size.width * index / (points.size - 1).toFloat()
-            val y = top + chartHeight * (1f - (point.retention / 100f).coerceIn(0f, 1f))
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-            lastX = x
-            lastY = y
-        }
-        drawPath(path = path, color = Accent, style = Stroke(width = 1.5.dp.toPx()))
-        drawCircle(color = Accent, radius = 3.dp.toPx(), center = Offset(lastX, lastY))
-    }
-    Spacer(modifier = Modifier.height(4.dp))
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = "今天 ${points.first().retention.roundToInt()}%",
-            style = VocabMonoStyle.copy(fontSize = 11.sp)
-        )
-        Text(
-            text = "第 ${points.last().day} 天 ${points.last().retention.roundToInt()}%",
-            style = VocabMonoStyle.copy(fontSize = 11.sp)
-        )
-    }
-}
-
-@Composable
-internal fun SettingsSection(
-    isShuffle: Boolean,
-    newWordsBatchSize: Int,
-    reviewBatchSize: Int,
-    onToggleOrder: () -> Unit,
-    onNewWordsBatchSizeChange: (Int) -> Unit,
-    onReviewBatchSizeChange: (Int) -> Unit
-) {
-    SettingRow(
-        label = "出词顺序",
-        options = listOf("顺序", "乱序"),
-        selectedIndex = if (isShuffle) 1 else 0,
-        onSelect = { index ->
-            if ((index == 1) != isShuffle) onToggleOrder()
-        }
-    )
-    SettingRow(
-        label = "新词每组",
-        options = NEW_WORDS_BATCH_SIZE_OPTIONS.map { it.toString() },
-        selectedIndex = NEW_WORDS_BATCH_SIZE_OPTIONS.indexOf(newWordsBatchSize),
-        onSelect = { index ->
-            NEW_WORDS_BATCH_SIZE_OPTIONS.getOrNull(index)?.let(onNewWordsBatchSizeChange)
-        }
-    )
-    SettingRow(
-        label = "复习每组",
-        options = REVIEW_BATCH_SIZE_OPTIONS.map { it.toString() },
-        selectedIndex = REVIEW_BATCH_SIZE_OPTIONS.indexOf(reviewBatchSize),
-        onSelect = { index ->
-            REVIEW_BATCH_SIZE_OPTIONS.getOrNull(index)?.let(onReviewBatchSizeChange)
-        }
-    )
-}
-
-@Composable
-private fun SettingRow(
-    label: String,
-    options: List<String>,
-    selectedIndex: Int,
-    onSelect: (Int) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(text = label, style = VocabRowLabelStyle)
-        AvelineSegmented(
-            options = options,
-            selectedIndex = selectedIndex.coerceAtLeast(0),
-            onSelect = onSelect,
-            modifier = Modifier.width(if (options.size <= 2) 120.dp else 174.dp)
-        )
     }
 }

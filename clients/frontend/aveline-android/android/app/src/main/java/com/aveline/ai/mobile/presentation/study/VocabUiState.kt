@@ -25,14 +25,7 @@ data class ReviewOverview(
     val dueWords: Int = 0,
     val masteredWords: Int = 0,
     val newToday: Int = 0,
-    val reviewToday: Int = 0,
-    /** 记忆曲线预测 [{day, retention}] */
-    val memoryCurve: List<MemoryCurvePoint> = emptyList()
-)
-
-data class MemoryCurvePoint(
-    val day: Int,
-    val retention: Float
+    val reviewToday: Int = 0
 )
 
 /** 高错词项 */
@@ -47,8 +40,9 @@ const val DEFAULT_REVIEW_BATCH_SIZE = 20
 
 /** 背新词与复习共用同一组分档，避免两处设置口径不一致。 */
 val VOCAB_BATCH_SIZE_OPTIONS = listOf(10, 20, 50)
-val NEW_WORDS_BATCH_SIZE_OPTIONS = VOCAB_BATCH_SIZE_OPTIONS
-val REVIEW_BATCH_SIZE_OPTIONS = VOCAB_BATCH_SIZE_OPTIONS
+
+/** 正在向后端领取的会话类型（点击入口到进入复习之间的等待态）。 */
+enum class VocabLaunch { REVIEW, NEW_WORDS }
 
 /** 词汇模块子页面层级（由 [StudyScreenV2] 提升持有）。 */
 enum class VocabSubScreen {
@@ -70,9 +64,10 @@ enum class VocabSubScreen {
  * @property showAnswer 当前卡片是否展示答案
  * @property sessionStats 复习会话统计
  * @property sessionSummary 会话总结(复习完成后展示,null 表示无)
+ * @property launching 正在启动的会话，非空时入口按钮转圈且忽略重复点击
+ * @property isFinishing 结算页已展示、后台仍在同步收尾并预取下一组
  */
 data class VocabUiState(
-    val dailyWords: List<StudyWord> = emptyList(),
     val learnWords: List<DailyWord> = emptyList(),
     val isReviewMode: Boolean = false,
     /** 是否处于背新单词模式（复用复习界面，区分标题与提示文案） */
@@ -99,7 +94,8 @@ data class VocabUiState(
     /** 本轮复习逐词结果（会/不会），用于结算页清单 */
     val reviewResults: List<ReviewResultItem> = emptyList(),
     val sessionSummary: Any? = null,
-    val dictStats: Any? = null,
+    val launching: VocabLaunch? = null,
+    val isFinishing: Boolean = false,
     /** 新词排序模式: sequential(顺序) / shuffle(乱序) */
     val wordOrder: String = "sequential",
     /** 每次背新词的分组数量 */
@@ -110,14 +106,14 @@ data class VocabUiState(
     val todayVocab: TodayVocabSummary? = null,
     /** 当前词书学习进度 */
     val bookProgress: VocabBookProgress? = null,
-    /** 今日已手动记录的背诵单词总数 */
-    val manualStudyToday: Int = 0,
     /** 可用词书文件名列表(来自后端 available_word_files) */
     val vocabBooks: List<String> = emptyList(),
     /** 当前选中的词书文件名 */
     val currentBook: String = "",
     /** 词书内单词列表(查看词书时填充) */
     val bookWords: List<BookWord> = emptyList(),
+    /** 词书单词列表加载中（切书后到新书单词返回前，详情页显示骨架） */
+    val bookWordsLoading: Boolean = false,
     /** 词书内单词总数 */
     val bookTotal: Int = 0,
     /** 词典搜索结果 */

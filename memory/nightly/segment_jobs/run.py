@@ -8,7 +8,7 @@
   提取器换版本后旧条目作废、段按新版本重算。
 - 开关 ``segment_extraction_enabled`` 默认关，关着时不读任何数据、不调用提取器；
   ``segment_extraction_shadow`` 默认开：只写笔记库，不影响任何读路径（G 之前也没有读路径用它）。
-- 白名单沿用 ``is_distillation_role_allowed``。
+- 默认所有正式角色（legacy scope 跳过）；``segment_role_whitelist`` 为可选自定义名单，不与旧蒸馏白名单共用。
 """
 
 from __future__ import annotations
@@ -22,10 +22,9 @@ from typing import Any
 from core.utils.logger import get_module_logger
 
 from .. import job_ledger
-from ..config import is_distillation_role_allowed
 from ..distill_run import RunClock
 from ..perspective import resolve_distillation_perspective
-from . import extractors, inputs
+from . import extractors, inputs, relay
 from .contracts import SKIP_UNSPECIFIED, Extractor, SegmentInput
 
 logger = get_module_logger(__name__, "nightly_processor.log")
@@ -104,6 +103,20 @@ def _open_note_store(scope: str, role_id: str) -> Any:
     return NoteStore(scope, perspective_role=role_id or scope)
 
 
+def segment_role_allowed(config: Mapping[str, Any], scope: str, role_id: str) -> bool | str:
+    """按段提取默认对所有正式角色生效（人设库认得出的 scope），legacy scope 跳过。
+
+    ``segment_role_whitelist`` 是可选的自定义口子：配置了才只跑名单里的角色 / scope；
+    不与旧蒸馏的 ``distillation_role_whitelist`` 共用。返回 True 或跳过原因。
+    """
+    whitelist = config.get("segment_role_whitelist")
+    if whitelist:
+        return True if {role_id, scope} & set(whitelist) else "not_whitelisted"
+    from ..perspective import perspective_for_scope
+
+    return True if role_id and perspective_for_scope(scope) else "legacy_scope"
+
+
 def _evidence_ok(draft: Any, allowed: set[str]) -> bool:
     """F5 最小子集：证据非空，且全部落在本段来源事件内。"""
     evidence = {str(item) for item in (getattr(draft, "source_event_ids", ()) or ())}
@@ -117,18 +130,26 @@ async def _process(
     ledger: job_ledger.DistillJobLedger,
     report: dict[str, Any],
     now: float,
+    items_by_id: dict[str, SegmentInput] | None = None,
 ) -> str:
     sid = item.segment_id
+    item = relay.with_carry(item, store, items_by_id or {})  # 上一段交来的没聊完的话题
     try:
         result = await extractor.extract(item)
     except Exception as exc:  # noqa: BLE001 - 解析失败 / 请求失败都可重试
         ledger.mark_failed(sid, type(exc).__name__, now=now)  # 只记类型，异常信息可能带正文
         return FAILED
     drafts = tuple(result.notes or ())
+    carry = tuple(getattr(result, "carry_event_ids", ()) or ())
     if not drafts:
+        if carry:  # 整段交给下一段：记下交出的往来，本段算已处理
+            await asyncio.to_thread(
+                store.replace_segment, item.conversation_id, sid, extractor.version, (),
+                segment_source_event_ids=item.allowed_sources, carry_event_ids=carry,
+            )
         ledger.mark_skipped(sid, result.skip_reason or SKIP_UNSPECIFIED, now=now)
         return SKIPPED
-    allowed = set(item.segment.source_event_ids)
+    allowed = set(item.allowed_sources)
     valid = tuple(draft for draft in drafts if _evidence_ok(draft, allowed))
     report["notes_rejected"] += len(drafts) - len(valid)
     if not valid:
@@ -140,9 +161,10 @@ async def _process(
         sid,
         extractor.version,
         valid,
-        segment_source_event_ids=tuple(item.segment.source_event_ids),
+        segment_source_event_ids=item.allowed_sources,
         occurred_from=item.segment.started_at,
         occurred_to=item.segment.ended_at,
+        carry_event_ids=carry,
     )
     report["notes_written"] += int(getattr(written, "written", 0) or 0)
     if await asyncio.to_thread(store.has_segment, item.conversation_id, sid, extractor.version):
@@ -167,20 +189,25 @@ async def run_segment_jobs(
         return {"segment_extraction": "disabled"}
     perspective = resolve_distillation_perspective(manager)
     role_id = str(perspective.get("role_id") or "")
-    if not is_distillation_role_allowed(dict(config), role_id):
-        return {"segment_extraction": "not_whitelisted"}
+    scope = str(getattr(manager, "storage_scope", "") or "") or role_id
+    allowed = segment_role_allowed(config, scope, role_id)
+    if allowed is not True:
+        return {"segment_extraction": allowed}
     extractor = extractor or extractors.resolve_extractor(dict(config))
     if extractor is None:
         return {"segment_extraction": "no_extractor"}
     if not config.get("segment_extraction_shadow", True):
         logger.warning("segment_extraction_shadow=false 暂无读路径接入（属 G/H），仍只写笔记库")
-    scope = str(getattr(manager, "storage_scope", "") or "") or role_id
     store = note_store if note_store is not None else _open_note_store(scope, role_id)
     stamp = time.time() if now is None else float(now)
     if segments is None:
         params = inputs.SegmentParams.from_config(config)
         segments = await asyncio.to_thread(
-            inputs.collect_segment_inputs, scope, params=params, now=stamp
+            inputs.collect_segment_inputs,
+            scope,
+            params=params,
+            now=stamp,
+            skip_conversations=config.get("segment_skip_conversations"),
         )
     closed = [item for item in segments if item.closed]
     ledger = _open_ledger(manager, config, extractor.version)
@@ -219,11 +246,19 @@ async def run_segment_jobs(
     ledger.lease(ids, now=stamp)
     ledger.save()
     clock = RunClock(float(budget.get("max_seconds") or 0.0))
+    items_by_id = {item.segment_id: item for item in closed}
+    pending_ids = {item.segment_id for item in pending}
+    outcomes: dict[str, str] = {}
     try:
         for item in picked:
             if clock.expired:
                 break
-            outcome = await _process(item, extractor, store, ledger, report, stamp)
+            # 接力：同一次对话的上一段还没处理完就先不跑这段（下次再跑，免得接不上）
+            previous = item.previous_segment_id
+            if previous in pending_ids and outcomes.get(previous) not in (DONE, SKIPPED):
+                continue
+            outcome = await _process(item, extractor, store, ledger, report, stamp, items_by_id)
+            outcomes[item.segment_id] = outcome
             clock.settled.add(item.segment_id)
             report[outcome] += 1
     finally:

@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -31,7 +32,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.aveline.ai.mobile.presentation.components.AvelineTabRow
 import com.aveline.ai.mobile.presentation.components.ModuleHeader
 import com.aveline.ai.mobile.presentation.health.daily.DailyDataUiState
-import com.aveline.ai.mobile.presentation.theme.EmotionGreen
+import com.aveline.ai.mobile.presentation.theme.Accent
 import kotlinx.coroutines.launch
 
 /**
@@ -40,10 +41,12 @@ import kotlinx.coroutines.launch
  * 说明:现有 [com.aveline.ai.mobile.presentation.health.daily.DailyTab] 仅包含
  * PORTRAIT / SCHEDULE / FILES 三个值,无法表达"饮水 / 餐食"两个独立 tab。
  * 为遵循"只创建新文件、不修改旧文件"的约束,这里新建 LifeTab 枚举。
+ *
+ * 日程 tab 已下线：睡眠起止时间仍在「健康」页的只读摘要里，
+ * 学习会话列表不再单独占一个 tab（需要复盘时去「学习 → 学习记录」）。
  */
 enum class LifeTab(val title: String) {
     HEALTH("健康"),
-    SCHEDULE("日程"),
     WATER("饮水"),
     MEAL("餐食")
 }
@@ -51,14 +54,13 @@ enum class LifeTab(val title: String) {
 /**
  * Life 模块主界面。
  *
- * 用 TabRow + HorizontalPager 组织 4 个 tab:健康 / 饮水 / 日程 / 餐食。
+ * 用 TabRow + HorizontalPager 组织 3 个 tab:健康 / 饮水 / 餐食。
  * 复用现有 [DailyDataUiState] 作为数据源,支持左右滑动切换。
  *
  * @param uiState 日常生活数据状态
  * @param onRefresh 自动刷新回调（ON_RESUME 等，内部按 30 秒节流）
  * @param onSyncSamsungHealth 从 Samsung Health 同步数据
  * @param onTabChange Tab 切换回调
- * @param onUpdateSchedule 更新作息回调(睡觉/起床时间)
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -66,11 +68,14 @@ fun LifeScreen(
     uiState: DailyDataUiState,
     onRefresh: () -> Unit,
     onSyncSamsungHealth: () -> Unit,
-    onTabChange: (LifeTab) -> Unit,
-    onUpdateSchedule: (sleep: String?, wakeup: String?) -> Unit
+    onTabChange: (LifeTab) -> Unit
 ) {
     val tabs = LifeTab.values()
-    val pagerState = rememberPagerState(initialPage = 0) { tabs.size }
+    // 日程下线后页数从 4 变 3：换一个 saveable 槽，避免旧版本（或改版前旋转屏幕）
+    // 存下的 currentPage=3 在恢复时越界 —— 那个下标原先是「餐食」。
+    val pagerState = key("life-tabs-v3") {
+        rememberPagerState(initialPage = 0) { tabs.size }
+    }
     val scope = rememberCoroutineScope()
 
     // 监听 pager 页面变化,通知外部
@@ -138,7 +143,7 @@ fun LifeScreen(
         uiState.message?.takeIf { it.isNotBlank() }?.let { message ->
             Text(
                 text = message,
-                color = EmotionGreen,
+                color = Accent,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
@@ -177,13 +182,6 @@ fun LifeScreen(
 
                     LifeTab.WATER -> LifeTabScroll {
                         LifeWaterTab(uiState = uiState)
-                    }
-
-                    LifeTab.SCHEDULE -> LifeTabScroll {
-                        LifeScheduleTab(
-                            uiState = uiState,
-                            onUpdateSchedule = onUpdateSchedule
-                        )
                     }
 
                     LifeTab.MEAL -> LifeTabScroll {

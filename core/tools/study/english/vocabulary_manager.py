@@ -49,6 +49,16 @@ class VocabularyManager:
         self.store._ensure_loaded()
 
     @property
+    def dictionary(self) -> List[Dict]:
+        """当前词书词表（懒加载）。
+
+        重构前 ``dictionary`` 是门面的公开属性，调用方（词书分页、模糊搜索）
+        仍按旧接口读取，这里保持同名属性并顺带触发加载，避免直接返回空表。
+        """
+        self.store._ensure_loaded()
+        return self.store.dictionary
+
+    @property
     def dictionary_path(self):
         return self.store.dictionary_path
 

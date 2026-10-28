@@ -372,7 +372,7 @@ class PreservationPropertyTest {
         coEvery { mockChatRepository.sendMessage(any(), any(), any()) } returns Result.success(mockk(relaxed = true))
         // 发送已迁移到 HTTP SSE 流式路径，显式给空流，保证后台管线行为确定
         coEvery {
-            mockChatRepository.sendMessageStreaming(any(), any(), any(), any(), any())
+            mockChatRepository.sendMessageStreaming(any(), any(), any(), any(), any(), any())
         } returns flowOf()
 
         val userMessage = "你好，这是用户消息"
@@ -412,7 +412,7 @@ class PreservationPropertyTest {
         
         coEvery { mockChatRepository.sendMessage(any(), any(), any()) } returns Result.success(mockk(relaxed = true))
         coEvery {
-            mockChatRepository.sendMessageStreaming(any(), any(), any(), any(), any())
+            mockChatRepository.sendMessageStreaming(any(), any(), any(), any(), any(), any())
         } returns flowOf()
         
         val messageTypes = listOf(

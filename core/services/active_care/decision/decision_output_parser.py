@@ -57,6 +57,15 @@ ACTIVE_CARE_OUTPUT_SCHEMA = {
                 "send_active_care 时填 0"
             ),
         },
+        "style": {
+            "type": "string",
+            "enum": ["greeting", "direct"],
+            "description": "send 时的发送方式：greeting 轻问候开头 / direct 直接说；defer 时留空",
+        },
+        "topic_id": {
+            "type": "string",
+            "description": "send 时从【可带的话题】里选中的 topic_id；greeting 时必填",
+        },
     },
     "required": ["action", "intent", "reason_code", "retry_after_seconds"]
 }
@@ -181,7 +190,7 @@ def _build_output_format_schema(chosen_action: str) -> str:
 - 必须在范围内随机取值，避免固定间隔
 
 示例输出（send）：
-{{"action": "send_active_care", "intent": "{chosen_action}", "reason_code": "recent_open_topic", "retry_after_seconds": 0}}
+{{"action": "send_active_care", "intent": "{chosen_action}", "reason_code": "plan_follow_up", "retry_after_seconds": 0, "style": "greeting", "topic_id": "plan:xxx"}}
 示例输出（defer）：
 {{"action": "defer_active_care", "intent": "{chosen_action}", "reason_code": "no_grounded_value", "retry_after_seconds": 2700}}
 """
@@ -306,6 +315,9 @@ def _normalize_decision_dict(
     if action == "send_active_care":
         retry_after_seconds = 0
 
+    from core.services.active_care.decision.action_protocol import normalize_style
+
+    is_send = action == "send_active_care"
     return {
         "action": action,
         "intent": intent,
@@ -316,6 +328,8 @@ def _normalize_decision_dict(
         "text": "",
         "defer_reason": reason_code,
         "specific_instruction": "",
+        "style": normalize_style(obj.get("style")) if is_send else "",
+        "topic_id": str(obj.get("topic_id") or "").strip()[:80] if is_send else "",
     }
 
 

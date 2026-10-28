@@ -341,13 +341,15 @@ fun AvelineApp(
     onDeepLinkConsumed: () -> Unit,
     notificationManager: AvelineNotificationManager,
     replyNotifier: com.aveline.ai.mobile.services.foreground.RoleReplyNotifier,
-    mainViewModel: MainViewModel = hiltViewModel()
+    mainViewModel: MainViewModel = hiltViewModel(),
+    drawerHintsViewModel: DrawerHintsViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
     val drawerState = rememberPullableDrawerState()
     val scope = rememberCoroutineScope()
 
     val mainUiState by mainViewModel.uiState.collectAsStateWithLifecycle()
+    val drawerHints by drawerHintsViewModel.uiState.collectAsStateWithLifecycle()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     // 去掉查询参数：destination.route 给的是带参数的 pattern（如 "study?tab={tab}"），
@@ -450,6 +452,13 @@ fun AvelineApp(
         mainViewModel.toggleSessionPin(sessionId, isPinned)
     }
 
+    // 学习剩余时长是后端数据，侧边栏每次展开都刷新一次；未读数由 Room 流实时更新。
+    LaunchedEffect(drawerState.isVisible) {
+        if (drawerState.isVisible) {
+            drawerHintsViewModel.refreshStudyRemaining()
+        }
+    }
+
     AdaptiveAppShell(
         drawerState = drawerState,
         onDismissRequest = {
@@ -468,6 +477,8 @@ fun AvelineApp(
                     connectionState = connectionState,
                     sessions = mainUiState.sessions,
                     currentSessionId = mainUiState.currentSessionId,
+                    unreadCount = drawerHints.unreadCount,
+                    studyRemainingMinutes = drawerHints.studyRemainingMinutes,
                     onNavigate = onNavigate,
                     onSessionClick = onSessionClick,
                     onNewSession = onNewSession,

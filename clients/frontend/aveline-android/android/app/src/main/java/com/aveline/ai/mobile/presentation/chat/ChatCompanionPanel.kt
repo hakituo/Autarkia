@@ -3,6 +3,7 @@ package com.aveline.ai.mobile.presentation.chat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,7 +15,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,7 +24,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aveline.ai.mobile.data.local.storage.PersonaAvatarStorage
@@ -75,8 +74,19 @@ fun ChatCompanionPanel(
     val selectedRoleModel by chatViewModel.selectedRoleModel.collectAsStateWithLifecycle()
     val roleModelLoading by chatViewModel.roleModelLoading.collectAsStateWithLifecycle()
     val roleModelError by chatViewModel.roleModelError.collectAsStateWithLifecycle()
+    val roleThinking by chatViewModel.roleThinking.collectAsStateWithLifecycle()
     val editScope = rememberCoroutineScope()
     var editingItem by remember { mutableStateOf<ConversationItem?>(null) }
+
+    // 页头标题用当前查看 persona 的展示名：与聊天顶栏同源，
+    // 避免顶栏写「Ling」、详情页写「Ling (QQ)」这种两处不一致。
+    val companionName = remember(personaUiState.personas, viewingFilename, localAvatarMap) {
+        resolveActivePersonaInfo(
+            personaUiState = personaUiState,
+            localAvatarMap = localAvatarMap,
+            viewingFilename = viewingFilename
+        ).displayName
+    }
 
     // 刷新必须绑定“详情真正可见”，不能只绑头像点击回调：
     // 左滑打开同样会把面板设为 visible。显式传入当前 persona，避免面板可见与
@@ -111,6 +121,8 @@ fun ChatCompanionPanel(
                     .fillMaxSize()
                     .statusBarsPadding()
             ) {
+                // 只留返回与编辑：标题位置让给下方页头里的伴侣名字，
+                // 一页里出现「伴侣详情」和「Aveline」两个标题会互相抢注意力。
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -124,13 +136,7 @@ fun ChatCompanionPanel(
                             tint = TextPrimary
                         )
                     }
-                    Text(
-                        text = "伴侣详情",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Spacer(modifier = Modifier.weight(1f))
                     IconButton(
                         onClick = {
                             val info = resolveActivePersonaInfo(personaUiState, localAvatarMap)
@@ -157,6 +163,7 @@ fun ChatCompanionPanel(
                 }
 
                 CompanionScreen(
+                    companionName = companionName,
                     statusUiState = statusUiState,
                     clockFlow = statusViewModel.clock,
                     personaUiState = personaUiState,
@@ -167,6 +174,8 @@ fun ChatCompanionPanel(
                     modelLoading = roleModelLoading,
                     modelError = roleModelError,
                     onModelSelected = chatViewModel::selectModelForCurrentRole,
+                    thinkingEnabled = roleThinking,
+                    onThinkingChange = chatViewModel::setThinkingForCurrentRole,
                     viewingFilename = viewingFilename,
                     // 错误横幅里的“重试”是用户主动点的，强制走网络拿权威数据。
                     onRefreshStatus = statusViewModel::forceRefreshStatus,
@@ -194,6 +203,7 @@ fun ChatCompanionPanel(
                     onConfirmDeleteMemory = memoryViewModel::confirmDelete,
                     onCancelDeleteMemory = memoryViewModel::cancelDelete,
                     onClearMemoryFilters = memoryViewModel::clearFilters,
+                    onLoadMoreMemory = memoryViewModel::loadMoreMemories,
                     onOpenMemoryDetail = memoryViewModel::openMemoryDetail,
                     onCloseMemoryDetail = memoryViewModel::closeMemoryDetail,
                     onGraphEnter = memoryViewModel::loadGraphAnchors,

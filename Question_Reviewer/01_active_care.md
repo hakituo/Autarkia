@@ -3452,3 +3452,21 @@
     2. `verify_persona_conversation_routing.py 离线重放通过，无模型调用或外发消息。`
     3. `venv_core 运行 Core CI 同款 pytest（完整 ignore/deselect）：948 passed, 18 skipped, 14 deselected。`
     4. `本次 Python 改动 Ruff 与 git diff --check 通过。`
+
+### QR-20261028-active-care-portrait-leftovers 画像补齐移除后的遗留：BERT 画像覆盖检测成死代码、MDP 开场奖励归因 (2026-10-28)
+*   **问题描述**: 画像补齐移除后 bert_proactive_mixin.analyze_portrait_topic_coverage 及其话题向量缓存无人调用；开场消息的 MDP 奖励按 last_sent_type 记到 agenda_opener 上，选中的动作学不到。
+*   **复现步骤**:
+    1. grep analyze_portrait_topic_coverage，只剩定义处
+    2. 查看 message_dispatcher / user_response_handler 的 MDP 更新，action 取 last_sent_type
+*   **预期行为**:
+    1. 死代码删除
+    2. 开场消息的奖励归因到决策选中的动作
+*   **实际行为**:
+    1. 保留未删（牵涉 BERT 向量缓存，范围外）
+    2. 奖励记在 agenda_opener 下
+*   **根因**:
+    1. 画像补齐整体下线，只删了直接生产者
+*   **修复方案**:
+    1. 待办：删 analyze_portrait_topic_coverage 与 _get_portrait_topic_embeddings；发送时另存 last_sent_action 供奖励归因
+*   **验证**:
+    1. `待处理`

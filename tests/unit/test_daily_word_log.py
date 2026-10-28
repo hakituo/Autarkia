@@ -958,6 +958,19 @@ def test_mark_known_with_date_and_latest_and_missing(mgr):
     }
 
 
+def test_phrase_survives_count_dropping_to_zero(mgr):
+    """短语次数归零后写成纯单词行，不能被截断成首词。"""
+    _write_day(mgr.base_dir, "2026/08/01", "multi word 1\n")
+
+    r1 = mgr.mark_known("multi word", date="2026-08-01")
+    assert r1["word"] == "multi word"
+    assert r1["unknown_count"] == 0
+
+    r2 = mgr.mark_unknown("multi word", date="2026-08-01")
+    assert r2["unknown_count"] == 1
+    assert [w["word"] for w in mgr.get_words_for_date("2026/08/01")] == ["multi word"]
+
+
 def test_remove_with_date_and_latest_and_missing(mgr):
     _write_day(mgr.base_dir, "2026/08/01", "alpha\nbeta\n")
 

@@ -201,6 +201,7 @@ class ChatViewModel @Inject constructor(
         flushManager = flushManager,
         mapEmotion = { mapEmotion(it) },
         resolveRoleModelRoute = { roleModelController.requestModelRoute() },
+        resolveRoleThinking = { roleModelController.requestThinking() },
         replyNotifier = replyNotifier,
         localMediaStore = localMediaStore
     )
@@ -249,6 +250,9 @@ class ChatViewModel @Inject constructor(
     val selectedRoleModel: StateFlow<AIModel?> get() = roleModelController.selectedModel
     val roleModelLoading: StateFlow<Boolean> get() = roleModelController.isLoading
     val roleModelError: StateFlow<String?> get() = roleModelController.error
+
+    /** 当前角色的思考模式开关；null = 没设置过，跟随后端配置（界面按开显示）。 */
+    val roleThinking: StateFlow<Boolean?> get() = roleModelController.thinking
 
     fun setViewingPersona(filename: String) = sessionController.setViewingPersona(filename)
 
@@ -355,6 +359,9 @@ class ChatViewModel @Inject constructor(
 
     fun selectModelForCurrentRole(modelId: String) =
         roleModelController.selectForCurrentRole(modelId)
+
+    fun setThinkingForCurrentRole(enabled: Boolean) =
+        roleModelController.setThinkingForCurrentRole(enabled)
 
     init {
         observeBackgroundHttpStreaming()

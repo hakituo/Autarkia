@@ -13,8 +13,9 @@
   结果通过 state 发出；
 - VoiceInputManager：开录前清空中间态、collector 不泄漏；模型加载与首次开录都挪到后台，
   并提供 isModelLoaded() 供启动路径判断；
-- InputArea / ChatVoiceInputPanel：输入栏原位切成语音态（实时文本 + 波形 + 计时 +
-  取消/完成），不再另挂转写横幅；
+- InputArea / ChatVoiceInputPanel：输入栏原位切成语音态（波形 + 计时 + 取消/完成），
+  不再另挂转写横幅；录音条本身不再显示流式文本，改由点「完成」时把
+  voicePartialText 一次性落进输入框（2026-10 设计稿「输入栏 v2」）；
 - ChatVoiceInputController：点「完成」先把 voicePartialText 落进输入框，最终结果回来
   只替换这一段；
 - ChatVoiceInputController：最终结果落进输入框后清空中间态并 reset 单例。
@@ -189,9 +190,9 @@ def main() -> int:
     results.append(
         _check(
             "fun ChatVoiceInputPanel(" in panel
-            and "partialText.isNotBlank()" in panel
-            and "VoiceWaveBars(" in panel,
-            "ChatVoiceInputPanel 实时展示 ASR 中间文本并带音量波形",
+            and "VoiceWaveBars(" in panel
+            and "RecordingTimer()" in panel,
+            "ChatVoiceInputPanel 录音条含音量波形与计时（流式文本改由完成时落字）",
         )
     )
     results.append(
@@ -211,10 +212,10 @@ def main() -> int:
     )
     results.append(
         _check(
-            "voicePartialText = uiState.voicePartialText" in bottom_area
-            and "voiceAmplitude = uiState.voiceAmplitude" in bottom_area
-            and "ChatBottomArea(" in screen,
-            "聊天页把 voicePartialText / voiceAmplitude 接到输入栏（实时上屏）",
+            "voiceAmplitude = uiState.voiceAmplitude" in bottom_area
+            and "ChatBottomArea(" in screen
+            and "val partial = current.voicePartialText.trim()" in controller,
+            "聊天页把音量接到录音条，流式文本在点完成时由 controller 落进输入框",
         )
     )
     results.append(

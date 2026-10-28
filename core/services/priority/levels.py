@@ -58,10 +58,12 @@ _REASON_LEVELS: Dict[str, PriorityLevel] = {
     "plan_item": PriorityLevel.PENDING,
     # 突发状态（tired / sick / low_battery 等）按安全类处理
     "urgent": PriorityLevel.CRITICAL,
-    # 聊天议程阶梯的五条（streaming_pipeline/agenda_injections）。
-    # 档位与阶梯顺序一致：计划提醒最急（带 300s TTL），每日学习任务次之，
-    # 其余三条同为日常软提示，它们之间靠阶梯顺序做 tie-break。
+    # 聊天议程阶梯（streaming_pipeline/agenda_injections）。
+    # 档位与阶梯顺序一致：计划提醒最急（带 300s TTL）；开场议程同档、排在其后
+    # （轻问候之后要带的那件事，到点硬提醒那一轮让位）；每日学习任务次之，
+    # 其余同为日常软提示，它们之间靠阶梯顺序做 tie-break。
     "plan_reminder": PriorityLevel.OVERDUE,
+    "active_care_agenda": PriorityLevel.OVERDUE,
     "daily_study_task": PriorityLevel.PENDING,
     "tomorrow_tone": PriorityLevel.ROUTINE,
     "today_plan": PriorityLevel.ROUTINE,

@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
 from core.agents.chat_agent_components.persona_system.prompt.active_care_prompts import (
+    DECISION_STYLE_GUIDE,
     DECISION_SYSTEM_PROMPT_TEMPLATE,
     DECISION_USER_MESSAGE_TEMPLATE,
     NO_DEFER_LEAK_CONSTRAINT,
@@ -66,7 +67,7 @@ def build_active_care_decision_prompt(
         llm_ctx: 决策上下文快照（json-serializable，进 user message）。
         dynamic_constraints: 当前状态约束行（P1 睡眠/模式/活动等）。
         specific_instruction: 候选动作的行为指引（透传给生成层，决策可参考）。
-        daily_push_text: 今日推送优先级格式化文本（可为空）。
+        daily_push_text: 【可带的话题】菜单文本（可为空）。
 
     Returns:
         DecisionPromptBundle：system / user 两条消息。
@@ -83,6 +84,7 @@ def build_active_care_decision_prompt(
     system_parts.append(SEND_DEFER_PROTOCOL.strip())
     system_parts.append(SHOULD_CONTACT_USER_GUIDE.strip())
     system_parts.append(NO_DEFER_LEAK_CONSTRAINT.strip())
+    system_parts.append(DECISION_STYLE_GUIDE.strip())
 
     # 输出格式 schema 与 retry 指导（决策 schema 唯一真相源在 decision_output_parser）
     from core.services.active_care.decision.decision_output_parser import (

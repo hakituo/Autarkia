@@ -61,7 +61,9 @@ COOLDOWN_EXEMPT_INTENTS = frozenset({
 })
 
 # 普通提问类 intent：未回复抑制 & 每日软上限 & 提问冷却只针对这类。
-QUESTION_INTENTS = frozenset({"curious_question", "checking"})
+# agenda_opener（轻问候开场，如「在不」）也算提问：上一条没回就不再开场，
+# 共用提问冷却与每日上限，防止开场白一天刷好几次。
+QUESTION_INTENTS = frozenset({"curious_question", "checking", "agenda_opener"})
 
 # 需要跨文案归属同一个 topic_group 做同题材冷却的 intent
 GROUP_COOLDOWN_INTENTS = frozenset({

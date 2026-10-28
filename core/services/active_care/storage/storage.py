@@ -55,6 +55,8 @@ class ActiveCareStorage:
         # P2-8: 改用 LazyAsyncLock 避免在 __init__ 中创建 asyncio.Lock（无事件循环时会出错）
         self._file_lock = LazyAsyncLock()
         self._pending_updates: Dict[str, Any] = {}
+        # 待写更新所属的 scope：延迟刷盘时按它落盘，避免 scope 切换后写进别人的目录
+        self._pending_scope: Optional[str] = None
         self._flush_task: Optional[asyncio.Task] = None
         self._flush_interval = 2.0
         self._dirty = False
@@ -353,6 +355,10 @@ class ActiveCareStorage:
         else:
             self._proactive_state_cache = {}
 
+        # 尚未刷盘的待写更新属于当前 scope 时叠加进读结果：
+        # 带 scope 的写会清空缓存，不能让已写内存、未落盘的值在重新读盘后消失。
+        if self._pending_updates and self._pending_scope in (None, self._runtime_scope):
+            self._proactive_state_cache.update(self._pending_updates)
         return await self._merge_user_sleep_state(self._proactive_state_cache)
 
     def _get_user_sleep_state_file(self) -> str:
@@ -494,23 +500,38 @@ class ActiveCareStorage:
         # 显式传入 scope 时，走并发安全的独立路径（不污染实例缓存）
         if scope is not None:
             state_file = os.path.join(self._get_runtime_dir(scope), "proactive_state.json")
-            # 读取当前状态
-            if os.path.exists(state_file):
-                try:
-                    current_state = await self._read_json_file(state_file)
-                except Exception:
-                    current_state = {}
-            else:
-                current_state = {}
-            # 合并更新
-            current_state.update(updates)
-            # 空数据时跳过写入，已有文件则删除
-            if not current_state:
+            # 与延迟刷盘共用同一把锁：否则「读盘-合并-写盘」会被 flush 的写插队覆盖
+            async with self._file_lock:
+                # 读取当前状态
                 if os.path.exists(state_file):
-                    os.remove(state_file)
-                return current_state
-            await self._write_json_file(state_file, current_state)
+                    try:
+                        current_state = await self._read_json_file(state_file)
+                    except Exception:
+                        current_state = {}
+                else:
+                    current_state = {}
+                # 同一 scope 还有未落盘的待写字段时先并进来：
+                # 否则直写会把它们从磁盘上抹掉，只剩内存副本（进程崩溃即丢失）。
+                normalized_scope = str(scope or "").strip().lower() or "aveline"
+                if self._pending_updates and self._pending_scope == normalized_scope:
+                    current_state.update(self._pending_updates)
+                # 合并更新
+                current_state.update(updates)
+                # 空数据时跳过写入，已有文件则删除
+                if not current_state:
+                    if os.path.exists(state_file):
+                        os.remove(state_file)
+                else:
+                    await self._write_json_file_unlocked(state_file, current_state)
+            # 文件已被直接改写，进程内缓存必然过期：
+            # 不清掉的话，后续无 scope 写会把旧缓存整片覆盖回旧值（含用户交互时间戳）。
+            self._proactive_state_cache = None
             return current_state
+
+        # scope 已切换但上一 scope 还有未落盘的更新：先按原 scope 刷掉，
+        # 否则这些字段会被合并进当前 scope 的文件（跨角色串味）。
+        if self._pending_updates and self._pending_scope not in (None, self._runtime_scope):
+            await self._flush_pending_updates()
 
         if self._proactive_state_cache is None:
             state_file = os.path.join(self._get_runtime_dir(), "proactive_state.json")
@@ -524,6 +545,7 @@ class ActiveCareStorage:
 
         self._proactive_state_cache.update(updates)
         self._pending_updates.update(updates)
+        self._pending_scope = self._runtime_scope
         self._dirty = True
 
         if immediate:
@@ -548,24 +570,71 @@ class ActiveCareStorage:
         await self._flush_pending_updates()
 
     async def _flush_pending_updates(self):
-        """将待写入的更新刷入磁盘"""
+        """将待写入的更新刷入磁盘。
+
+        2026-10-27 修复「双写路径互相覆盖」：刷盘前先重读磁盘，只合并本次待写字段。
+        此前是把整份 ``_proactive_state_cache`` 覆盖写盘，缓存若早于带 scope 的写
+        （用户交互时间戳 / last_proactive_replied）加载，就会把这些新值抹回旧值。
+        """
         if not self._dirty:
             return
         async with self._file_lock:
             if not self._dirty:
                 return
             self._dirty = False
-            state = self._proactive_state_cache
-            if state is None:
+            pending = dict(self._pending_updates)
+            # 待写字段属于入队时的 scope；没有待写字段时按当前运行 scope 走兜底语义
+            target_scope = (
+                (self._pending_scope or self._runtime_scope)
+                if pending
+                else self._runtime_scope
+            )
+            state_file = os.path.join(
+                self._get_runtime_dir(target_scope), "proactive_state.json"
+            )
+            if pending:
+                try:
+                    disk_state = await self._read_json_file(state_file)
+                except Exception as read_err:
+                    # 看不到磁盘原值时不能只拿待写字段覆盖（会丢掉整份状态）：
+                    # 保留待写更新并重新排一次刷盘，稍后重试。
+                    logger.warning(
+                        "Active Care Storage: 刷盘前读盘失败，保留待写更新稍后重试: %s",
+                        read_err,
+                    )
+                    self._dirty = True
+                    self._ensure_flush_task()
+                    return
+                if not isinstance(disk_state, dict):
+                    disk_state = {}
+                state = {**disk_state, **pending}
+            elif self._proactive_state_cache is None:
+                # 无待写字段且缓存已被带 scope 的写失效：没有可写的真相，直接跳过
                 return
-            state_file = os.path.join(self._get_runtime_dir(), "proactive_state.json")
+            else:
+                # 兜底：只有缓存标脏（无待写字段）时沿用旧的「缓存即真相」语义
+                state = dict(self._proactive_state_cache)
+            if target_scope == self._runtime_scope:
+                self._proactive_state_cache = dict(state)
+            else:
+                # 本次刷盘属于别的 scope，当前 scope 的缓存不能被它顶替
+                self._proactive_state_cache = None
             if not state:
                 # 空数据时跳过写入，已有文件则删除
                 if os.path.exists(state_file):
                     os.remove(state_file)
             else:
                 await self._write_json_file_unlocked(state_file, state)
-            self._pending_updates.clear()
+            # 只清理本次确实写进文件的字段：刷盘期间新增的更新留给下一轮
+            for key, value in pending.items():
+                if self._pending_updates.get(key) == value:
+                    self._pending_updates.pop(key, None)
+            if self._pending_updates:
+                self._dirty = True
+                self._ensure_flush_task()
+            else:
+                # 全部落盘后才清 scope 标记；刷盘期间新入队的更新会自己写上新标记
+                self._pending_scope = None
 
     async def load_policy_scores(self) -> Dict[str, Any]:
         """从磁盘加载 Bandit 策略分值"""

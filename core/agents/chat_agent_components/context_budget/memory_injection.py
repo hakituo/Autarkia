@@ -3,6 +3,7 @@
 
 职责：往 messages 末尾追加 system 消息（思考库摘要、敏感记忆）。
 互不依赖，仅依赖 WeightedMemoryManager。
+梗概库注入（``inject_note_memories``）只是调用点，逻辑在 ``memory.notes.injection``。
 """
 
 import asyncio
@@ -87,3 +88,30 @@ async def inject_sensitive_memories(
         str(len(sensitive_mems)),
         str(is_sensitive_mode),
     )
+
+
+async def inject_note_memories(
+    *,
+    user_id: str,
+    message_text: str,
+    is_cloud: bool,
+    is_sensitive_mode: bool,
+    injections: List[str],
+) -> None:
+    """梗概库自动注入（开关 memory.notes_injection_enabled，默认关）。
+
+    关时直接返回，``injections`` 原样不动；开时把一个注入块追加到末尾（与已有注入去重）。
+    """
+    from memory.notes.injection import build_notes_injection, injection_enabled
+
+    if not injection_enabled():
+        return
+    block = await build_notes_injection(
+        user_id=user_id,
+        message_text=message_text,
+        is_cloud=is_cloud,
+        is_sensitive_mode=is_sensitive_mode,
+        existing=injections,
+    )
+    if block:
+        injections.append(block)

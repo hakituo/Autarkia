@@ -8,10 +8,11 @@
 1. pull 能从对端工作副本拿到提交（含对端还没推到 GitHub 的提交），且幂等；
 2. push 把本机提交写进 hub，对端随后能从 hub 拉到；
 3. **无关的未跟踪文件不再卡死同步**（旧 workflow 正是被这条拖死的）；
-4. 本地改动与新提交冲突时返回 2，且本地内容原样保留；
+4. 本地改动与新提交冲突时返回 2，本地内容原样保留，且只点名真正挡路的文件；
 5. 两端各有独有提交（分叉）时返回 2，不做自动合并；
 6. 非 main 分支直接跳过，不动工作区；
-7. hub 不存在时 push 自动建裸仓库。
+7. hub 不存在时 push 自动建裸仓库；
+8. 对端领先、hub 落后时仍追平对端（两个来源各用独立 ref，互不覆盖）。
 
 运行：python tests/scripts/sync/verify_code_sync.py
 退出码：0=全部通过；1=存在失败项。
@@ -177,17 +178,23 @@ def case_untracked_does_not_block(tmp: Path) -> None:
 
 
 def case_local_change_blocks(tmp: Path) -> None:
-    print("[4] 本地改动与新提交冲突：返回 2 且不覆盖本地内容")
+    print("[4] 本地改动与新提交冲突：返回 2、不覆盖本地内容、只点名挡路文件")
     fx = Fixture(tmp / "c4")
     fx.build()
+    # 先让两侧共享 extra.txt 的历史，本机随后改它时才算「无关的本地改动」
+    commit_file(fx.win, "extra.txt", "base\n", "win: add extra")
+    git(fx.lin, "pull", "-q", str(fx.win), "main")
     commit_file(fx.win, "a.txt", "from-win\n", "win: change a")
     (fx.lin / "a.txt").write_text("local-wip\n", encoding="utf-8")
+    (fx.lin / "extra.txt").write_text("local-extra\n", encoding="utf-8")
     lin_head = head(fx.lin)
 
     code = call("pull", fx.lin, fx.hub, fx.win)
     _check(code == 2, "被本地改动挡住时返回 2（可重试，不是成功）")
     _check((fx.lin / "a.txt").read_text(encoding="utf-8") == "local-wip\n", "本地改动原样保留")
     _check(head(fx.lin) == lin_head, "HEAD 未被移动")
+    _check("挡住：a.txt" in _last_output, "输出点名真正挡路的 a.txt")
+    _check("extra.txt" not in _last_output, "对端没改的本机改动不被当成挡路者")
 
 
 def case_diverged(tmp: Path) -> None:
@@ -230,6 +237,19 @@ def case_push_creates_hub(tmp: Path) -> None:
     _check(fx.hub.is_dir(), "hub 被自动创建")
 
 
+def case_peer_ahead_of_hub(tmp: Path) -> None:
+    print("[9] 对端领先、hub 落后：追平对端，不被 hub 的旧位置覆盖")
+    fx = Fixture(tmp / "c9")
+    fx.build()
+    _check(call("push", fx.lin, fx.hub, None) == 0, "先把 base 写进 hub（hub 从此落后）")
+    win_head = commit_file(fx.win, "g.txt", "from-win\n", "win: add g")
+
+    code = call("pull", fx.lin, fx.hub, fx.win)
+    _check(code == 0, "pull 返回 0")
+    _check(head(fx.lin) == win_head, "HEAD 追平对端，未被 hub 的旧提交盖回去")
+    _check("无法快进" not in _last_output, "两个来源各用独立 ref，日志不再自相矛盾")
+
+
 def case_status(tmp: Path) -> None:
     print("[8] status：只报告，不动工作区")
     fx = Fixture(tmp / "c8")
@@ -256,6 +276,7 @@ def main() -> int:
             case_diverged,
             case_non_main_branch,
             case_push_creates_hub,
+            case_peer_ahead_of_hub,
             case_status,
         ):
             case(tmp)

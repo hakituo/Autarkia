@@ -51,6 +51,8 @@ class ChatSendController(
     private val flushManager: ChatFlushManager,
     private val mapEmotion: (String) -> Emotion?,
     private val resolveRoleModelRoute: () -> String? = { null },
+    /** 当前角色这一轮要不要开思考模式；null = 跟随后端配置。 */
+    private val resolveRoleThinking: () -> Boolean? = { null },
     /**
      * 后台回复通知发布器。
      *
@@ -98,6 +100,7 @@ class ChatSendController(
         replyNotifier = outcomeNotifier,
         mapEmotion = mapEmotion,
         resolveRoleModelRoute = resolveRoleModelRoute,
+        resolveRoleThinking = resolveRoleThinking,
         localMediaStore = localMediaStore
     )
 

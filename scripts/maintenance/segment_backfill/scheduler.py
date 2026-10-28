@@ -32,7 +32,8 @@ PROVIDERS = {
 _THINK = re.compile(r"<think(?:ing)?>.*?</think(?:ing)?>", re.DOTALL | re.IGNORECASE)
 #: 额度用尽而不是临时限流的响应特征（MiniMax plan 常见：余额不足 / 额度到期）
 _QUOTA_HINTS = re.compile(
-    r"insufficient|quota|balance|余额|额度|欠费|plan\s*(?:expired|limit)|usage\s*limit",
+    r"insufficient|quota|balance|余额|额度|欠费|用量上限|\(2056\)"
+    r"|plan\s*(?:expired|limit)|usage\s*limit",
     re.IGNORECASE,
 )
 
@@ -148,6 +149,12 @@ class DirectScheduler:
             }
             if name == "minimax":
                 payload["reasoning_split"] = True
+                if kwargs.get("thinking_enabled") is False:
+                    # MiniMax-M3 认顶层 thinking:disabled（10-27 实测）；不传时保持默认思考
+                    payload["thinking"] = {"type": "disabled"}
+            elif name == "deepseek" and not kwargs.get("thinking_enabled", False):
+                # 回填按输出计费，思考 token 也算输出：默认关掉
+                payload["thinking"] = {"type": "disabled"}
             if name != self.provider:
                 self.usage["fallback"] += 1
             try:
@@ -210,6 +217,8 @@ class DirectScheduler:
             self.usage["prompt"] += prompt_tokens
             self.usage["completion"] += completion_tokens
             self.usage["cached"] += cached_tokens
+            reasoning = (usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
+            self.usage["reasoning"] = self.usage.get("reasoning", 0) + int(reasoning or 0)
             bucket = self._bucket(name, alias)
             bucket["calls"] += 1
             bucket["prompt"] += prompt_tokens

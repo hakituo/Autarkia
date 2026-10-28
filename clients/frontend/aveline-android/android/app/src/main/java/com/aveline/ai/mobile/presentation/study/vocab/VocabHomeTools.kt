@@ -17,7 +17,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -36,8 +35,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aveline.ai.mobile.presentation.components.controls.AvelineButton
-import com.aveline.ai.mobile.presentation.components.controls.AvelineButtonVariant
 import com.aveline.ai.mobile.presentation.study.VocabUiState
 import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.Edge
@@ -184,37 +181,6 @@ internal fun MistakesRow(uiState: VocabUiState, onClick: () -> Unit) {
             contentDescription = null,
             tint = TextTertiary,
             modifier = Modifier.size(20.dp)
-        )
-    }
-}
-
-@Composable
-internal fun ManualRecordRow(todayCount: Int, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = "手动记录", fontSize = 15.sp, color = TextPrimary)
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = if (todayCount > 0) {
-                    "今天在 App 外背了 $todayCount 个"
-                } else {
-                    "记录今天在 App 外背的单词"
-                },
-                fontSize = 12.5.sp,
-                color = TextTertiary
-            )
-        }
-        AvelineButton(
-            text = "记录",
-            onClick = onClick,
-            modifier = Modifier.height(36.dp),
-            variant = AvelineButtonVariant.Secondary,
-            icon = Icons.Default.Add
         )
     }
 }

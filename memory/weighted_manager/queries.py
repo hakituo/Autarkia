@@ -117,10 +117,64 @@ class WeightedManagerQueryMixin:
         emotion: str = None,
         exclude_categories: Optional[List[str]] = None,
         exclude_sensitive: bool = False,
+        offset: int = 0,
+        sort_by: str = "weight",
+    ) -> List[Dict[str, Any]]:
+        filtered = self._collect_weighted_memories(
+            min_weight=min_weight,
+            topics=topics,
+            category=category,
+            emotion=emotion,
+            exclude_categories=exclude_categories,
+            exclude_sensitive=exclude_sensitive,
+            sort_by=sort_by,
+        )
+        offset_value, limit_value = self._pagination_bounds(offset, limit)
+        return filtered[offset_value: offset_value + limit_value]
+
+    def get_weighted_memories_page(
+        self,
+        min_weight: float = None,
+        topics: List[str] = None,
+        limit: int = 10,
+        category: str = None,
+        emotion: str = None,
+        exclude_categories: Optional[List[str]] = None,
+        exclude_sensitive: bool = False,
+        offset: int = 0,
+        sort_by: str = "weight",
+    ) -> tuple[List[Dict[str, Any]], int]:
+        """返回一页记忆与过滤后的总条数，供列表接口做 offset 懒加载。"""
+        filtered = self._collect_weighted_memories(
+            min_weight=min_weight,
+            topics=topics,
+            category=category,
+            emotion=emotion,
+            exclude_categories=exclude_categories,
+            exclude_sensitive=exclude_sensitive,
+            sort_by=sort_by,
+        )
+        offset_value, limit_value = self._pagination_bounds(offset, limit)
+        return filtered[offset_value: offset_value + limit_value], len(filtered)
+
+    def _collect_weighted_memories(
+        self,
+        min_weight: float = None,
+        topics: List[str] = None,
+        category: str = None,
+        emotion: str = None,
+        exclude_categories: Optional[List[str]] = None,
+        exclude_sensitive: bool = False,
+        sort_by: str = "weight",
     ) -> List[Dict[str, Any]]:
         lock_ctx = self._rw_lock.read_lock() if self._use_rw_lock else self.lock
         with lock_ctx:
             self._perf_stats["rw_lock_reads"] += 1
+            access_counts = (
+                dict(getattr(self, "_cache", {}).get("access_count", {}))
+                if sort_by == "accessed"
+                else {}
+            )
             if category:
                 memories = [
                     self.weighted_memories[memory_id].copy()
@@ -153,5 +207,53 @@ class WeightedManagerQueryMixin:
             if emotion and emotion in memory.get("emotions", []):
                 updated["weight"] *= 1.2
             filtered.append(updated)
-        filtered.sort(key=lambda item: item.get("weight", 0), reverse=True)
-        return filtered[:limit]
+        filtered.sort(key=lambda item: self._weighted_sort_key(item, sort_by, access_counts))
+        return filtered
+
+    @staticmethod
+    def _pagination_bounds(offset: Any, limit: Any) -> tuple[int, int]:
+        try:
+            offset_value = max(0, int(offset))
+        except (TypeError, ValueError):
+            offset_value = 0
+        try:
+            limit_value = max(0, int(limit))
+        except (TypeError, ValueError):
+            limit_value = 0
+        return offset_value, limit_value
+
+    @classmethod
+    def _weighted_sort_key(
+        cls,
+        memory: Dict[str, Any],
+        sort_by: str,
+        access_counts: Dict[str, int],
+    ) -> tuple:
+        memory_id = str(memory.get("id") or "")
+        weight = cls._sort_number(memory.get("weight"))
+        if sort_by == "newest":
+            return (-cls._sort_number(memory.get("timestamp")), memory_id)
+        if sort_by == "oldest":
+            return (cls._sort_number(memory.get("timestamp"), float("inf")), memory_id)
+        if sort_by == "accessed":
+            try:
+                access_count = int(access_counts.get(memory_id, 0))
+            except (TypeError, ValueError):
+                access_count = 0
+            return (-access_count, -weight, memory_id)
+        if sort_by == "important":
+            raw_importance = memory.get("importance")
+            importance = (
+                weight
+                if raw_importance is None
+                else cls._sort_number(raw_importance, weight)
+            )
+            return (-importance, -weight, memory_id)
+        return (-weight, memory_id)
+
+    @staticmethod
+    def _sort_number(value: Any, default: float = 0.0) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default

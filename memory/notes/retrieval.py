@@ -10,8 +10,9 @@ C8 结论：每段梗概作主检索单元、混合检索最好；原文不与�
 
 from __future__ import annotations
 
-import os
+import math
 import threading
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -20,8 +21,9 @@ import numpy as np
 
 from core.utils.logger import get_logger
 
-from . import embeddings
+from . import embeddings, legacy
 from .bm25 import BM25
+from .plan_due import plan_state
 from .store import NoteStore
 
 logger = get_logger("NoteRetrieval")
@@ -30,13 +32,23 @@ logger = get_logger("NoteRetrieval")
 RRF_K = 60
 CANDIDATES_PER_ROUTE = 50
 
+#: 重要度微调（spec §9 第 7 条：relevance 与 importance 分量分开给出，不合成说不清的总分）。
+#: 调整量 = IMPORTANCE_WEIGHT × (importance − 0.5)，importance 截到 [0, 1]，0.5 档恰为 0，
+#: 所以 v8 之前全是 0.5 的旧梗概排序逐条不变。取 0.001 的理由（RRF_K=60）：
+#: - 单路榜首相邻名次的 RRF 差 1/61−1/62≈0.00026，v8 的 0.8 与 0.3 两档相差 0.0005，
+#:   大约只够跨过单路两个名次，只在相关度相近时改变先后；
+#: - 两路都命中（≥2/111≈0.0180）与只有一路命中（≤1/61≈0.0164）至少差 0.0016，
+#:   而调整量全幅（0→1）也只有 0.001，只被一路召回的弱相关条目不会被顶到两路共识条目前面。
+IMPORTANCE_WEIGHT = 0.001
+NEUTRAL_IMPORTANCE = 0.5
+
 #: 闸门函数：(事件 payload 列表, 请求会话, 分支边界) -> 被隐藏的 event_id 集合
 Gate = Callable[[list[dict[str, Any]], str, Mapping[str, Any] | None], set[str]]
 
 
 @dataclass
 class _Corpus:
-    stamps: dict[str, float] = field(default_factory=dict)
+    stamps: dict[str, tuple[float, float]] = field(default_factory=dict)
     notes: list[dict[str, Any]] = field(default_factory=list)
     bm25: BM25 | None = None
 
@@ -63,23 +75,15 @@ def read_gate_hidden(
     return {str(item["event_id"]) for item in payloads} - visible
 
 
-def _file_stamp(store: NoteStore, conversation_id: str) -> float:
-    from .paths import notes_path
-
-    try:
-        return os.path.getmtime(notes_path(store.scope, conversation_id))
-    except OSError:
-        return 0.0
-
-
 def _load_corpus(store: NoteStore) -> _Corpus:
-    conversations = store.list_conversations()
-    stamps = {cid: _file_stamp(store, cid) for cid in conversations}
+    # v2 过渡期新旧双读（旧梗概只补新梗概没覆盖的对话），见 ``legacy``
+    conversations = legacy.readable_conversations(store)
+    stamps = {cid: legacy.readable_stamp(store, cid) for cid in conversations}
     with _cache_lock:
         cached = _cache.get(store.scope)
         if cached and cached.stamps == stamps:
             return cached
-    notes = [note for cid in conversations for note in store.list_notes(cid)]
+    notes = [note for cid in conversations for note in legacy.readable_notes(store, cid)]
     notes = [note for note in notes if str(note.get("text") or "").strip()]
     corpus = _Corpus(stamps=stamps, notes=notes, bm25=BM25([n["text"] for n in notes]))
     with _cache_lock:
@@ -151,7 +155,8 @@ class NoteRetriever:
         for ranking in rankings:
             for rank, index in enumerate(ranking):
                 fused[index] = fused.get(index, 0.0) + 1.0 / (RRF_K + rank + 1)
-        ordered = sorted(fused, key=lambda i: (-fused[i], corpus.notes[i]["note_id"]))
+        adjusted = {i: fused[i] + importance_adjustment(corpus.notes[i]) for i in fused}
+        ordered = sorted(adjusted, key=lambda i: (-adjusted[i], corpus.notes[i]["note_id"]))
         candidates = [corpus.notes[i] for i in ordered]
         hidden = self._hidden_events(candidates, conversation_id, branch_scope)
         hits = []
@@ -159,7 +164,7 @@ class NoteRetriever:
             note = corpus.notes[index]
             if hidden & set(note.get("source_event_ids") or []):
                 continue
-            hits.append(_hit(note, fused[index]))
+            hits.append(_hit(note, fused[index], adjusted[index]))
             if len(hits) >= limit:
                 break
         return hits
@@ -185,7 +190,18 @@ class NoteRetriever:
         return self._gate(payloads, conversation_id, branch_scope)
 
 
-def _hit(note: Mapping[str, Any], score: float) -> dict[str, Any]:
+def importance_adjustment(note: Mapping[str, Any]) -> float:
+    """重要度对 RRF 分的加性调整；缺失 / 非数值 / NaN 按 0.5 档处理（调整为 0）。"""
+    try:
+        importance = float(note.get("importance", NEUTRAL_IMPORTANCE))
+    except (TypeError, ValueError):
+        return 0.0
+    if math.isnan(importance):
+        return 0.0
+    return IMPORTANCE_WEIGHT * (min(max(importance, 0.0), 1.0) - NEUTRAL_IMPORTANCE)
+
+
+def _hit(note: Mapping[str, Any], rrf: float, score: float) -> dict[str, Any]:
     return {
         "note_id": note["note_id"],
         "kind": note.get("kind"),
@@ -195,8 +211,21 @@ def _hit(note: Mapping[str, Any], score: float) -> dict[str, Any]:
         "occurred_to": note.get("occurred_to"),
         "source_event_ids": list(note.get("source_event_ids") or []),
         "source_segment_id": note.get("source_segment_id"),
+        "importance": note.get("importance"),
+        # plan 的 open / done / cancelled（提取器 v9 起），过了到期日的读时算成 expired
+        "status": plan_state(note, time.time()),
+        "valid_to": note.get("valid_to"),
+        # score 是排序用的最终分；rrf_score / importance_adjust 是可解释的分量，便于排查
         "score": round(score, 6),
+        "rrf_score": round(rrf, 6),
+        "importance_adjust": round(score - rrf, 6),
     }
 
 
-__all__ = ["NoteRetriever", "read_gate_hidden", "reset_note_retrieval_cache"]
+__all__ = [
+    "IMPORTANCE_WEIGHT",
+    "NoteRetriever",
+    "importance_adjustment",
+    "read_gate_hidden",
+    "reset_note_retrieval_cache",
+]

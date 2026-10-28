@@ -6,59 +6,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 import java.time.LocalDate
-import java.util.LinkedHashMap
 
-/**
- * 复习结果按单词去重：同一单词多次提交（如 Again 重排）只保留最后一次结果，
- * 并保持首次出现顺序。用于结算页「会/不会」清单与正确率统计，避免重复计数。
- */
-private fun dedupeResults(list: List<ReviewResultItem>): List<ReviewResultItem> {
-    val map = LinkedHashMap<String, ReviewResultItem>()
-    for (item in list) map[item.word.lowercase()] = item
-    return map.values.toList()
-}
+/** 后端结算还没回来时的占位：结算页只读本地 reviewResults，有值即可展示。 */
+private const val LOCAL_SUMMARY = "local"
 
-/** 解析普通释义或扩展释义，缺少新字段时兼容旧词书。 */
-private fun JsonObject.parseTranslations(key: String): List<WordTranslation> {
-    return this[key]
-        ?.jsonArray
-        ?.map { element ->
-            val translation = element.jsonObject
-            WordTranslation(
-                type = translation.string("type"),
-                translation = translation.string("translation"),
-                primary = translation.boolean("primary") ?: false,
-                domains = translation["domains"]
-                    ?.jsonArray
-                    ?.mapNotNull { it.jsonPrimitive.contentOrNull }
-                    .orEmpty()
-            )
-        }
-        .orEmpty()
-}
-
-/**
- * 词汇复习会话管理器
- *
- * 从 StudyViewModel 中提取的词汇复习相关逻辑，负责：
- * - 加载待复习的词汇列表（Learn Words）
- * - 开始/提交/结束一次复习会话
- * - 维护复习卡片索引、是否展示答案、会话统计等 UI 状态
- *
- * 词汇复习专用状态写入独立的 [VocabUiState] 流（由 ViewModel 持有并暴露），
- * 通用加载/错误状态仍写入共享的 [StudyUiState] 流。
- *
- * @property scope 协程作用域，通常为 ViewModel 的 viewModelScope
- * @property uiState 通用可变状态流（仅用于 isLoading / error 等共享字段）
- * @property vocabState 词汇复习专用可变状态流
- * @property studyRepository 学习仓库，负责远端数据访问
- */
 class StudyVocabReviewManager(
     private val scope: CoroutineScope,
     private val uiState: MutableStateFlow<StudyUiState>,
@@ -79,10 +32,10 @@ class StudyVocabReviewManager(
     fun restoreUnfinishedSession(): Boolean {
         // 旧版本存过 30 这类已下线的档位，恢复时丢弃，避免分段选择没有选中项。
         sessionStore?.getNewWordsBatchSize()
-            ?.takeIf { it in NEW_WORDS_BATCH_SIZE_OPTIONS }
+            ?.takeIf { it in VOCAB_BATCH_SIZE_OPTIONS }
             ?.let { batchSize -> vocabState.update { it.copy(newWordsBatchSize = batchSize) } }
         sessionStore?.getReviewBatchSize()
-            ?.takeIf { it in REVIEW_BATCH_SIZE_OPTIONS }
+            ?.takeIf { it in VOCAB_BATCH_SIZE_OPTIONS }
             ?.let { batchSize -> vocabState.update { it.copy(reviewBatchSize = batchSize) } }
         val snapshot = sessionStore?.restore() ?: return false
         vocabState.update {
@@ -126,13 +79,13 @@ class StudyVocabReviewManager(
         java.util.UUID.randomUUID().toString().replace("-", "").take(16)
 
     fun setNewWordsBatchSize(batchSize: Int) {
-        if (batchSize !in NEW_WORDS_BATCH_SIZE_OPTIONS) return
+        if (batchSize !in VOCAB_BATCH_SIZE_OPTIONS) return
         sessionStore?.saveNewWordsBatchSize(batchSize)
         vocabState.update { it.copy(newWordsBatchSize = batchSize) }
     }
 
     fun setReviewBatchSize(batchSize: Int) {
-        if (batchSize !in REVIEW_BATCH_SIZE_OPTIONS) return
+        if (batchSize !in VOCAB_BATCH_SIZE_OPTIONS) return
         sessionStore?.saveReviewBatchSize(batchSize)
         vocabState.update { it.copy(reviewBatchSize = batchSize) }
     }
@@ -190,70 +143,6 @@ class StudyVocabReviewManager(
     }
 
     /**
-     * 加载从未学过的新词列表（从当前词书取不在 progress 里的词）。
-     *
-     * 拉取成功后写入 [VocabUiState.learnWords] 并标记 [VocabUiState.isNewWordsMode]。
-     */
-    fun loadNewWords(
-        count: Int = vocabState.value.newWordsBatchSize,
-        order: String = "sequential"
-    ) {
-        scope.launch {
-            uiState.update { it.copy(isLoading = true, error = null) }
-            studyRepository.getNewWords(count, order).onSuccess { response ->
-                val words = parseDailyWords(response)
-                uiState.update { it.copy(isLoading = false) }
-                vocabState.update { it.copy(learnWords = words, isNewWordsMode = true) }
-            }.onFailure { error ->
-                uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = error.message ?: "加载新词失败"
-                    )
-                }
-            }
-        }
-    }
-
-    /** 解析后端返回的词汇列表为 DailyWord 列表（复用于复习词和新词） */
-    private fun parseDailyWords(response: JsonObject): List<DailyWord> {
-        return response["data"]?.jsonArray.orEmptyArray().map { item ->
-            val obj = item.jsonObject
-            val translations = obj.parseTranslations("translations")
-            val extendedTranslations = obj.parseTranslations("extended_translations")
-            val phrases = obj["phrases"]
-                ?.jsonArray
-                ?.map { p ->
-                    val pObj = p.jsonObject
-                    WordPhrase(
-                        phrase = pObj.string("phrase"),
-                        translation = pObj.string("translation")
-                    )
-                }
-            val sentences = obj["sentences"]
-                ?.jsonArray
-                ?.map { s ->
-                    val sObj = s.jsonObject
-                    WordSentence(
-                        sentence = sObj.string("sentence"),
-                        translation = sObj.string("translation")
-                    )
-                }
-            DailyWord(
-                word = obj.string("word"),
-                translations = translations,
-                extendedTranslations = extendedTranslations,
-                phrases = phrases,
-                sentences = sentences,
-                us = obj["us"]?.jsonPrimitive?.contentOrNull,
-                uk = obj["uk"]?.jsonPrimitive?.contentOrNull,
-                status = obj.string("status"),
-                dueTime = obj.long("due_time")
-            )
-        }
-    }
-
-    /**
      * 开始一次词汇复习会话。
      *
      * 与背新词一致按组领取：每次只拉 [VocabUiState.reviewBatchSize] 个待复习词，
@@ -261,6 +150,8 @@ class StudyVocabReviewManager(
      * 中途退出（本地队列未走完）仍从断点续背，不重新拉取。
      */
     fun startReview() {
+        // 防重入：请求在途或上一组还在收尾时，连点只算一次
+        if (vocabState.value.launching != null || vocabState.value.isFinishing) return
         scope.launch {
             // 续背：内存里还有未完成的复习会话（非新词模式、有卡片、未背完、至少提交过一次）
             // 则从断点 currentCardIndex 继续，不重置索引、不重新拉取、不调后端开新会话。
@@ -280,27 +171,25 @@ class StudyVocabReviewManager(
             }
 
             // 正常开新会话：先领一组词，确保进入复习界面时就是本组的队列
-            uiState.update { it.copy(isLoading = true, error = null) }
+            vocabState.update { it.copy(launching = VocabLaunch.REVIEW) }
+            uiState.update { it.copy(error = null) }
             val batchResult = studyRepository.getDailyReviewBatch(
                 current.reviewBatchSize,
                 _currentOrder()
             )
             val words = batchResult.getOrNull()?.let { parseDailyWords(it) }
             if (words == null) {
+                vocabState.update { it.copy(launching = null) }
                 uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = batchResult.exceptionOrNull()?.message ?: "加载复习词失败"
-                    )
+                    it.copy(error = batchResult.exceptionOrNull()?.message ?: "加载复习词失败")
                 }
                 return@launch
             }
             if (words.isEmpty()) {
-                uiState.update {
-                    it.copy(isLoading = false, successMessage = "今天的复习已经全部完成")
-                }
+                uiState.update { it.copy(successMessage = "今天的复习已经全部完成") }
                 vocabState.update {
                     it.copy(
+                        launching = null,
                         isReviewMode = false,
                         sessionDate = "",
                         learnWords = emptyList()
@@ -312,9 +201,10 @@ class StudyVocabReviewManager(
 
             studyRepository.startReviewSession().onSuccess {
                 sessionStore?.clear()
-                uiState.update { it.copy(isLoading = false) }
+                // 同一次更新里清掉结算并进入复习：结算页直接推到复习页，中间不回主页
                 vocabState.update {
                     it.copy(
+                        launching = null,
                         learnWords = words,
                         isReviewMode = true,
                         isNewWordsMode = false,
@@ -331,9 +221,8 @@ class StudyVocabReviewManager(
                 }
                 startTimer(vocabState.value)
             }.onFailure { error ->
-                uiState.update {
-                    it.copy(isLoading = false, error = error.message ?: "开始复习失败")
-                }
+                vocabState.update { it.copy(launching = null) }
+                uiState.update { it.copy(error = error.message ?: "开始复习失败") }
             }
         }
     }
@@ -345,6 +234,8 @@ class StudyVocabReviewManager(
      * 新词提交评分时 [submitReview] 会自动通过 FSRS 初始化进度。
      */
     fun startNewWordsSession(count: Int = vocabState.value.newWordsBatchSize) {
+        // 防重入；上一组收尾（评分同步）完成前不领新词，否则刚背的词可能又被发回来
+        if (vocabState.value.launching != null || vocabState.value.isFinishing) return
         scope.launch {
             val current = vocabState.value
             if (hasPendingQueue(current) && current.isNewWordsMode) {
@@ -358,19 +249,19 @@ class StudyVocabReviewManager(
                 return@launch
             }
 
-            uiState.update { it.copy(isLoading = true, error = null) }
+            vocabState.update { it.copy(launching = VocabLaunch.NEW_WORDS) }
+            uiState.update { it.copy(error = null) }
             studyRepository.getNewWords(count, _currentOrder()).onSuccess { response ->
                 val words = parseDailyWords(response)
                 if (words.isEmpty()) {
-                    uiState.update {
-                        it.copy(isLoading = false, error = "当前词书没有新词了")
-                    }
+                    vocabState.update { it.copy(launching = null) }
+                    uiState.update { it.copy(error = "当前词书没有新词了") }
                     return@onSuccess
                 }
-                uiState.update { it.copy(isLoading = false) }
                 sessionStore?.clear()
                 vocabState.update {
                     it.copy(
+                        launching = null,
                         learnWords = words,
                         isNewWordsMode = true,
                         isReviewMode = true,
@@ -387,13 +278,32 @@ class StudyVocabReviewManager(
                 }
                 startTimer(vocabState.value)
             }.onFailure { error ->
-                uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = error.message ?: "加载新词失败"
-                    )
-                }
+                vocabState.update { it.copy(launching = null) }
+                uiState.update { it.copy(error = error.message ?: "加载新词失败") }
             }
+        }
+    }
+
+    /**
+     * 切换词书后丢掉属于旧书的未完成新词队列（复习队列与词书无关，保留）。
+     */
+    fun discardNewWordsQueue() {
+        val current = vocabState.value
+        if (!current.isNewWordsMode || current.isReviewMode || current.sessionSummary != null) return
+        if (current.learnWords.isEmpty() && current.sessionDate.isEmpty()) return
+        sessionStore?.clear()
+        timerManager?.endSession()
+        vocabState.update {
+            it.copy(
+                learnWords = emptyList(),
+                sessionDate = "",
+                sessionId = "",
+                sessionElapsedSeconds = 0,
+                currentCardIndex = 0,
+                showAnswer = false,
+                reviewResults = emptyList(),
+                redoCounts = emptyMap()
+            )
         }
     }
 
@@ -412,6 +322,8 @@ class StudyVocabReviewManager(
         // 乐观更新：先同步推进本地卡片状态（立即切卡、翻回问题面），
         // 再在后台把评分同步到后端。这样点 Again/Hard/Good/Easy 不再卡顿。
         val vocab = vocabState.value
+        // 已经离开复习（最后一张已进结算）时再点评分一律忽略，杜绝同一个词重复提交
+        if (!vocab.isReviewMode || vocab.sessionSummary != null || vocab.isFinishing) return
         val currentIdx = vocab.currentCardIndex
         val currentList = vocab.learnWords
         val currentWord = currentList.getOrNull(currentIdx) ?: return
@@ -451,9 +363,8 @@ class StudyVocabReviewManager(
         } else {
             val nextIndex = currentIdx + 1
             if (nextIndex >= currentList.size) {
-                // 进入结算前清空本轮重置的临时列表，保留 reviewResults（去重）
+                // 保留 reviewResults（去重）；结算页由 finishSession 立即打开
                 vocabState.update { it.copy(reviewResults = dedupeResults(it.reviewResults + resultItem)) }
-                sessionStore?.clear()
                 shouldFinishSession = true
             } else {
                 vocabState.update {
@@ -498,46 +409,50 @@ class StudyVocabReviewManager(
     /**
      * 结束当前复习会话（一组）。
      *
-     * 收尾时先领取下一组：结算页的「继续下一组」必须对应真实存在的下一组，
-     * 同时在拿不到下一组时把按钮降级成「返回」，避免点了之后才发现没词。
+     * 结算页只依赖本地的 reviewResults，所以先在同一次更新里切到结算（不等网络），
+     * 再在后台依次：等评分同步 → 结束会话 → 预取下一组。预取完成前结算页的
+     * 「继续」按钮转圈；拿不到下一组时按钮降级成「返回」，避免点了才发现没词。
      */
     fun finishSession() {
+        if (vocabState.value.isFinishing) return
+        sessionStore?.clear()
+        timerManager?.endSession()
+        vocabState.update {
+            it.copy(
+                isReviewMode = false,
+                showAnswer = false,
+                isFinishing = true,
+                sessionSummary = it.sessionSummary ?: LOCAL_SUMMARY,
+                // 本轮已收尾：清掉会话日期，后续刷新可以正常回落远端当天批次
+                sessionDate = "",
+                sessionId = "",
+                sessionElapsedSeconds = 0
+            )
+        }
         val reviewSync = pendingReviewSyncJob
         scope.launch {
             reviewSync?.join()
             studyRepository.endReviewSession().onSuccess { response ->
-                sessionStore?.clear()
-                timerManager?.endSession()
                 val nextBatch = studyRepository.getDailyReviewBatch(
                     vocabState.value.reviewBatchSize,
                     _currentOrder()
                 ).getOrNull()?.let { parseDailyWords(it) }.orEmpty()
                 vocabState.update {
                     it.copy(
-                        sessionSummary = response["data"],
-                        isReviewMode = false,
-                        // 本轮已收尾：清掉会话日期，后续刷新可以正常回落远端当天批次
-                        sessionDate = "",
-                        sessionId = "",
-                        sessionElapsedSeconds = 0,
+                        // 用户可能已经离开结算页，此时不再把结算补回来
+                        sessionSummary = it.sessionSummary?.let { _ -> response["data"] ?: LOCAL_SUMMARY },
+                        isFinishing = false,
                         learnWords = nextBatch
                     )
                 }
                 onReviewProgressChanged()
             }.onFailure { error ->
-                sessionStore?.clear()
-                timerManager?.endSession()
-                vocabState.update {
-                    it.copy(
-                        isReviewMode = false,
-                        sessionDate = "",
-                        sessionId = "",
-                        sessionElapsedSeconds = 0
-                    )
-                }
+                // 结算照常展示本地结果，不把用户踢回主页；没有下一组可继续复习
+                vocabState.update { it.copy(isFinishing = false, learnWords = emptyList()) }
                 uiState.update {
-                    it.copy(error = error.message ?: "结束会话失败")
+                    it.copy(error = "结束会话没同步上：${error.message ?: "网络异常"}，评分已逐词提交")
                 }
+                onReviewProgressChanged()
             }
         }
     }

@@ -2,55 +2,55 @@ package com.aveline.ai.mobile.presentation.study
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material.icons.filled.Assessment
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.School
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.aveline.ai.mobile.presentation.components.SectionCard
-import com.aveline.ai.mobile.presentation.theme.Accent
+import androidx.compose.ui.unit.sp
+import com.aveline.ai.mobile.domain.models.LatestProgress
+import com.aveline.ai.mobile.presentation.components.controls.AvelineButton
+import com.aveline.ai.mobile.presentation.components.controls.AvelineButtonVariant
+import com.aveline.ai.mobile.presentation.theme.Line
+import com.aveline.ai.mobile.presentation.theme.TextBody
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
+import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 
 /**
- * 学习概览 Tab。
+ * 学习记录页。
  *
- * 展示学习仪表盘:学习模式开关、今日学习统计、学习会话输入、各科进度。
- * 优先使用 [StudyDailyUiState.latestProgress] 中的进度内容,为空时使用 placeholder。
+ * 第三轮设计稿把原来的四张卡收成三段：
+ * 1. 三个统计数字（今日时长 / 科目 / 连续学习），不用卡片、不用图标；
+ * 2. 最新进度一段话（「各科进展」已在「学科」Tab 里，这里剥掉，不重复）；
+ * 3. 今天的会话列表（时间 + 会话名 + 时长）。
  *
- * @param uiState 学习模块 UI 状态
- * @param dailyUiState Daily 文件夹 UI 状态
- * @param onToggleStudyMode 切换学习模式
- * @param onTopicChange 学习主题变更
- * @param onContentChange 学习内容变更
- * @param onDurationChange 学习时长变更(分钟)
- * @param onRecordStudy 保存学习记录
- * @param onStartStudy 开始学习会话
- * @param onFinishStudy 结束学习会话
+ * 手动录入的三个输入框收进底部按钮，点开是底部面板；录入仍复用
+ * [StudyUiState.recordTopic] / [StudyUiState.recordContent] / [StudyUiState.recordDuration]，
+ * 不新增第二套表单状态。
  */
 @Composable
 fun StudyOverviewTab(
@@ -63,361 +63,327 @@ fun StudyOverviewTab(
     onStartStudy: () -> Unit,
     onFinishStudy: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // 今日学习统计(从 Daily 整合)
-        TodayStudySection(uiState = uiState)
+    val sessions = uiState.studyRecords
+    val subjectCount = remember(sessions) {
+        sessions.map { it.topic.trim() }.filter { it.isNotBlank() }.distinct().size
+    }
+    var showRecordSheet by remember { mutableStateOf(false) }
 
-        // 最新学习进度(优先使用后端 latestProgress,为空时使用 placeholder)
-        LatestProgressSection(dailyUiState = dailyUiState)
+    Column(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentPadding = PaddingValues(bottom = 16.dp)
+        ) {
+            item {
+                RecordStats(
+                    minutes = uiState.todayStudyMinutes,
+                    subjectCount = subjectCount,
+                    streakDays = uiState.studyStreakDays
+                )
+            }
+            // 表单收进底部面板后，保存失败不能再靠"点了没反应"暴露，错误直接挂在列表上方。
+            uiState.error?.takeIf { it.isNotBlank() }?.let { message ->
+                item {
+                    Text(
+                        text = message,
+                        fontSize = 13.sp,
+                        lineHeight = 20.sp,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 14.dp)
+                    )
+                }
+            }
+            item { LatestProgressBlock(progress = dailyUiState.latestProgress) }
+            item { TodaySessionsBlock(sessions = sessions) }
+        }
 
-        // 学习会话输入(从 Daily 整合,去掉重复)
-        StudySessionSection(
+        // 固定在页底：列表只占按钮以上的空间，滚动内容不会从按钮下面穿过去。
+        AvelineButton(
+            text = "手动记录一次",
+            onClick = { showRecordSheet = true },
+            icon = Icons.Default.Add,
+            variant = AvelineButtonVariant.Secondary,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp, bottom = 24.dp)
+        )
+    }
+
+    if (showRecordSheet) {
+        StudyRecordSheet(
             topic = uiState.recordTopic,
             content = uiState.recordContent,
             duration = uiState.recordDuration,
             onTopicChange = onTopicChange,
             onContentChange = onContentChange,
             onDurationChange = onDurationChange,
-            onRecordStudy = onRecordStudy,
-            onStartStudy = onStartStudy,
-            onFinishStudy = onFinishStudy
+            onSave = {
+                onRecordStudy()
+                showRecordSheet = false
+            },
+            onStart = {
+                onStartStudy()
+                showRecordSheet = false
+            },
+            onFinish = {
+                onFinishStudy()
+                showRecordSheet = false
+            },
+            onDismiss = { showRecordSheet = false }
         )
-
-        // 各科进度(从 Daily 进度文件解析)
-        SubjectProgressSection(dailyUiState = dailyUiState)
     }
 }
 
-/** 今日学习统计分区:时长/科目/会话数(使用后端真实数据) */
+/** 三个统计数字：26sp 等宽数值 + 12sp 灰标签，不套卡片。 */
 @Composable
-private fun TodayStudySection(uiState: StudyUiState) {
-    val subjectCount = uiState.studyRecords.map { it.topic }.distinct().size
-    val sessionCount = uiState.studyRecords.size
-
-    SectionCard(
-        title = "今日学习",
-        icon = Icons.Default.Schedule,
-        subtitle = "时长 · 科目 · 会话数"
+private fun RecordStats(minutes: Int, subjectCount: Int, streakDays: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 22.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            TodayStatCard(
-                icon = Icons.Default.Schedule,
-                label = "学习时长",
-                value = "${uiState.todayStudyMinutes}分钟",
-                modifier = Modifier.weight(1f)
-            )
-            TodayStatCard(
-                icon = Icons.Default.School,
-                label = "科目数",
-                value = subjectCount.toString(),
-                modifier = Modifier.weight(1f)
-            )
-            TodayStatCard(
-                icon = Icons.Default.Schedule,
-                label = "会话数",
-                value = sessionCount.toString(),
-                modifier = Modifier.weight(1f)
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MiniStat(label = "连续学习", value = "${uiState.studyStreakDays}天")
-            MiniStat(label = "今日复习", value = uiState.reviewedToday.toString())
-        }
+        RecordStat(
+            label = "今日时长",
+            value = formatRecordMinutes(minutes),
+            modifier = Modifier.weight(1f)
+        )
+        RecordStat(
+            label = "科目",
+            value = subjectCount.toString(),
+            modifier = Modifier.weight(1f)
+        )
+        RecordStat(
+            label = "连续学习",
+            value = streakDays.toString(),
+            unit = "天",
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
-/** 今日统计小卡片 */
 @Composable
-private fun TodayStatCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+private fun RecordStat(
     label: String,
     value: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    unit: String? = null
 ) {
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0x14000000))
-            .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = Accent,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = TextPrimary
-        )
+        Row {
+            Text(
+                text = value,
+                fontSize = 26.sp,
+                lineHeight = 30.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = (-0.6f).sp,
+                color = TextPrimary,
+                style = RecordNumericStyle,
+                maxLines = 1,
+                modifier = Modifier.alignByBaseline()
+            )
+            if (!unit.isNullOrBlank()) {
+                Spacer(modifier = Modifier.width(3.dp))
+                Text(
+                    text = unit,
+                    fontSize = 14.sp,
+                    color = TextTertiary,
+                    modifier = Modifier.alignByBaseline()
+                )
+            }
+        }
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
+            fontSize = 12.sp,
             color = TextTertiary
         )
     }
 }
 
-/** 迷你统计标签 */
+/** 最新进度：细线 + 小标签 + 一段话；「各科进展」段落已移到「学科」Tab。 */
 @Composable
-private fun MiniStat(label: String, value: String) {
+private fun LatestProgressBlock(progress: LatestProgress?) {
+    val content = progress?.content.orEmpty()
+    val summary = remember(content) { stripSubjectProgress(content) }
+
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0x1AFFFFFF))
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .fillMaxWidth()
+            .padding(top = 26.dp)
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = TextTertiary)
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
-    }
-}
-
-/**
- * 最新学习进度分区。
- *
- * 只展示 [StudyDailyUiState.latestProgress] 中的后端进度内容,不再使用 placeholder。
- */
-@Composable
-private fun LatestProgressSection(dailyUiState: StudyDailyUiState) {
-    val progress = dailyUiState.latestProgress
-
-    SectionCard(
-        title = "最新学习进度",
-        icon = Icons.AutoMirrored.Filled.TrendingUp,
-        subtitle = progress?.date ?: "暂无日期"
-    ) {
-        if (progress?.content.isNullOrBlank()) {
+        SectionHairline()
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(text = "最新进度", fontSize = 13.sp, color = TextTertiary)
+        Spacer(modifier = Modifier.height(10.dp))
+        if (summary.isBlank()) {
             Text(
                 text = "暂无学习进度记录",
-                style = MaterialTheme.typography.bodyMedium,
+                fontSize = 15.sp,
                 color = TextTertiary,
-                modifier = Modifier.padding(vertical = 12.dp)
+                modifier = Modifier.padding(vertical = 8.dp)
             )
         } else {
-            // 复用日记 Tab 的简单 Markdown 渲染器
-            SimpleDiaryMarkdown(text = progress?.content.orEmpty())
+            NotesMarkdownRenderer(
+                text = summary,
+                bodyStyle = RecordBodyStyle,
+                documentStyle = true
+            )
         }
     }
 }
 
-/** 学习会话分区:主题/时长/笔记输入 + 开始/结束按钮 */
+/** 今天的会话：时间（等宽）+ 会话名 + 时长；没有时长就只显示名字。 */
 @Composable
-private fun StudySessionSection(
-    topic: String,
-    content: String,
-    duration: Int,
-    onTopicChange: (String) -> Unit,
-    onContentChange: (String) -> Unit,
-    onDurationChange: (Int) -> Unit,
-    onRecordStudy: () -> Unit,
-    onStartStudy: () -> Unit,
-    onFinishStudy: () -> Unit
-) {
-    SectionCard(
-        title = "学习会话",
-        icon = Icons.AutoMirrored.Filled.MenuBook,
-        subtitle = "主题 · 时长 · 笔记"
+private fun TodaySessionsBlock(sessions: List<StudyRecord>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 24.dp)
     ) {
-        OutlinedTextField(
-            value = topic,
-            onValueChange = onTopicChange,
-            label = { Text("科目") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        OutlinedTextField(
-            value = duration.toString(),
-            onValueChange = { text ->
-                text.toIntOrNull()?.let(onDurationChange)
-            },
-            label = { Text("时长(分钟)") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        OutlinedTextField(
-            value = content,
-            onValueChange = onContentChange,
-            label = { Text("笔记") },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 2
-        )
+        SectionHairline()
         Spacer(modifier = Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = onRecordStudy,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("保存记录")
-            }
-            Button(
-                onClick = onStartStudy,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("开始会话")
-            }
-            Button(
-                onClick = onFinishStudy,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0x33000000))
-            ) {
-                Text("结束")
-            }
-        }
-    }
-}
-
-/**
- * 各科进度分区:从 Daily 进度文件解析各科状态。
- *
- * 解析 progress 文件中的 `## 各科进展` 部分,提取科目名和状态文字,
- * 映射为进度百分比后按标准顺序(语数英→物化生→政史地→其他)排列。
- */
-@Composable
-private fun SubjectProgressSection(dailyUiState: StudyDailyUiState) {
-    val progressContent = dailyUiState.latestProgress?.content
-    val subjects = if (!progressContent.isNullOrBlank()) {
-        parseSubjectProgress(progressContent)
-    } else {
-        emptyList()
-    }
-
-    SectionCard(
-        title = "各科进度",
-        icon = Icons.Default.Assessment,
-        subtitle = "各学科掌握情况"
-    ) {
-        if (subjects.isEmpty()) {
+        Text(
+            text = "今天的会话",
+            fontSize = 13.sp,
+            color = TextTertiary,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        if (sessions.isEmpty()) {
             Text(
-                text = "暂无各科进度数据",
-                style = MaterialTheme.typography.bodyMedium,
+                text = "今天还没有学习会话",
+                fontSize = 13.5f.sp,
                 color = TextTertiary,
                 modifier = Modifier.padding(vertical = 12.dp)
             )
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                subjects.forEach { (name, progress) ->
-                    SubjectProgressBar(name = name, progress = progress)
-                }
+            sessions.forEach { session ->
+                SessionRow(session = session)
             }
         }
     }
 }
 
-/**
- * 从进度文件内容解析各科进度。
- *
- * 解析 `## 各科进展` 下的 `### 科目名` 和 `- 状态：...`，
- * 将状态文字映射为进度百分比,按标准顺序排列。
- */
-private fun parseSubjectProgress(content: String): List<Pair<String, Float>> {
-    if (content.isBlank()) return emptyList()
-
-    // 找到 "## 各科进展" 部分
-    val sectionStart = content.indexOf("## 各科进展")
-    if (sectionStart < 0) return emptyList()
-
-    // 截取到下一个二级标题或文件末尾
-    val afterSection = content.substring(sectionStart)
-    val nextSection = afterSection.indexOf("\n## ", 1)
-    val sectionText = if (nextSection > 0) {
-        afterSection.substring(0, nextSection)
-    } else {
-        afterSection
-    }
-
-    // 按 ### 分割科目,提取科目名和状态
-    val subjectRegex = Regex("""### (.+?)\n(.*?)(?=\n###|\z)""", RegexOption.DOT_MATCHES_ALL)
-    val subjects = mutableMapOf<String, Float>()
-
-    subjectRegex.findAll(sectionText).forEach { match ->
-        val name = match.groupValues[1].trim()
-        val body = match.groupValues[2]
-
-        // 提取状态行
-        val statusLine = body.lines().firstOrNull { it.startsWith("- 状态：") }
-        val status = statusLine?.removePrefix("- 状态：")?.trim() ?: ""
-
-        subjects[name] = mapStatusToProgress(status)
-    }
-
-    // 按标准顺序排列:语数英 → 物化生 → 政史地 → 其他
-    val order = listOf(
-        "语文", "数学", "英语",
-        "物理", "化学", "生物",
-        "政治", "历史", "地理",
-        "计算机科学", "其他"
-    )
-    val ordered = order.mapNotNull { name -> subjects[name]?.let { name to it } }
-    // 加上未在标准顺序中的科目
-    val extras = subjects.filterKeys { it !in order }.map { it.key to it.value }
-    return ordered + extras
-}
-
-/**
- * 将状态文字映射为进度百分比。
- *
- * 规则基于 progress 文件中Ling写的状态描述:
- * - "完整"/"全覆盖" → 90%
- * - "体系" → 70%
- * - "很大"/"很广" → 60%
- * - "框架" → 40%
- * - "较少" → 20%
- * - "弱项"/"需关注" → 50%
- * - "无"/"——" → 0%
- * - 其他 → 50%
- */
-private fun mapStatusToProgress(status: String): Float {
-    if (status.isBlank() || status == "——" || status == "无") return 0.0f
-    return when {
-        status.contains("完整") || status.contains("全覆盖") -> 0.9f
-        status.contains("体系") -> 0.7f
-        status.contains("很大") || status.contains("很广") -> 0.6f
-        status.contains("框架") -> 0.4f
-        status.contains("较少") -> 0.2f
-        status.contains("弱项") || status.contains("需关注") -> 0.5f
-        else -> 0.5f
-    }
-}
-
-/** 单个科目进度条 */
 @Composable
-private fun SubjectProgressBar(name: String, progress: Float) {
-    val color = if (progress >= 0.3f) Accent else TextTertiary
-    Column {
+private fun SessionRow(session: StudyRecord) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary
-            )
-            Text(
-                text = "${(progress * 100).toInt()}%",
-                style = MaterialTheme.typography.labelSmall,
-                color = color
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        LinearProgressIndicator(
-            progress = { progress },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp)),
-            color = color,
-            trackColor = Color(0x1AFFFFFF)
+                .padding(vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = session.time.ifBlank { "--:--" },
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace,
+                color = TextTertiary,
+                modifier = Modifier.width(52.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = session.topic.ifBlank { "未命名会话" },
+                    fontSize = 15.sp,
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (session.content.isNotBlank()) {
+                    Text(
+                        text = session.content,
+                        fontSize = 12.5f.sp,
+                        color = TextTertiary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            val minutes = session.minutes
+            if (minutes != null && minutes > 0) {
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "$minutes 分钟",
+                    fontSize = 13.5f.sp,
+                    color = TextSecondary,
+                    style = RecordNumericStyle
+                )
+            }
+        }
+        // 行分隔线走底边：小标题下面不再先压一条线。
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(RecordHairline)
         )
     }
 }
+
+@Composable
+private fun SectionHairline() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(Line)
+    )
+}
+
+/** `200` → `3h 20m`；不足一小时只报分钟。 */
+internal fun formatRecordMinutes(minutes: Int): String {
+    val safe = minutes.coerceAtLeast(0)
+    val hours = safe / 60
+    val rest = safe % 60
+    return when {
+        hours <= 0 -> "${rest}m"
+        rest == 0 -> "${hours}h"
+        else -> "${hours}h ${rest}m"
+    }
+}
+
+/**
+ * 去掉进度文件里的 `## 各科进展` 段落。
+ *
+ * 各科进度已经在「学科」Tab 的列表里，记录页只保留进度文件里的其余叙述，
+ * 避免同一份数据在同一屏重复出现。
+ */
+internal fun stripSubjectProgress(content: String): String {
+    if (content.isBlank()) return ""
+    val sectionStart = content.indexOf(SUBJECT_SECTION_HEADING)
+    if (sectionStart < 0) return content.trim()
+
+    val before = content.substring(0, sectionStart).trimEnd()
+    val afterSection = content.substring(sectionStart)
+    val nextSection = afterSection.indexOf("\n## ", 1)
+    val after = if (nextSection > 0) {
+        afterSection.substring(nextSection).trimStart()
+    } else {
+        ""
+    }
+    return listOf(before, after)
+        .filter { it.isNotBlank() }
+        .joinToString("\n\n")
+}
+
+/** 进度正文：15sp / 1.75 行高。 */
+private val RecordBodyStyle = TextStyle(
+    fontSize = 15.sp,
+    lineHeight = 26.sp,
+    color = TextBody
+)
+
+/** 等宽数字：统计与会话时长切换数值时不跳动。 */
+private val RecordNumericStyle = TextStyle(fontFeatureSettings = "tnum")
+
+/** 会话行分隔线：6% 白，走行底边。 */
+private val RecordHairline = Color(0x0FFFFFFF)
+
+private const val SUBJECT_SECTION_HEADING = "## 各科进展"

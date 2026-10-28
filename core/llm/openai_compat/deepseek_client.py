@@ -53,16 +53,20 @@ class DeepSeekClient(OpenAIClient):
         )
 
     def _build_payload(self, messages: list, stream: bool, **kwargs) -> Dict[str, Any]:
-        """构建 DeepSeek API 请求 Payload，自动注入思考模式参数"""
-        if self.thinking_enabled:
-            extra_body = kwargs.get("extra_body", {})
-            extra_body["thinking"] = {"type": "enabled"}
-            kwargs["extra_body"] = extra_body
+        """构建 DeepSeek API 请求 Payload，注入思考模式参数。
 
-            if self.reasoning_effort:
-                kwargs["reasoning_effort"] = self.reasoning_effort
+        思考开关写顶层 ``thinking`` 字段：本客户端是裸 HTTP，``extra_body`` 不会像 OpenAI SDK
+        那样被展开（2026-10-27 实测：写在 extra_body 里与不传一样，服务端默认开思考，
+        配置关思考不生效；顶层 disabled 才真正关掉）。
+        单次调用可传 ``thinking_enabled=False`` 关掉思考（离线提取等按输出计费的批量任务）。
+        """
+        override = kwargs.pop("thinking_enabled", None)
+        thinking = self.thinking_enabled if override is None else bool(override)
+        if thinking and self.reasoning_effort:
+            kwargs["reasoning_effort"] = self.reasoning_effort
 
         payload = super()._build_payload(messages, stream, **kwargs)
+        payload["thinking"] = {"type": "enabled" if thinking else "disabled"}
 
         # 流式请求要求服务端在最后一个 chunk 返回 usage
         # （含 prompt_cache_hit_tokens / prompt_cache_miss_tokens，供缓存命中率统计）。

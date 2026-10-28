@@ -10,15 +10,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -36,9 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.presentation.theme.ControlAccent
@@ -51,97 +48,61 @@ import kotlin.math.abs
 import kotlin.math.sin
 
 /**
- * 输入栏的语音态（设计稿「Chat · 输入栏」原位切换）。
+ * 输入栏的语音态（设计稿「输入栏 v2」）。
  *
- * 点麦克风后输入栏本身变成这一态，不再另起一条横幅：
- * - 第一行是 ASR 的实时转写（说一句出一句，不等收尾解码）；
- * - 第二行是音量波形 + 录音计时；
- * - 底部「取消」丢弃本轮，「完成」把当前已识别的文本立刻落进输入框。
- *
- * 为什么「完成」不等最终结果：收尾解码还要跑一段 native 计算，
- * 等它返回会让用户对着"正在识别"干等几秒。这里先提交已经实时上屏的文本，
- * 最终结果回来后再由 [ChatVoiceInputController] 原地替换那一段。
+ * 输入栏原位变成一条 48dp 的录音条，高度不变：
+ * 左侧关闭本轮，中间是音量波形 + 计时，右侧「完成」把已识别文本落进输入框。
+ * 容器圆角、底色和强调色呼吸描边由 [com.aveline.ai.mobile.presentation.components.InputArea]
+ * 统一负责，这里只画内容。
  */
 @Composable
 internal fun ChatVoiceInputPanel(
-    partialText: String,
     amplitude: Float,
     onCancel: () -> Unit,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(40.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // 还没出字时保持设计稿的原始形态（只有波形 + 计时），
-        // 一旦 ASR 吐出中间文本就立刻插到波形上方——这就是"边说边出字"
-        if (partialText.isNotBlank()) {
-            Text(
-                text = partialText,
-                color = ControlInk,
-                fontSize = 15.5.sp,
-                lineHeight = 24.sp,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 24.dp)
+        VoiceCircleAction(
+            contentDescription = "取消录音",
+            onClick = onCancel
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = null,
+                tint = ControlMute,
+                modifier = Modifier.size(21.dp)
             )
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             VoiceWaveBars(
                 amplitude = amplitude,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(24.dp)
+                modifier = Modifier.height(20.dp)
             )
             RecordingTimer()
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+        VoiceCircleAction(
+            contentDescription = "完成录音",
+            onClick = onFinish
         ) {
-            // 取消：纯文字按钮，按下给一层浅底，不占实心色
-            Row(
+            Box(
                 modifier = Modifier
-                    .height(40.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable(onClick = onCancel)
-                    .padding(horizontal = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = null,
-                    tint = ControlMute,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "取消",
-                    color = ControlMute,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            // 完成：整栏唯一的实心按钮
-            Row(
-                modifier = Modifier
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(ControlInk)
-                    .clickable(onClick = onFinish)
-                    .padding(start = 10.dp, end = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(ControlInk),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Filled.Check,
@@ -149,15 +110,26 @@ internal fun ChatVoiceInputPanel(
                     tint = ControlOnInk,
                     modifier = Modifier.size(18.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "完成",
-                    color = ControlOnInk,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
             }
         }
+    }
+}
+
+@Composable
+private fun VoiceCircleAction(
+    contentDescription: String,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+            .semantics { this.contentDescription = contentDescription },
+        contentAlignment = Alignment.Center
+    ) {
+        content()
     }
 }
 
@@ -182,8 +154,8 @@ private fun RecordingTimer() {
 }
 
 /**
- * 音量波形：一条相位动画驱动全部竖条，只改绘制缩放、不触发布局，
- * 每 5 根里第 3 根用强调色，和设计稿一致。
+ * 音量波形：一条相位动画驱动全部竖条，只改绘制缩放、不触发布局。
+ * 12 根 2.5dp 强调色竖条，说话时随音量抬得更高，静音时也保留细起伏。
  */
 @Composable
 private fun VoiceWaveBars(
@@ -209,24 +181,21 @@ private fun VoiceWaveBars(
         verticalAlignment = Alignment.CenterVertically
     ) {
         repeat(BAR_COUNT) { index ->
-            val wave = abs(sin((phase + index * 0.09f) * 2f * PI)).toFloat()
-            // 静音时也保留一点细起伏，说话时随音量抬到满格
-            val barScale = 0.18f + (0.35f + level * 0.65f) * 0.82f * wave
+            val wave = abs(sin((phase + index * 0.08f) * 2f * PI)).toFloat()
+            val barScale = (0.25f + 0.75f * wave) * (0.55f + 0.45f * level)
             Box(
                 modifier = Modifier
-                    .width(3.dp)
-                    .height(24.dp)
+                    .width(2.5.dp)
+                    .height(20.dp)
                     .graphicsLayer {
                         scaleY = barScale
                         transformOrigin = TransformOrigin(0.5f, 0.5f)
                     }
                     .clip(RoundedCornerShape(2.dp))
-                    .background(
-                        if (index % 5 == 2) ControlAccent else ControlInk.copy(alpha = 0.72f)
-                    )
+                    .background(ControlAccent)
             )
         }
     }
 }
 
-private const val BAR_COUNT = 18
+private const val BAR_COUNT = 12

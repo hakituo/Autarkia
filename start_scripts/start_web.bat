@@ -1,7 +1,7 @@
 @echo off
-title Xiaoyou Web Frontend
+title Autarkia Web Frontend
 echo ==========================================
-echo Starting Xiaoyou Web Frontend...
+echo Starting Autarkia Web Frontend...
 echo ==========================================
 echo.
 echo Please choose mode:

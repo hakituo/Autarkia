@@ -197,16 +197,17 @@ interface AvelineApiService : StudyDailyApiService {
      * - category: 单值字符串, 按分类过滤 (前端类型筛选时取第一个)
      * - min_weight: 按最小权重过滤
      * - include_thinking: 是否包含 thinking 分类, 默认 true (让用户看到 AI 思考类记忆)
-     * - limit: 返回条数上限, 默认 100 (后端默认 50, 提到 100 让用户看更多)
+     * - limit: 单页返回条数上限 (后端上限 500)
+     * - offset: 跳过的条数, 滚动懒加载用
+     * - sort: weight/newest/oldest/accessed/important
      * - emotion: 按情绪过滤 (前端未用, 保留接口)
-     *
-     * 注意: 前端原 `types`/`important_only`/`min_importance`/`page`/`page_size`
-     * 后端一个都不认, 导致参数完全失效且无法看到 thinking 分类记忆。
      *
      * @param category 单个分类名 (小写)
      * @param minWeight 最小权重阈值
      * @param includeThinking 是否包含 thinking 分类 (默认 true)
-     * @param limit 返回条数上限
+     * @param limit 单页返回条数上限
+     * @param offset 跳过的条数
+     * @param sort 后端排序方式
      * @param emotion 情绪过滤 (可选)
      * @return List of memories matching filters
      */
@@ -215,7 +216,9 @@ interface AvelineApiService : StudyDailyApiService {
         @Query("category") category: String? = null,
         @Query("min_weight") minWeight: Double? = null,
         @Query("include_thinking") includeThinking: Boolean? = true,
-        @Query("limit") limit: Int? = 100,
+        @Query("limit") limit: Int? = 500,
+        @Query("offset") offset: Int? = 0,
+        @Query("sort") sort: String? = null,
         @Query("emotion") emotion: String? = null,
         // 按 persona 查询记忆：传人格文件名（如 qq/Aveline_QQ_Master.json），
         // 由后端权威解析成 shared__scope__{scope}，保证按角色隔离且跨平台互通。
@@ -679,17 +682,6 @@ interface AvelineApiService : StudyDailyApiService {
         @Query("scope") scope: String = "book"
     ): JsonObject
 
-    /** 手动记录当天背了多少个单词 */
-    @POST("/api/v1/vocab/manual-study")
-    suspend fun addManualStudy(@Body payload: JsonObject): JsonObject
-
-    /** 获取手动背诵统计（days 或 date 二选一） */
-    @GET("/api/v1/vocab/manual-study/stats")
-    suspend fun getManualStudyStats(
-        @Query("days") days: Int = 7,
-        @Query("date") date: String = ""
-    ): JsonObject
-
     @POST("/api/v1/vocab/sessions")
     suspend fun startSession(): JsonObject
 
@@ -747,9 +739,6 @@ interface AvelineApiService : StudyDailyApiService {
 
     @GET("/api/v1/vocab/dictionary/stats")
     suspend fun getDictStats(): JsonObject
-
-    @GET("/api/v1/vocab/curve")
-    suspend fun getMemoryCurve(): JsonObject
 
     @GET("/api/v1/vocab/mistakes")
     suspend fun getMistakes(): JsonObject

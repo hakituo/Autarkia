@@ -1,8 +1,8 @@
-# Xiaoyou Core FRP Start Script
+# Autarkia FRP Start Script
 $ErrorActionPreference = "Continue"
 
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "  Xiaoyou Core FRP Start Script" -ForegroundColor Cyan
+Write-Host "  Autarkia FRP Start Script" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
 $FRP_EXE = ".\external\frpc.exe"

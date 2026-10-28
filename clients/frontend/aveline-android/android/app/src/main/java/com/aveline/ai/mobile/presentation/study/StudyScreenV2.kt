@@ -2,14 +2,7 @@ package com.aveline.ai.mobile.presentation.study
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,8 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,7 +22,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.domain.models.PlanItem
@@ -39,8 +29,6 @@ import com.aveline.ai.mobile.presentation.components.AvelineTabRow
 import com.aveline.ai.mobile.presentation.components.ModuleHeader
 import com.aveline.ai.mobile.presentation.study.today.currentTodayDateLabel
 import com.aveline.ai.mobile.presentation.study.today.formatTodayDateLabel
-import com.aveline.ai.mobile.presentation.theme.Background
-import com.aveline.ai.mobile.presentation.theme.Accent
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -108,7 +96,6 @@ fun StudyScreenV2(
     onFocusLongBreakMinutesChange: (Int) -> Unit = {},
     onFocusNameChange: (String) -> Unit = {},
     onToggleWordOrder: () -> Unit = {},
-    onAddManualStudy: (Int) -> Unit = {},
     onOpenBooks: () -> Unit = {},
     onLoadBookWords: () -> Unit = {},
     onSwitchBook: (String) -> Unit = {},
@@ -144,8 +131,10 @@ fun StudyScreenV2(
         formatTodayDateLabel(planDate).ifBlank { currentTodayDateLabel() }
     }
 
-    LaunchedEffect(pagerState.currentPage) {
-        val tab = tabs[pagerState.currentPage]
+    // 以停稳的页为准：点「管理计划」从今天翻到「更多」时会途经学科/专注，
+    // 用 currentPage 会在途中把刚打开的计划板块重置回入口，并在滑动中途触发加载。
+    LaunchedEffect(pagerState.settledPage) {
+        val tab = tabs[pagerState.settledPage]
         onTabChange(tab)
         // Today 依赖 typed DailyPlan；复用 NavGraph 现有 PLAN 加载分支，避免重复网络层逻辑。
         if (tab == StudyTabV2.TODAY) {
@@ -188,17 +177,41 @@ fun StudyScreenV2(
         }
     }
 
+    fun openMoreSection(section: StudyMoreSection) {
+        requestMoreSection(section)
+        if (section != StudyMoreSection.VOCAB && !vocabUiState.isReviewMode) {
+            vocabSubScreen = VocabSubScreen.DASHBOARD
+        }
+    }
+
+    // 三层「盖住」：二级板块盖学习页本体；笔记阅读页、词汇全屏层再盖二级板块。
+    // 被盖住的一层只左移让位并压暗，盖上来的一层从右侧推入，全程只有一个方向在动。
+    val moreCover = rememberLayerCover(
+        covered = moreSection != StudyMoreSection.HUB,
+        label = "study_more_cover"
+    )
+    val readerCover = rememberLayerCover(
+        covered = notesUiState.isReaderOpen,
+        label = "study_reader_cover"
+    )
+    val vocabCover = rememberVocabBaseCover(resolveVocabScreen(vocabUiState, vocabSubScreen))
+
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
+                .then(with(vocabCover) { Modifier.basePose() })
+                .then(with(readerCover) { Modifier.basePose() })
         ) {
-            // 二级板块（更多 → 计划/词汇/笔记/日记/学习记录）自己画返回行 + 大标题，
-            // 顶层「学习」页头和 Tab 栏在这时让位，避免同一屏出现两级标题。
-            val inMoreSection = moreSection != StudyMoreSection.HUB &&
-                tabs[pagerState.currentPage] == StudyTabV2.MORE
-            if (!inMoreSection) {
+            Column(
+                modifier = with(moreCover) {
+                    Modifier
+                        .fillMaxSize()
+                        .basePose()
+                        .statusBarsPadding()
+                }
+            ) {
+                // 页头与 Tab 栏常驻：二级板块从上层盖过来，这里不收起、不跳动
                 // 不再放刷新键：回到页面时由 ON_RESUME 的变更检查自动刷新
                 // 页头只留「学习」：Tab 自己就是标题，正文里不再重复写「今天 / 学科 / 更多」。
                 // 「今天」页把日期放在右侧，其他页留空，页头宽度不跳。
@@ -231,158 +244,139 @@ fun StudyScreenV2(
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
-            }
+        
 
-            uiState.successMessage?.takeIf { it.isNotBlank() }?.let { message ->
-                androidx.compose.material3.Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable { onClearError() },
-                    colors = androidx.compose.material3.CardDefaults.cardColors(
-                        containerColor = Accent.copy(alpha = 0.1f)
-                    ),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text(
-                        text = message,
-                        color = Accent,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(14.dp)
-                    )
-                }
-            }
+                // 「更多」进入二级板块（计划/词汇/笔记/日记/学习记录）后禁用外层手势：
+                // 否则子页面里的横向滑动会被外层 pager 吃掉，把整个“更多”页翻到左边的「专注」。
+                // 注意只禁用手势，TabRow 点击走 animateScrollToPage 的程序化切页不受影响。
+                val pagerGestureEnabled = moreSection == StudyMoreSection.HUB
 
-            // 「更多」进入二级板块（计划/词汇/笔记/日记/学习记录）后禁用外层手势：
-            // 否则子页面里的横向滑动会被外层 pager 吃掉，把整个“更多”页翻到左边的「专注」。
-            // 注意只禁用手势，TabRow 点击走 animateScrollToPage 的程序化切页不受影响。
-            val pagerGestureEnabled = moreSection == StudyMoreSection.HUB
-
-            HorizontalPager(
-                state = pagerState,
-                userScrollEnabled = pagerGestureEnabled,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp)
-            ) { page ->
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.TopStart
-                ) {
-                    when (tabs[page]) {
-                        StudyTabV2.TODAY -> StudyTodayTab(
-                            uiState = uiState,
-                            planUiState = planUiState,
-                            onToggleItem = onTogglePlanItem,
-                            onStartFocus = { item ->
-                                StudyPlanFocusLink.select(item.id)
-                                onPlanStartFocus(item)
-                                scope.launch { pagerState.animateScrollToPage(StudyTabV2.FOCUS.ordinal) }
-                            },
-                            onOpenPlanManager = {
-                                requestMoreSection(StudyMoreSection.PLAN)
-                                scope.launch { pagerState.animateScrollToPage(StudyTabV2.MORE.ordinal) }
-                            }
-                        )
-
-                        StudyTabV2.SUBJECTS -> StudySubjectsTab(dailyUiState = dailyUiState)
-
-                        StudyTabV2.FOCUS -> StudyFocusTab(
-                            focusState = focusState,
-                            onToggleTimer = onToggleFocusTimer,
-                            onReset = onResetFocusTimer,
-                            onSkipPhase = onSkipFocusPhase,
-                            onWorkMinutesChange = onFocusWorkMinutesChange,
-                            onBreakMinutesChange = onFocusBreakMinutesChange,
-                            onLongBreakMinutesChange = onFocusLongBreakMinutesChange,
-                            onFocusNameChange = onFocusNameChange
-                        )
-
-                        StudyTabV2.MORE -> StudyMoreTab(
-                            section = moreSection,
-                            uiState = uiState,
-                            dailyUiState = dailyUiState,
-                            planUiState = planUiState,
-                            notesUiState = notesUiState,
-                            vocabUiState = vocabUiState,
-                            onSectionChange = { section ->
-                                requestMoreSection(section)
-                                if (section != StudyMoreSection.VOCAB && !vocabUiState.isReviewMode) {
-                                    vocabSubScreen = VocabSubScreen.DASHBOARD
+                // 16dp 边距放进每一页里而不是套在分页器外：切页时内容一直滑到屏幕边缘，
+                // 不会在离边 16dp 处被硬切。
+                HorizontalPager(
+                    state = pagerState,
+                    userScrollEnabled = pagerGestureEnabled,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        contentAlignment = Alignment.TopStart
+                    ) {
+                        when (tabs[page]) {
+                            StudyTabV2.TODAY -> StudyTodayTab(
+                                uiState = uiState,
+                                planUiState = planUiState,
+                                onToggleItem = onTogglePlanItem,
+                                onStartFocus = { item ->
+                                    StudyPlanFocusLink.select(item.id)
+                                    onPlanStartFocus(item)
+                                    scope.launch { pagerState.animateScrollToPage(StudyTabV2.FOCUS.ordinal) }
+                                },
+                                onOpenPlanManager = {
+                                    requestMoreSection(StudyMoreSection.PLAN)
+                                    scope.launch { pagerState.animateScrollToPage(StudyTabV2.MORE.ordinal) }
                                 }
-                            },
-                            onDateSelected = onSelectDate,
-                            onTogglePlanItem = onTogglePlanItem,
-                            onAddPlanItem = onAddPlanItem,
-                            onUpdatePlanItem = onUpdatePlanItem,
-                            onDeletePlanItem = onDeletePlanItem,
-                            onPlanStartFocus = { item ->
-                                StudyPlanFocusLink.select(item.id)
-                                onPlanStartFocus(item)
-                                scope.launch { pagerState.animateScrollToPage(StudyTabV2.FOCUS.ordinal) }
-                            },
-                            onTopicChange = onTopicChange,
-                            onContentChange = onContentChange,
-                            onDurationChange = onDurationChange,
-                            onRecordStudy = onRecordStudy,
-                            onStartStudy = onStartStudy,
-                            onFinishStudy = onFinishStudy,
-                            onStartReview = onStartReview,
-                            onStartNewWords = onStartNewWords,
-                            onNewWordsBatchSizeChange = onNewWordsBatchSizeChange,
-                            onReviewBatchSizeChange = onReviewBatchSizeChange,
-                            onToggleWordOrder = onToggleWordOrder,
-                            onAddManualStudy = onAddManualStudy,
-                            onOpenBooks = {
-                                onOpenBooks()
-                                vocabSubScreen = VocabSubScreen.BOOK_LIST
-                            },
-                            onOpenMistakes = { vocabSubScreen = VocabSubScreen.MISTAKES },
-                            onSearch = onSearch,
-                            onClearSearch = onClearSearch,
-                            onOpenLibraryNote = onOpenLibraryNote
-                        )
+                            )
 
-                        else -> Unit
+                            StudyTabV2.SUBJECTS -> StudySubjectsTab(dailyUiState = dailyUiState)
+
+                            StudyTabV2.FOCUS -> StudyFocusTab(
+                                focusState = focusState,
+                                onToggleTimer = onToggleFocusTimer,
+                                onReset = onResetFocusTimer,
+                                onSkipPhase = onSkipFocusPhase,
+                                onWorkMinutesChange = onFocusWorkMinutesChange,
+                                onBreakMinutesChange = onFocusBreakMinutesChange,
+                                onLongBreakMinutesChange = onFocusLongBreakMinutesChange,
+                                onFocusNameChange = onFocusNameChange
+                            )
+
+                            StudyTabV2.MORE -> StudyMoreHub(onOpen = ::openMoreSection)
+
+                            else -> Unit
+                        }
                     }
                 }
             }
-        }
 
-        // 笔记阅读页挂在根层：列表在分页器内、左右各有 16dp 内边距，放在列表里会被切窄。
-        AnimatedVisibility(
-            visible = notesUiState.isReaderOpen,
-            modifier = Modifier.background(Background),
-            enter = slideInHorizontally(tween(300)) { it } + fadeIn(tween(300)),
-            exit = slideOutHorizontally(tween(300)) { it } + fadeOut(tween(300))
-        ) {
-            NoteReaderScreen(uiState = notesUiState, onClose = onCloseLibraryNoteReader)
-        }
-
-        val showVocabHost = vocabUiState.isReviewMode
-            || vocabUiState.sessionSummary != null
-            || vocabSubScreen != VocabSubScreen.DASHBOARD
-        AnimatedVisibility(
-            visible = showVocabHost,
-            modifier = Modifier.background(Background),
-            enter = slideInHorizontally(tween(300)) { it } + fadeIn(tween(300)),
-            exit = slideOutHorizontally(tween(300)) { it } + fadeOut(tween(300))
-        ) {
-            StudyVocabBookHost(
-                uiState = vocabUiState,
-                elapsedSeconds = vocabElapsedSeconds,
-                vocabSubScreen = vocabSubScreen,
-                onVocabSubScreenChange = { vocabSubScreen = it },
-                onSetShowAnswer = onSetShowAnswer,
-                onSubmitReview = onSubmitReview,
-                onSetIsReviewMode = onSetIsReviewMode,
-                onSetSessionSummary = onSetSessionSummary,
-                onSwitchBook = onSwitchBook,
-                onLoadBookWords = onLoadBookWords,
+            moreCover.ScrimLayer()
+            StudyMoreSectionLayer(
+                section = moreSection,
+                uiState = uiState,
+                dailyUiState = dailyUiState,
+                planUiState = planUiState,
+                notesUiState = notesUiState,
+                vocabUiState = vocabUiState,
+                onSectionChange = ::openMoreSection,
+                onDateSelected = onSelectDate,
+                onTogglePlanItem = onTogglePlanItem,
+                onAddPlanItem = onAddPlanItem,
+                onUpdatePlanItem = onUpdatePlanItem,
+                onDeletePlanItem = onDeletePlanItem,
+                onPlanStartFocus = { item ->
+                    StudyPlanFocusLink.select(item.id)
+                    onPlanStartFocus(item)
+                    scope.launch { pagerState.animateScrollToPage(StudyTabV2.FOCUS.ordinal) }
+                },
+                onTopicChange = onTopicChange,
+                onContentChange = onContentChange,
+                onDurationChange = onDurationChange,
+                onRecordStudy = onRecordStudy,
+                onStartStudy = onStartStudy,
+                onFinishStudy = onFinishStudy,
+                onStartReview = onStartReview,
                 onStartNewWords = onStartNewWords,
-                onStartReview = onStartReview
+                onNewWordsBatchSizeChange = onNewWordsBatchSizeChange,
+                onReviewBatchSizeChange = onReviewBatchSizeChange,
+                onToggleWordOrder = onToggleWordOrder,
+                onOpenBooks = {
+                    onOpenBooks()
+                    vocabSubScreen = VocabSubScreen.BOOK_LIST
+                },
+                onOpenMistakes = { vocabSubScreen = VocabSubScreen.MISTAKES },
+                onSearch = onSearch,
+                onClearSearch = onClearSearch,
+                onOpenLibraryNote = onOpenLibraryNote
             )
         }
+
+        // 笔记阅读页挂在根层：列表在二级板块里、左右各有 16dp 内边距，放在列表里会被切窄。
+        readerCover.ScrimLayer()
+        AnimatedVisibility(
+            visible = notesUiState.isReaderOpen,
+            enter = vocabTransform(VocabMove.PushForward).targetContentEnter,
+            exit = vocabTransform(VocabMove.PushBack).initialContentExit
+        ) {
+            VocabPage(move = if (notesUiState.isReaderOpen) VocabMove.PushForward else VocabMove.PushBack) {
+                NoteReaderScreen(uiState = notesUiState, onClose = onCloseLibraryNoteReader)
+            }
+        }
+
+        // 词汇全屏层盖住学习页时，本体跟着让位（推入左移 / 会话缩小），再压一层遮罩
+        vocabCover.ScrimLayer()
+        StudyVocabBookHost(
+            uiState = vocabUiState,
+            elapsedSeconds = vocabElapsedSeconds,
+            vocabSubScreen = vocabSubScreen,
+            onVocabSubScreenChange = { vocabSubScreen = it },
+            onSetShowAnswer = onSetShowAnswer,
+            onSubmitReview = onSubmitReview,
+            onSetIsReviewMode = onSetIsReviewMode,
+            onSetSessionSummary = onSetSessionSummary,
+            onSwitchBook = onSwitchBook,
+            onLoadBookWords = onLoadBookWords,
+            onStartNewWords = onStartNewWords,
+            onStartReview = onStartReview
+        )
+
+        // 轻提示在最上层：背词会话里出错（如提交失败、没有新词）也看得到
+        StudyToast(
+            error = uiState.error,
+            success = uiState.successMessage,
+            onDismiss = onClearError,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 }

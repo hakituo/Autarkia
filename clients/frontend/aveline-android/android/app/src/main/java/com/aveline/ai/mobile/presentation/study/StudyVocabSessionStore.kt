@@ -80,21 +80,21 @@ class StudyVocabSessionStore(context: Context) {
 
     fun getNewWordsBatchSize(): Int = preferences
         .getInt(KEY_NEW_WORDS_BATCH_SIZE, DEFAULT_NEW_WORDS_BATCH_SIZE)
-        .takeIf { it in NEW_WORDS_BATCH_SIZE_OPTIONS }
+        .takeIf { it in VOCAB_BATCH_SIZE_OPTIONS }
         ?: DEFAULT_NEW_WORDS_BATCH_SIZE
 
     fun saveNewWordsBatchSize(batchSize: Int) {
-        if (batchSize !in NEW_WORDS_BATCH_SIZE_OPTIONS) return
+        if (batchSize !in VOCAB_BATCH_SIZE_OPTIONS) return
         preferences.edit().putInt(KEY_NEW_WORDS_BATCH_SIZE, batchSize).apply()
     }
 
     fun getReviewBatchSize(): Int = preferences
         .getInt(KEY_REVIEW_BATCH_SIZE, DEFAULT_REVIEW_BATCH_SIZE)
-        .takeIf { it in REVIEW_BATCH_SIZE_OPTIONS }
+        .takeIf { it in VOCAB_BATCH_SIZE_OPTIONS }
         ?: DEFAULT_REVIEW_BATCH_SIZE
 
     fun saveReviewBatchSize(batchSize: Int) {
-        if (batchSize !in REVIEW_BATCH_SIZE_OPTIONS) return
+        if (batchSize !in VOCAB_BATCH_SIZE_OPTIONS) return
         preferences.edit().putInt(KEY_REVIEW_BATCH_SIZE, batchSize).apply()
     }
 

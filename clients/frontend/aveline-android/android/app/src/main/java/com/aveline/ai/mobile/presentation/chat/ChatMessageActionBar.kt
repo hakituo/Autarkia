@@ -1,6 +1,5 @@
 package com.aveline.ai.mobile.presentation.chat
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -43,7 +41,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.domain.models.Message
-import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 
@@ -53,8 +50,8 @@ import com.aveline.ai.mobile.presentation.theme.TextTertiary
  * 操作与版本切换放在同一行，不塞进气泡内部：
  * AI：复制 / TTS / 重新生成 / 版本导航 / 更多；用户：编辑 / 版本导航 / 更多。
  *
- * 控件语言对齐设计稿：默认是 40dp 的 ghost 图标（20dp 图标、Faint 色），
- * 只有「重新生成」带 8% 白圆底（相当于按下/强调态），版本计数用等宽数字。
+ * 控件语言对齐设计稿：所有动作都是 40dp 的无底色 ghost 图标（19dp 图标、Tertiary 色），
+ * 版本计数用等宽数字。
  */
 @Composable
 fun ChatMessageActionBar(
@@ -118,16 +115,14 @@ fun ChatMessageActionBar(
                 }
             }
 
-            // 重新生成是这一行里唯一的"浮起"按钮：8% 白圆底 + Ink 图标
             ToolbarButton(
                 onClick = { actions.onRegenerate(message.id) },
-                contentDescription = "重新生成",
-                onSurface = true
+                contentDescription = "重新生成"
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Refresh,
                     contentDescription = null,
-                    tint = TextPrimary,
+                    tint = TextTertiary,
                     modifier = Modifier.size(19.dp)
                 )
             }
@@ -222,7 +217,6 @@ fun ChatMessageActionBar(
 /**
  * 操作栏里的图标按钮。
  *
- * @param onSurface 是否带 8% 白圆底（设计稿里「按下 / 强调」那一档）
  * @param width 版本导航用 32dp 的窄位，其余是 40dp 的方形触控区
  */
 @Composable
@@ -230,7 +224,6 @@ private fun ToolbarButton(
     onClick: () -> Unit,
     contentDescription: String,
     enabled: Boolean = true,
-    onSurface: Boolean = false,
     width: Dp = 40.dp,
     content: @Composable () -> Unit
 ) {
@@ -240,7 +233,6 @@ private fun ToolbarButton(
             .height(40.dp)
             .alpha(if (enabled) 1f else 0.38f)
             .clip(CircleShape)
-            .background(if (onSurface) Color.White.copy(alpha = 0.08f) else Color.Transparent)
             .clickable(enabled = enabled, onClick = onClick)
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center

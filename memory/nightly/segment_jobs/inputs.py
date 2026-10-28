@@ -21,17 +21,24 @@ from memory.topology.segments import build_segments
 
 from . import mainline
 from .contracts import SegmentInput
+from .skip import default_skip_patterns, is_skipped_conversation
 
 logger = get_module_logger(__name__, "nightly_processor.log")
 
 
 @dataclass(frozen=True)
 class SegmentParams:
-    """分段参数。默认值待 C8 定（实验用 16 条消息 ≈ 8 轮 / 空闲 30 分钟 / 4000 字）。"""
+    """分段参数。``segmenter`` = "v1"（按轮数，现行默认）或 "v2"（交换 + 话题，spec §7.1）。
+
+    v1 的轮数实际约等于消息数（多气泡回复各算一轮），详见 spec §7.1「v1 现状」。
+    """
 
     idle_seconds: float = 1800.0
     max_turns: int = 8
     max_chars: int = 4000
+    segmenter: str = "v1"
+    session_max_chars: int = 4000
+    min_part_chars: int = 300
 
     @classmethod
     def from_config(cls, config: Mapping[str, Any] | None) -> SegmentParams:
@@ -40,10 +47,20 @@ class SegmentParams:
             idle_seconds=float(config.get("segment_idle_seconds") or cls.idle_seconds),
             max_turns=int(config.get("segment_max_turns") or cls.max_turns),
             max_chars=int(config.get("segment_max_chars") or cls.max_chars),
+            segmenter=str(config.get("segment_segmenter") or _active_segmenter()).strip().lower(),
+            session_max_chars=int(config.get("segment_session_max_chars") or cls.session_max_chars),
+            min_part_chars=int(config.get("segment_min_part_chars") or cls.min_part_chars),
         )
 
 
-#: 没传参数时用的默认分段参数
+def _active_segmenter() -> str:
+    """与梗概库目录同一个开关（settings ``memory.notes_segmenter``），保证写读一致。"""
+    from memory.notes import paths as notes_paths
+
+    return notes_paths.active_segmenter()
+
+
+#: 没传参数时用的默认分段参数（v1）；运行时按开关取请用 ``SegmentParams.from_config({})``
 DEFAULT_PARAMS = SegmentParams()
 
 
@@ -55,8 +72,12 @@ def build_conversation_inputs(
     params: SegmentParams | None = None,
     now: float | None = None,
     tree_reader: mainline.TreeReader | None = None,
+    topic_context: Any = None,
 ) -> list[SegmentInput]:
-    """一个会话的全部段（含未封口的最后一段，``closed`` 如实标注）。"""
+    """一个会话的全部段（含未封口的最后一段，``closed`` 如实标注）。
+
+    v2 需要 ``topic_context``（切点账本 + 打分器），缺省时按 scope 现建一个。
+    """
     params = params or DEFAULT_PARAMS
     stamp = time.time() if now is None else float(now)
     line = mainline.prepare_mainline(
@@ -65,18 +86,35 @@ def build_conversation_inputs(
     if not line.normalized:
         return []
     continuity_id = line.normalized[0].continuity_id
-    # tree_id 取会话 ID：根节点集合会随回填 / 嫁接变化，用它算 segment_id 会让整条会话的段全部失效
-    segments = build_segments(
-        line.normalized,
-        tree_id=conversation_id,
-        continuity_id=continuity_id,
-        idle_seconds=params.idle_seconds,
-        max_turns=params.max_turns,
-        max_chars=params.max_chars,
-        topology_status=line.topology_status,
-    )
-    by_id = {str(item.get("event_id") or ""): item for item in line.events}
     tail_closed = stamp - line.last_event_at > params.idle_seconds
+    open_count = 0 if tail_closed else 1
+    # tree_id 取会话 ID：根节点集合会随回填 / 嫁接变化，用它算 segment_id 会让整条会话的段全部失效
+    if params.segmenter == "v2":
+        from .topic_inputs import TopicContext, segment_v2
+
+        own = topic_context is None
+        context = topic_context if not own else TopicContext(scope)
+        segments, open_count = segment_v2(
+            line,
+            conversation_id,
+            continuity_id,
+            params,
+            context=context,
+            tail_closed=tail_closed,
+        )
+        if own:
+            context.save()
+    else:
+        segments = build_segments(
+            line.normalized,
+            tree_id=conversation_id,
+            continuity_id=continuity_id,
+            idle_seconds=params.idle_seconds,
+            max_turns=params.max_turns,
+            max_chars=params.max_chars,
+            topology_status=line.topology_status,
+        )
+    by_id = {str(item.get("event_id") or ""): item for item in line.events}
     inputs: list[SegmentInput] = []
     for index, segment in enumerate(segments):
         source = set(segment.source_event_ids)
@@ -89,17 +127,26 @@ def build_conversation_inputs(
                 conversation_id=conversation_id,
                 segment=segment,
                 events=tuple(by_id[eid] for eid in segment.source_event_ids if eid in by_id),
-                closed=index < len(segments) - 1 or tail_closed,
+                closed=index < len(segments) - open_count,
                 aliases=aliases,
+                context_events=tuple(
+                    by_id[eid] for eid in segment.context_event_ids if eid in by_id
+                ),
+                previous_segment_id=(
+                    segments[index - 1].segment_id
+                    if index and segments[index - 1].boundary_reason == "topic"
+                    else ""
+                ),
             )
         )
     return inputs
 
 
-def list_scope_conversations(scope: str) -> list[str]:
+def list_scope_conversations(scope: str, *, skip: Iterable[str] = ()) -> list[str]:
     """该 scope 聊天目录下的会话（文件 stem）；优先用派生索引，不可用时遍历目录。
 
-    目录里可能混着旧版本误放的其他角色会话：能确定属于别的角色的跳过。
+    目录里可能混着旧版本误放的其他角色会话：能确定属于别的角色的跳过；
+    命中 ``skip`` 名单（探针 / 系统问候）的也跳过。
     """
     from core.utils.data import data_paths
     from core.utils.data.scope_registry import matched_persona_scope
@@ -119,6 +166,8 @@ def list_scope_conversations(scope: str) -> list[str]:
     stems = set(stems) or {path.stem for path in root.rglob("*.jsonl")}
     allowed = []
     for stem in sorted(stems):
+        if is_skipped_conversation(stem, skip):
+            continue
         owner = matched_persona_scope(stem)
         if owner and owner != scope:
             continue
@@ -135,9 +184,15 @@ def collect_segment_inputs(
     store: Any = None,
     tree_reader: mainline.TreeReader | None = None,
     include_open: bool = False,
+    skip_conversations: Sequence[str] | None = None,
 ) -> list[SegmentInput]:
-    """全 scope 的段；默认只返回已封口的段。单个会话失败只跳过该会话。"""
-    params = params or DEFAULT_PARAMS
+    """全 scope 的段；默认只返回已封口的段。单个会话失败只跳过该会话。
+
+    不传 ``params`` 时按开关取分段器版本，回填脚本与 nightly 与梗概库目录保持一致。
+    ``skip_conversations`` 为空时取 nightly 默认名单（探针 / 系统问候等零信息量会话）。
+    """
+    params = params or SegmentParams.from_config({})
+    skip = tuple(skip_conversations) if skip_conversations is not None else default_skip_patterns()
     from core.utils.data import data_paths
 
     if store is None:
@@ -148,7 +203,13 @@ def collect_segment_inputs(
             return []  # 不为一个没有聊天记录的 scope 建空目录
         store = ChatHistoryStore(root)
     cids = list(conversations) if conversations is not None else list_scope_conversations(scope)
+    cids = [cid for cid in cids if not is_skipped_conversation(cid, skip)]
     stamp = time.time() if now is None else float(now)
+    topic_context = None
+    if params.segmenter == "v2":
+        from .topic_inputs import TopicContext
+
+        topic_context = TopicContext(scope)
     collected: list[SegmentInput] = []
     for cid in cids:
         try:
@@ -161,11 +222,14 @@ def collect_segment_inputs(
                 params=params,
                 now=stamp,
                 tree_reader=tree_reader,
+                topic_context=topic_context,
             )
         except Exception as exc:  # noqa: BLE001 - 一个会话坏数据不拖垮整轮
             logger.warning("会话分段失败，已跳过: %s (%s)", cid, type(exc).__name__)
             continue
         collected.extend(item for item in items if include_open or item.closed)
+    if topic_context is not None:
+        topic_context.save()
     return collected
 
 
@@ -203,6 +267,7 @@ __all__ = [
     "SegmentParams",
     "build_conversation_inputs",
     "collect_segment_inputs",
+    "is_skipped_conversation",
     "list_scope_conversations",
     "summarize_inputs",
 ]

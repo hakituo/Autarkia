@@ -1,63 +1,48 @@
 package com.aveline.ai.mobile.presentation.companion.memory
 
 import androidx.compose.ui.graphics.Color
-import com.aveline.ai.mobile.domain.models.MemoryType
+import com.aveline.ai.mobile.presentation.theme.Sand
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/** 重要性 / 强调统一的琥珀色，与旧版星标保持一致 */
-internal val MemoryImportantColor = Color(0xFFFFC107)
+/**
+ * 「重要」统一用沙金色。
+ *
+ * 原来是 #FFC107 琥珀——那是 Material 警示色的黄，在深色底上非常抢眼，
+ * 一屏里出现五六个星标就把正文彻底压下去了。沙金与强调色同一明度带，够醒目但不刺眼。
+ */
+internal val MemoryImportantColor = Sand
 
-/** 树状引导线颜色 */
+/** 树状引导线 / 行分隔线：8% 白 */
 internal val MemoryTreeLineColor = Color(0x26FFFFFF)
-
-/** 记忆类型对应颜色（与后端 taxonomy 分类对齐） */
-internal fun memoryTypeColor(type: MemoryType): Color = when (type) {
-    MemoryType.DAILY -> Color(0xFF2196F3)
-    MemoryType.LEARNING -> Color(0xFF9C27B0)
-    MemoryType.WORK -> Color(0xFF4CAF50)
-    MemoryType.FESTIVAL -> Color(0xFFFF9800)
-    MemoryType.HEALTH -> Color(0xFFF44336)
-    MemoryType.PROFILE -> Color(0xFF00BCD4)
-    MemoryType.ENTERTAINMENT -> Color(0xFFE91E63)
-    MemoryType.FINANCE -> Color(0xFF3F51B5)
-    MemoryType.TECH -> Color(0xFF009688)
-    MemoryType.EMOTION -> Color(0xFFFF5722)
-    MemoryType.RELATIONSHIP -> Color(0xFF795548)
-    MemoryType.SENSITIVE -> Color(0xFFC62828)
-    MemoryType.PREFERENCE -> Color(0xFF9C27B0)
-    MemoryType.THINKING -> Color(0xFF607D8B)
-    MemoryType.UNCATEGORIZED,
-    MemoryType.UNKNOWN -> Color(0xFF9E9E9E)
-}
 
 /**
  * 话题颜色。
  *
- * 用低饱和的深色主题友好色板；未登记的话题统一走中性灰，不随机取色，
- * 保证同一话题在概览 chips 和树节点上颜色一致。
+ * 14 种高饱和话题色（#F472B6 / #FB7185 / #38BDF8 …）换成 8 种低彩度色：
+ * 图上分得清，但整体不会像撒了一把糖果。同一家族（健康与工作、娱乐与节日、
+ * 技术与财务、个人与偏好）共用一色，减少需要辨认的色相数量。
  */
 internal fun memoryTopicColor(key: String): Color = when (key) {
-    "relationship" -> Color(0xFFF472B6)
-    "emotion" -> Color(0xFFFB7185)
-    "daily" -> Color(0xFF38BDF8)
-    "learning" -> Color(0xFFA78BFA)
-    "work" -> Color(0xFF34D399)
-    "health" -> Color(0xFF4ADE80)
-    "profile" -> Color(0xFF22D3EE)
-    "preference" -> Color(0xFFC084FC)
-    "tech" -> Color(0xFF2DD4BF)
-    "entertainment" -> Color(0xFFFBBF24)
-    "finance" -> Color(0xFF818CF8)
-    "festival" -> Color(0xFFFB923C)
-    "sensitive" -> Color(0xFFF87171)
-    "thinking" -> Color(0xFF94A3B8)
-    else -> Color(0xFF94A3B8)
+    "learning" -> Color(0xFFA9A3CC)
+    "daily" -> Color(0xFF9DB4C4)
+    "emotion", "sensitive" -> Color(0xFFC8A19C)
+    "relationship" -> Color(0xFFC4A2B6)
+    "health", "work" -> Color(0xFFA2C0A6)
+    "entertainment", "festival" -> Color(0xFFCBB88E)
+    "tech", "finance" -> Color(0xFF93BAB3)
+    else -> Color(0xFFB0B8C0)
 }
 
 private val TIMESTAMP_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
-/** 绝对时间，详情弹窗用 */
+/** 绝对时间，详情面板用 */
 internal fun formatMemoryTimestamp(instant: Instant): String =
     instant.atZone(ZoneId.systemDefault()).format(TIMESTAMP_FORMATTER)
+
+/** 只取时分：记忆树条目旁边空间紧，日期已经由时间桶表达了 */
+private val CLOCK_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+internal fun formatMemoryClock(instant: Instant): String =
+    instant.atZone(ZoneId.systemDefault()).format(CLOCK_FORMATTER)

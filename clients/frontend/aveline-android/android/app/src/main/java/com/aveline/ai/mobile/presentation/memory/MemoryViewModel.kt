@@ -13,21 +13,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * 记忆管理 ViewModel
- * 
- * 功能：
- * - 记忆列表加载和刷新
- * - 搜索和过滤
- * - 删除和标记重要
- * 
- * Requirements: 9.1, 9.2, 9.3
- */
+/** 记忆管理 ViewModel：列表分页、搜索过滤、删除/标重要，以及聊天记录与记忆网络的转发。 */
 @HiltViewModel
 class MemoryViewModel @Inject constructor(
     private val memoryRepository: MemoryRepository,
@@ -48,26 +38,28 @@ class MemoryViewModel @Inject constructor(
     private var searchJob: Job? = null
     private val searchDebounceMs = 300L
 
+    private var loadJob: Job? = null
+    private var loadMoreJob: Job? = null
+
+    /** 下一页的 offset；以服务端实际返回条数累加，避免客户端过滤后错位 */
+    private var nextOffset = 0
+
+    /** 列表代次：切角色 / 排序 / 搜索时递增，丢弃迟到的旧分页结果 */
+    private var pageGeneration = 0
+
     /** 当前正在查看的 persona 文件名（来自聊天会话/伴侣面板选择，纯只读）；为 null 表示用后端默认 */
     @Volatile
     private var currentProfileFilename: String? = null
 
-    /** 当前聊天会话 id；聊天记录树的数据源，纯只读 */
-    @Volatile
-    private var currentSessionId: String? = null
-
-    private var conversationJob: Job? = null
+    /** 「聊天记录」视图的数据源：本地树 + 服务端历史 */
+    private val conversationCoordinator = MemoryConversationCoordinator(chatRepository, viewModelScope)
 
     /** 首轮记忆列表 / 统计 / 标签是否已经拉过（避免按 null persona 白拉一轮）。 */
     private var initialLoadStarted = false
 
     /**
-     * 首次加载（幂等）。
-     *
-     * 以前在 init 里先按 null persona 拉一轮，等 ChatScreen 注入 persona 后再整轮重拉，
-     * 6 个请求里有一半是白发的。现在改成"谁先确定上下文谁触发"：
-     * - 聊天页进页时 [setViewingPersona] 直接带 persona 拉一次；
-     * - 深链只给 role 没给 persona 时，详情面板打开会调 [ensureLoaded] 兜底。
+     * 首轮加载（幂等），由先确定上下文的调用方触发：聊天页进页走 [setViewingPersona]，
+     * 深链只给 role 时由详情面板调 [ensureLoaded] 兜底。
      */
     private fun loadAllForCurrentContext() {
         initialLoadStarted = true
@@ -99,64 +91,90 @@ class MemoryViewModel @Inject constructor(
 
     /**
      * 设置「正在查看的聊天会话」，用于展示完整聊天记录树（含所有平行分支）。
-     *
      * 与 setViewingPersona 一样是只读注入：只切数据源，不切换聊天会话本身。
      */
     fun setViewingSession(sessionId: String?) {
-        val target = sessionId?.trim().orEmpty().ifBlank { null }
-        if (target == currentSessionId) return
-        currentSessionId = target
-        conversationJob?.cancel()
-        conversationJob = null
-
-        if (target == null) {
-            _uiState.update {
-                it.copy(conversationMessages = emptyList(), remoteConversationMessages = emptyList())
+        conversationCoordinator.setSession(
+            sessionId = sessionId,
+            onLocalMessages = { messages ->
+                _uiState.update { it.copy(conversationMessages = messages) }
+            },
+            onRemoteMessages = { messages ->
+                _uiState.update { it.copy(remoteConversationMessages = messages) }
             }
-            return
-        }
-
-        conversationJob = viewModelScope.launch(Dispatchers.IO) {
-            // 本地消息树先上屏；服务端历史随后补进来，断网时只显示本地部分。
-            launch {
-                chatRepository.observeAllMessages(target)
-                    .catch { e -> Log.w(TAG, "聊天记录树订阅失败: ${e.message}") }
-                    .collect { messages ->
-                        _uiState.update { it.copy(conversationMessages = messages) }
-                    }
-            }
-            val remote = chatRepository.fetchRemoteHistory(target).getOrElse { emptyList() }
-            _uiState.update { it.copy(remoteConversationMessages = remote) }
-        }
+        )
     }
 
     /**
-     * 加载记忆列表
+     * 加载首屏记忆列表（offset 归零）
      */
     fun loadMemories() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+        val generation = ++pageGeneration
+        loadJob?.cancel()
+        loadMoreJob?.cancel()
+        loadMoreJob = null
+        loadJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(isLoading = true, isLoadingMore = false, error = null)
+            }
 
             // 类型 / 话题 / 重要筛选全部在客户端完成：后端只支持 category 过滤，
             // 而历史记忆的 category 基本是 uncategorized，按类型请求会直接把列表筛空。
-            val result = memoryRepository.getMemories(
+            val page = memoryRepository.getMemories(
                 MemoryFilter(),
                 _uiState.value.sortOrder,
-                persona = currentProfileFilename
+                persona = currentProfileFilename,
+                offset = 0,
+                limit = MEMORY_PAGE_SIZE
             )
+            if (generation != pageGeneration) return@launch
+            nextOffset = page.memories.size
 
             _uiState.update {
                 it.copy(
-                    memories = result,
-                    isLoading = false
+                    memories = page.memories,
+                    isLoading = false,
+                    hasMore = page.hasMore
                 )
             }
         }
     }
 
     /**
-     * 加载统计信息
+     * 滚动到底部时加载下一页，追加到已有列表。
      */
+    fun loadMoreMemories() {
+        val state = _uiState.value
+        if (state.isLoading || state.isLoadingMore || !state.hasMore) return
+
+        val offset = nextOffset
+        val generation = pageGeneration
+        loadMoreJob = viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMore = true) }
+
+            val page = memoryRepository.getMemories(
+                MemoryFilter(),
+                _uiState.value.sortOrder,
+                persona = currentProfileFilename,
+                offset = offset,
+                limit = MEMORY_PAGE_SIZE
+            )
+            if (generation != pageGeneration) return@launch
+            nextOffset = offset + page.memories.size
+
+            _uiState.update { current ->
+                val existingIds = current.memories.mapTo(HashSet()) { it.id }
+                val appended = page.memories.filterNot { it.id in existingIds }
+                current.copy(
+                    memories = current.memories + appended,
+                    isLoadingMore = false,
+                    // 整页都是重复说明服务端没有按 offset 前进，停下比空转更安全
+                    hasMore = page.hasMore && appended.isNotEmpty()
+                )
+            }
+        }
+    }
+
     private fun loadStats() {
         viewModelScope.launch {
             val stats = memoryRepository.getMemoryStats(persona = currentProfileFilename)
@@ -164,9 +182,6 @@ class MemoryViewModel @Inject constructor(
         }
     }
 
-    /**
-     * 加载标签列表
-     */
     private fun loadTags() {
         viewModelScope.launch {
             val tags = memoryRepository.getTags(persona = currentProfileFilename)
@@ -181,23 +196,28 @@ class MemoryViewModel @Inject constructor(
         _uiState.update { it.copy(searchQuery = query) }
         
         searchJob?.cancel()
+        loadMoreJob?.cancel()
         
         if (query.isBlank()) {
             loadMemories()
             return
         }
-        
+
+        val generation = ++pageGeneration
         searchJob = viewModelScope.launch {
             delay(searchDebounceMs)
-            
-            _uiState.update { it.copy(isLoading = true) }
-            
+
+            _uiState.update { it.copy(isLoading = true, isLoadingMore = false) }
+
             val results = memoryRepository.searchMemories(query, persona = currentProfileFilename)
+            if (generation != pageGeneration) return@launch
+            nextOffset = results.size
             
             _uiState.update { 
                 it.copy(
                     memories = results,
-                    isLoading = false
+                    isLoading = false,
+                    hasMore = false
                 )
             }
         }
@@ -218,10 +238,17 @@ class MemoryViewModel @Inject constructor(
     }
     
     /**
-     * 设置排序方式
+     * 设置排序方式。
+     *
+     * 分页后不能再只重排已加载的部分，否则跨页顺序会错；排序切换时从 offset=0 重拉。
+     * 搜索结果是一次性取回的完整集合，仍然本地排序即可。
      */
     fun setSortOrder(order: MemorySortOrder) {
+        if (_uiState.value.sortOrder == order) return
         _uiState.update { it.copy(sortOrder = order) }
+        if (_uiState.value.searchQuery.isBlank()) {
+            loadMemories()
+        }
     }
     
     /**
@@ -247,6 +274,8 @@ class MemoryViewModel @Inject constructor(
             
             result.fold(
                 onSuccess = {
+                    // 服务端删掉一条后，后面的条目整体前移，下一页 offset 要跟着减一
+                    nextOffset = (nextOffset - 1).coerceAtLeast(0)
                     _uiState.update { 
                         it.copy(
                             memories = it.memories.filter { m -> m.id != memory.id },

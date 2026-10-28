@@ -13,20 +13,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.sp
 
-private val EdgeColor = Color(0xFF5E7385)
-
-/** 布局层刻意用纯 JVM 的 [GraphPoint] 便于单测，画到 Compose 画布时再转 [Offset] */
-private fun GraphPoint.toOffset(): Offset = Offset(x, y)
+/** 节点标签：正文一行，地标层再加一行日期 · 条数 */
+internal data class GraphLabel(val text: String, val meta: String? = null)
 
 /**
  * 记忆网络的画布。
@@ -34,13 +27,21 @@ private fun GraphPoint.toOffset(): Offset = Offset(x, y)
  * 布局是确定性的（见 [MemoryGraphLayout]）：同样的数据每次都画在同一位置，
  * 用户才能形成空间记忆。手势只做双指缩放与拖动，点击命中节点后回调。
  *
+ * 这一版把「罗盘」真正画了出来：三圈 2/5 虚线环表示 1/2/3 跳，六条极淡的扇区线，
+ * 外圈标上扇区名。之前这三样在布局里都存在，却没有任何一处往下传，画面上只剩一堆球。
+ *
+ * 具体的绘制在 [drawMemoryGraph] 里，本文件只负责测量、手势与视口变换。
+ *
  * @param nodes 参与布局的节点
  * @param edges 边（两端必须都在 [nodes] 里，布局阶段会再过滤一次）
  * @param seedId 中心记忆；地标层传 null
  * @param isAnchorLayer true 画地标环，false 画以 [seedId] 为中心的同心环
+ * @param centerCount 地标层中心要显示的总条数；邻域层传 null
  * @param colorOf 节点 id → 主题色
  * @param labelOf 节点 id → 标签，返回 null 则不画字
- * @param onNodeClick 点击节点回调
+ * @param selectedId 当前选中的节点
+ * @param neighbors 选中节点的一跳邻居（决定谁保持亮、谁继续显示标签）
+ * @param onNodeClick 点击节点回调；点空白处传 null
  */
 @Composable
 internal fun MemoryGraphCanvas(
@@ -48,9 +49,12 @@ internal fun MemoryGraphCanvas(
     edges: List<GraphEdgeInput>,
     seedId: String?,
     isAnchorLayer: Boolean,
+    centerCount: Int?,
     colorOf: (String) -> Color,
-    labelOf: (String) -> String?,
-    onNodeClick: (String) -> Unit,
+    labelOf: (String) -> GraphLabel?,
+    selectedId: String?,
+    neighbors: Set<String>,
+    onNodeClick: (String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -63,6 +67,8 @@ internal fun MemoryGraphCanvas(
         offsetState.value = Offset.Zero
     }
 
+    val textMeasurer = rememberTextMeasurer()
+
     BoxWithConstraints(modifier = modifier) {
         val widthPx = with(density) { maxWidth.toPx() }
         val heightPx = with(density) { maxHeight.toPx() }
@@ -74,13 +80,6 @@ internal fun MemoryGraphCanvas(
                 MemoryGraphLayout.neighborhood(nodes, edges, seedId, widthPx, heightPx)
             }
         }
-        val centers = remember(placement) {
-            placement.nodes.associate { it.id to it.center.toOffset() }
-        }
-        val textMeasurer = rememberTextMeasurer()
-        val labelStyle = remember {
-            TextStyle(fontSize = 9.sp, color = Color(0xFF35424C), fontWeight = FontWeight.Medium)
-        }
 
         Canvas(
             modifier = Modifier
@@ -91,7 +90,7 @@ internal fun MemoryGraphCanvas(
                         val offset = offsetState.value
                         val localX = (tap.x - center.x - offset.x) / scale + center.x
                         val localY = (tap.y - center.y - offset.y) / scale + center.y
-                        placement.nodeAt(localX, localY)?.let(onNodeClick)
+                        onNodeClick(placement.nodeAt(localX, localY))
                     }
                 }
                 .pointerInput(Unit) {
@@ -106,44 +105,17 @@ internal fun MemoryGraphCanvas(
                 translate(offsetState.value.x, offsetState.value.y)
                 scale(scaleState.floatValue, scaleState.floatValue, pivot = center)
             }) {
-                placement.edges.forEach { edge ->
-                    val from = centers[edge.sourceId] ?: return@forEach
-                    val to = centers[edge.targetId] ?: return@forEach
-                    val strength = edge.strength.coerceIn(0f, 1f)
-                    drawLine(
-                        color = EdgeColor.copy(alpha = 0.16f + strength * 0.30f),
-                        start = from,
-                        end = to,
-                        strokeWidth = 1f + strength * 1.6f
-                    )
-                }
-                placement.nodes.forEach { node ->
-                    val color = colorOf(node.id)
-                    drawCircle(
-                        color = color.copy(alpha = 0.82f),
-                        radius = node.radius,
-                        center = node.center.toOffset()
-                    )
-                    if (node.isSeed) {
-                        drawCircle(
-                            color = color,
-                            radius = node.radius + 4f,
-                            center = node.center.toOffset(),
-                            style = Stroke(width = 2.2f)
-                        )
-                    }
-                }
-                placement.nodes.forEach { node ->
-                    val label = labelOf(node.id) ?: return@forEach
-                    val layout = textMeasurer.measure(label, style = labelStyle)
-                    drawText(
-                        textLayoutResult = layout,
-                        topLeft = Offset(
-                            node.center.x - layout.size.width / 2f,
-                            node.center.y + node.radius + 6f
-                        )
-                    )
-                }
+                drawMemoryGraph(
+                    placement = placement,
+                    isAnchorLayer = isAnchorLayer,
+                    seedId = seedId,
+                    selectedId = selectedId,
+                    neighbors = neighbors,
+                    centerCount = centerCount,
+                    colorOf = colorOf,
+                    labelOf = labelOf,
+                    measurer = textMeasurer
+                )
             }
         }
     }

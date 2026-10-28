@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.aveline.ai.mobile.domain.repository.StudyRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -62,6 +63,7 @@ class StudyViewModel @Inject constructor(
 
     // 词汇复习专用状态流（与通用 uiState 分离，便于独立观察）
     private val _vocabUiState = MutableStateFlow(VocabUiState())
+    private var bookWordsJob: Job? = null
     val vocabUiState: StateFlow<VocabUiState> = _vocabUiState.asStateFlow()
 
     /** 学习时长已落库事件：计划页与今日学习时长需要跟着刷新。 */
@@ -193,17 +195,11 @@ class StudyViewModel @Inject constructor(
         _vocabUiState.update { it.copy(searchResults = emptyList(), isSearching = false) }
     }
 
-    /** 加载复习总览（今日待复习、连续天数、记忆曲线等） */
+    /** 加载复习总览（今日待复习、连续天数、已掌握等） */
     fun loadReviewOverview() {
         viewModelScope.launch {
             studyRepository.getReviewOverview().onSuccess { resp ->
                 val data = resp["data"]?.let { it as? JsonObject } ?: resp
-                val curve = (data["memory_curve"] as? JsonArray)?.mapNotNull { p ->
-                    val obj = p as? JsonObject ?: return@mapNotNull null
-                    val day = (obj["day"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
-                    val retention = (obj["retention"] as? JsonPrimitive)?.content?.toFloatOrNull() ?: 0f
-                    MemoryCurvePoint(day, retention)
-                } ?: emptyList()
                 _vocabUiState.update {
                     it.copy(
                         reviewOverview = ReviewOverview(
@@ -213,8 +209,7 @@ class StudyViewModel @Inject constructor(
                             dueWords = data.int("due_words") ?: 0,
                             masteredWords = data.int("mastered_words") ?: 0,
                             newToday = data.int("new_today") ?: 0,
-                            reviewToday = data.int("review_today") ?: 0,
-                            memoryCurve = curve
+                            reviewToday = data.int("review_today") ?: 0
                         )
                     )
                 }
@@ -253,38 +248,6 @@ class StudyViewModel @Inject constructor(
         vocabReviewManager.loadLearnWords(next)
     }
 
-    /** 手动记录当天背了多少个单词 */
-    fun addManualStudy(count: Int) {
-        viewModelScope.launch {
-            studyRepository.addManualStudy(count).onSuccess { resp ->
-                val data = resp["data"]?.takeIf { it is JsonObject } as? JsonObject
-                val dayTotal = (data?.get("day_total") as? JsonPrimitive)
-                    ?.content?.toIntOrNull() ?: count
-                _vocabUiState.update { it.copy(manualStudyToday = dayTotal) }
-                _uiState.update {
-                    it.copy(successMessage = "已记录 $count 个,今日累计 $dayTotal 个")
-                }
-            }.onFailure { e ->
-                _uiState.update { it.copy(error = e.message ?: "记录失败") }
-            }
-        }
-    }
-
-    /** 加载今日已手动记录的单词总数(进入词汇 Tab 时调用) */
-    fun loadManualStudyToday() {
-        viewModelScope.launch {
-            val today = java.text.SimpleDateFormat(
-                "yyyy-MM-dd", java.util.Locale.getDefault()
-            ).format(java.util.Date())
-            studyRepository.getManualStudyStats(date = today).onSuccess { resp ->
-                val data = resp["data"]?.takeIf { it is JsonObject } as? JsonObject
-                val total = (data?.get("total") as? JsonPrimitive)
-                    ?.content?.toIntOrNull() ?: 0
-                _vocabUiState.update { it.copy(manualStudyToday = total) }
-            }
-        }
-    }
-
     /** 加载词书列表与当前词书 */
     fun loadVocabBooks() {
         viewModelScope.launch {
@@ -299,13 +262,19 @@ class StudyViewModel @Inject constructor(
         }
     }
 
-    /** 加载当前词书内的单词列表 */
+    /**
+     * 加载当前词书内的单词列表。
+     *
+     * 新请求会取消旧请求：切书后旧书的响应晚到也不会覆盖新书的列表。
+     */
     fun loadBookWords(page: Int = 1, pageSize: Int = 60) {
-        viewModelScope.launch {
+        bookWordsJob?.cancel()
+        _vocabUiState.update { it.copy(bookWordsLoading = true) }
+        bookWordsJob = viewModelScope.launch {
             studyRepository.getBookWords(page, pageSize).onSuccess { resp ->
-                val data = resp["data"]?.takeIf { it is JsonObject } as? JsonObject ?: return@onSuccess
-                val total = (data["total"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
-                val words = (data["words"] as? kotlinx.serialization.json.JsonArray)
+                val data = resp["data"]?.takeIf { it is JsonObject } as? JsonObject
+                val total = (data?.get("total") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+                val words = (data?.get("words") as? JsonArray)
                     ?.mapNotNull { el ->
                         val obj = el as? JsonObject ?: return@mapNotNull null
                         val w = (obj["word"] as? JsonPrimitive)?.content ?: return@mapNotNull null
@@ -316,19 +285,47 @@ class StudyViewModel @Inject constructor(
                             ?: ""
                         BookWord(w, t)
                     } ?: emptyList()
-                _vocabUiState.update { it.copy(bookWords = words, bookTotal = total) }
+                _vocabUiState.update {
+                    it.copy(bookWords = words, bookTotal = total, bookWordsLoading = false)
+                }
+            }.onFailure { e ->
+                _vocabUiState.update { it.copy(bookWordsLoading = false) }
+                _uiState.update { it.copy(error = e.message ?: "加载词书单词失败") }
             }
         }
     }
 
-    /** 切换当前词书 */
+    /**
+     * 切换当前词书（乐观更新）。
+     *
+     * 请求发出前就把标题换成新书、清空旧单词并进入加载态，详情页不会闪出旧书内容
+     * 或「暂无单词数据」；失败时回滚到原来那本并提示。
+     */
     fun switchVocabBook(filename: String) {
+        val previous = _vocabUiState.value
+        if (filename == previous.currentBook) return
+        bookWordsJob?.cancel()
+        _vocabUiState.update {
+            it.copy(currentBook = filename, bookWords = emptyList(), bookTotal = 0, bookWordsLoading = true)
+        }
         viewModelScope.launch {
             studyRepository.switchVocabBook(filename).onSuccess {
-                _vocabUiState.update { it.copy(currentBook = filename, bookWords = emptyList()) }
-                loadVocabBooks()
                 loadBookWords()
+                loadVocabBooks()
+                // 主页的词书进度、待复习数、今日词量都要换成新书的口径
+                vocabReviewManager.discardNewWordsQueue()
+                loadVocabInsights()
+                loadReviewOverview()
+                loadLearnWords()
             }.onFailure { e ->
+                _vocabUiState.update {
+                    it.copy(
+                        currentBook = previous.currentBook,
+                        bookWords = previous.bookWords,
+                        bookTotal = previous.bookTotal,
+                        bookWordsLoading = false
+                    )
+                }
                 _uiState.update { it.copy(error = e.message ?: "切换词书失败") }
             }
         }

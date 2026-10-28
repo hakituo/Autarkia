@@ -47,4 +47,24 @@ object AvelineTextStyles {
         color = TextPrimary,
         fontFeatureSettings = "tnum"
     )
+
+    /** Study 今日进度的大数字：40sp，等宽数字避免 1h → 2h 时整行抖动。 */
+    val studyMoment = TextStyle(
+        fontSize = 40.sp,
+        lineHeight = 40.sp,
+        fontWeight = FontWeight.Medium,
+        letterSpacing = (-1.5).sp,
+        color = TextPrimary,
+        fontFeatureSettings = "tnum"
+    )
+
+    /** 专注倒计时：64sp Light + 等宽数字，每秒只换数字不换宽度。 */
+    val focusClock = TextStyle(
+        fontSize = 64.sp,
+        lineHeight = 64.sp,
+        fontWeight = FontWeight.Light,
+        letterSpacing = (-2).sp,
+        color = TextPrimary,
+        fontFeatureSettings = "tnum"
+    )
 }

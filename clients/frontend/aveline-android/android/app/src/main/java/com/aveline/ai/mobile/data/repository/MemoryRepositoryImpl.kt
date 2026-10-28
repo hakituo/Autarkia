@@ -40,8 +40,10 @@ class MemoryRepositoryImpl @Inject constructor(
     override suspend fun getMemories(
         filter: MemoryFilter,
         sortOrder: MemorySortOrder,
-        persona: String?
-    ): List<Memory> {
+        persona: String?,
+        offset: Int,
+        limit: Int
+    ): MemoryPage {
         return try {
             // 后端 category 是单值, 前端 types 是 Set, 取第一个非空类型
             val category = filter.types.firstOrNull()?.name?.lowercase()
@@ -49,13 +51,20 @@ class MemoryRepositoryImpl @Inject constructor(
                 category = category,
                 minWeight = filter.minImportance,
                 includeThinking = filter.includeThinking,
+                limit = limit,
+                offset = offset,
+                sort = sortOrder.toApiSort(),
                 persona = persona
             )
             val memories = response.data.map { it.toDomain() }
-            applySortOrder(memories, sortOrder)
+            MemoryPage(
+                memories = memories,
+                total = response.total ?: (offset + memories.size),
+                hasMore = response.hasMore ?: (memories.size >= limit)
+            )
         } catch (e: Exception) {
             Log.w(TAG, "获取记忆列表失败: ${e.message}")
-            emptyList()
+            MemoryPage()
         }
     }
 
@@ -67,7 +76,7 @@ class MemoryRepositoryImpl @Inject constructor(
             // 搜索策略：拉取当前角色的记忆列表（传 persona 保证按角色），在客户端按关键词过滤。
             val response = apiService.getMemories(
                 includeThinking = true,
-                limit = 500,
+                limit = MEMORY_PAGE_SIZE,
                 persona = persona
             )
             val q = query.trim()
@@ -233,18 +242,17 @@ class MemoryRepositoryImpl @Inject constructor(
     }
     
     private suspend fun refreshMemories() {
-        val memories = getMemories()
-        _memoriesFlow.tryEmit(memories)
+        val page = getMemories()
+        _memoriesFlow.tryEmit(page.memories)
     }
-    
-    private fun applySortOrder(memories: List<Memory>, sortOrder: MemorySortOrder): List<Memory> {
-        return when (sortOrder) {
-            MemorySortOrder.NEWEST_FIRST -> memories.sortedByDescending { it.createdAt }
-            MemorySortOrder.OLDEST_FIRST -> memories.sortedBy { it.createdAt }
-            MemorySortOrder.MOST_ACCESSED -> memories.sortedByDescending { it.accessCount }
-            MemorySortOrder.MOST_IMPORTANT -> memories.sortedByDescending { it.importance }
-        }
-    }
+}
+
+/** 后端列表排序参数 */
+private fun MemorySortOrder.toApiSort(): String = when (this) {
+    MemorySortOrder.NEWEST_FIRST -> "newest"
+    MemorySortOrder.OLDEST_FIRST -> "oldest"
+    MemorySortOrder.MOST_ACCESSED -> "accessed"
+    MemorySortOrder.MOST_IMPORTANT -> "important"
 }
 
 /**

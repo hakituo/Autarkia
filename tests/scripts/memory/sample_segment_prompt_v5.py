@@ -46,8 +46,6 @@ def _pending(scope: str, versions: set[str]) -> list:
             }
         if item.segment_id in done_by[item.conversation_id]:
             continue
-        if policy.excluded(scope, item.events):
-            continue
         pending.append(item)
     return pending
 
@@ -171,9 +169,6 @@ def main() -> int:
     parser.add_argument("--scope", action="append", default=None)
     parser.add_argument("--sample", type=int, default=3)
     parser.add_argument("--min-chars", type=int, default=80)
-    parser.add_argument(
-        "--skip-sensitive", action="store_true", help="跳过露骨段，专测正常段的前缀缓存"
-    )
     parser.add_argument("--no-summaries", action="store_true")
     parser.add_argument(
         "--summary-chars", type=int, default=0, help="终端只打印前 N 字梗概（0=全文）"
@@ -192,8 +187,6 @@ def main() -> int:
             print(f"[{scope}] 不在人设里，跳过")
             continue
         pending = _pending(scope, versions)
-        if args.skip_sensitive:
-            pending = [item for item in pending if not policy.explicit_content(item.events)]
         items = _pick(pending, args.sample, args.min_chars)
         print(f"[{scope}] 未处理段 {len(pending)}，抽 {len(items)}")
         if items:

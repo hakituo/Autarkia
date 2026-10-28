@@ -1,51 +1,32 @@
 package com.aveline.ai.mobile.presentation.study
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.aveline.ai.mobile.presentation.theme.Background
-import com.aveline.ai.mobile.presentation.theme.Accent
-import com.aveline.ai.mobile.presentation.theme.SurfaceHigh
-import com.aveline.ai.mobile.presentation.theme.TextPrimary
-import com.aveline.ai.mobile.presentation.theme.TextSecondary
+import com.aveline.ai.mobile.presentation.study.focus.FocusBottomPanel
+import com.aveline.ai.mobile.presentation.study.focus.FocusControls
+import com.aveline.ai.mobile.presentation.study.focus.FocusRing
+import com.aveline.ai.mobile.presentation.study.focus.FocusTargetSelector
+import com.aveline.ai.mobile.presentation.study.focus.focusDots
+import com.aveline.ai.mobile.presentation.study.focus.focusRoundProgress
 
 /**
  * 番茄钟（专注）Tab。
  *
- * 提供可配置工作 / 休息 / 长休息时长的倒计时器，支持开始、暂停、重置、跳过阶段。
+ * 整页只剩一个大计时：事项名在顶部（未开始可点改、开始后收成一行文字），
+ * 中间是 3dp 细环 + 64sp Light 数字 + 本轮小点，下面是两个描边圆按钮和
+ * 一个 76dp 实心按钮；底部未开始时是三个紧凑步进器，开始后换成三格统计。
+ *
+ * 排版块在同包 [com.aveline.ai.mobile.presentation.study.focus] 下拆开，
+ * 本文件只负责拼装与滚动兜底（窄屏时上半部分自己滚，底部设置不跟着走）。
  */
 @Composable
 fun StudyFocusTab(
@@ -58,258 +39,66 @@ fun StudyFocusTab(
     onLongBreakMinutesChange: (Int) -> Unit,
     onFocusNameChange: (String) -> Unit = {}
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
-    ) {
-        Spacer(modifier = Modifier.height(16.dp))
+    val totalSeconds = focusTotalSeconds(focusState)
+    // 「开始过一次」= 正在计时，或当前阶段已经走了几秒（暂停中也算）：
+    // 暂停不该让设置面板和事项输入框突然回来抢版面，重置才是回到可编辑态。
+    val started = focusState.isRunning || focusState.remainingSeconds < totalSeconds
+    val roundProgress = focusRoundProgress(
+        completedCycles = focusState.completedCycles,
+        cyclesPerRound = focusState.cyclesBeforeLongBreak,
+        phase = focusState.phase
+    )
 
-        // 自定义专注事项名：完成番茄后作为科目上报后端，与概览"今日学习"联动
-        OutlinedTextField(
-            value = focusState.focusName,
-            onValueChange = onFocusNameChange,
-            label = { Text("专注事项（如：数学复习）") },
-            singleLine = true,
-            enabled = !focusState.isRunning,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 阶段标签
-        Text(
-            text = when (focusState.phase) {
-                FocusPhase.WORK -> if (focusState.focusName.isNotBlank()) {
-                    "专注中 · ${focusState.focusName}"
-                } else {
-                    "专注中"
-                }
-                FocusPhase.BREAK -> "休息一下"
-                FocusPhase.LONG_BREAK -> "长休息"
-            },
-            color = if (focusState.phase == FocusPhase.LONG_BREAK) {
-                Color(0xFF64B5F6)
-            } else {
-                Accent
-            },
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // 倒计时圆环
-        val totalSeconds = when (focusState.phase) {
-            FocusPhase.WORK -> focusState.workMinutes * 60
-            FocusPhase.BREAK -> focusState.breakMinutes * 60
-            FocusPhase.LONG_BREAK -> focusState.longBreakMinutes * 60
-        }.coerceAtLeast(1)
-        val progress = 1f - (focusState.remainingSeconds.toFloat() / totalSeconds).coerceIn(0f, 1f)
-
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.size(240.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            CircularProgressIndicator(
-                progress = { 1f },
-                modifier = Modifier.fillMaxSize(),
-                color = SurfaceHigh,
-                strokeWidth = 12.dp,
-                trackColor = Color.Transparent
+            Spacer(modifier = Modifier.height(16.dp))
+
+            FocusTargetSelector(
+                name = focusState.focusName,
+                collapsed = started,
+                onNameChange = onFocusNameChange
             )
-            CircularProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxSize(),
-                color = if (focusState.phase == FocusPhase.LONG_BREAK) {
-                    Color(0xFF64B5F6)
-                } else {
-                    Accent
-                },
-                strokeWidth = 12.dp,
-                trackColor = Color.Transparent
+
+            Spacer(modifier = Modifier.height(26.dp))
+
+            FocusRing(
+                phase = focusState.phase,
+                remainingSeconds = focusState.remainingSeconds,
+                totalSeconds = totalSeconds,
+                dotStates = focusDots(roundProgress, focusState.cyclesBeforeLongBreak)
             )
-            Text(
-                text = formatFocusTime(focusState.remainingSeconds),
-                color = TextPrimary,
-                fontSize = 56.sp,
-                fontWeight = FontWeight.Bold
+
+            Spacer(modifier = Modifier.height(30.dp))
+
+            FocusControls(
+                isRunning = focusState.isRunning,
+                onToggle = onToggleTimer,
+                onReset = onReset,
+                onSkip = onSkipPhase
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // 控制按钮
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            FilledTonalIconButton(
-                onClick = onReset,
-                modifier = Modifier.size(56.dp),
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = SurfaceHigh
-                )
-            ) {
-                Icon(
-                    Icons.Filled.Refresh,
-                    contentDescription = "重置",
-                    tint = TextPrimary
-                )
-            }
-
-            FilledIconButton(
-                onClick = onToggleTimer,
-                modifier = Modifier.size(72.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = Accent
-                )
-            ) {
-                Icon(
-                    imageVector = if (focusState.isRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (focusState.isRunning) "暂停" else "开始",
-                    tint = Background,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-
-            FilledTonalIconButton(
-                onClick = onSkipPhase,
-                modifier = Modifier.size(56.dp),
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = SurfaceHigh
-                )
-            ) {
-                Icon(
-                    Icons.Filled.FastForward,
-                    contentDescription = "跳过",
-                    tint = TextPrimary
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // 今日统计
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = SurfaceHigh)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                StatItem(value = "${focusState.todayTomatoes}", label = "今日番茄")
-                StatItem(value = "${focusState.completedCycles}", label = "本次专注")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // 时长设置
-        Text(
-            text = "时长设置（分钟）",
-            color = TextPrimary,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.Start)
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        DurationStepper(
-            label = "专注",
-            value = focusState.workMinutes,
-            onValueChange = onWorkMinutesChange,
-            enabled = !focusState.isRunning
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        DurationStepper(
-            label = "短休息",
-            value = focusState.breakMinutes,
-            onValueChange = onBreakMinutesChange,
-            enabled = !focusState.isRunning
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        DurationStepper(
-            label = "长休息",
-            value = focusState.longBreakMinutes,
-            onValueChange = onLongBreakMinutesChange,
-            enabled = !focusState.isRunning
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-    }
-}
-
-@Composable
-private fun StatItem(value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = value,
-            color = Accent,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = label,
-            color = TextSecondary,
-            style = MaterialTheme.typography.bodyMedium
+        FocusBottomPanel(
+            state = focusState,
+            showStats = started,
+            onWorkMinutesChange = onWorkMinutesChange,
+            onBreakMinutesChange = onBreakMinutesChange,
+            onLongBreakMinutesChange = onLongBreakMinutesChange
         )
     }
 }
 
-@Composable
-private fun DurationStepper(
-    label: String,
-    value: Int,
-    onValueChange: (Int) -> Unit,
-    enabled: Boolean
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            color = TextPrimary,
-            style = MaterialTheme.typography.bodyLarge
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(
-                onClick = { onValueChange((value - 1).coerceAtLeast(1)) },
-                enabled = enabled && value > 1
-            ) {
-                Text("-", fontSize = 20.sp)
-            }
-            Text(
-                text = value.toString(),
-                modifier = Modifier.padding(horizontal = 16.dp),
-                color = TextPrimary,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            OutlinedButton(
-                onClick = { onValueChange((value + 1).coerceAtMost(120)) },
-                enabled = enabled && value < 120
-            ) {
-                Text("+", fontSize = 20.sp)
-            }
-        }
-    }
-}
-
-private fun formatFocusTime(totalSeconds: Int): String {
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return "%02d:%02d".format(minutes, seconds)
-}
+/** 当前阶段的总时长；阶段切换瞬间也不会出现除零。 */
+internal fun focusTotalSeconds(state: StudyFocusState): Int = when (state.phase) {
+    FocusPhase.WORK -> state.workMinutes * 60
+    FocusPhase.BREAK -> state.breakMinutes * 60
+    FocusPhase.LONG_BREAK -> state.longBreakMinutes * 60
+}.coerceAtLeast(1)

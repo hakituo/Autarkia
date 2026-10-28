@@ -41,7 +41,12 @@ class MiniMaxClient(OpenAIClient):
                 del msg["name"]
 
     def _build_payload(self, messages: list, stream: bool, **kwargs) -> Dict[str, Any]:
+        # 单次调用传 thinking_enabled=False 关思考（离线提取用；MiniMax-M3 认顶层
+        # thinking:disabled，10-27 实测）。不传时保持默认思考，主对话行为不变。
+        thinking = kwargs.pop("thinking_enabled", None)
         payload = super()._build_payload(messages, stream, **kwargs)
+        if thinking is False:
+            payload["thinking"] = {"type": "disabled"}
         payload["reasoning_split"] = True
         payload.pop("max_tokens", None)
         # MiniMax 被动 prompt 缓存只回 usage.prompt_tokens_details.cached_tokens，

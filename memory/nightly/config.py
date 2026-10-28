@@ -94,18 +94,27 @@ DEFAULT_NIGHTLY_CONFIG: Dict[str, Any] = {
     "distillation_batch_size": 10,
     # 按时间连续性分组：相邻待蒸馏消息间隔超过该分钟数视为不同对话段，拆开各自蒸馏
     "distillation_group_gap_minutes": 30,
-    # 按 segment 提取（v3 F3）：默认关；打开后先影子写派生笔记库，不影响任何读路径
-    "segment_extraction_enabled": False,
+    # 按 segment 提取（v3 F3）：2026-10-28 aveline 试点后打开，所有正式角色（legacy scope 跳过）；
+    # 只想跑部分角色时可加可选的 segment_role_whitelist（不与上面的旧蒸馏白名单共用）
+    "segment_extraction_enabled": True,
     "segment_extraction_shadow": True,
-    # 分段参数：待 C8 定（实验用 16 条消息≈8 轮 / 空闲 30 分钟 / 4000 字封口）
+    # 分段参数（spec §7.1 / §13.4）：分段器版本不在这里，统一读 settings memory.notes_segmenter
     "segment_idle_seconds": 1800,
     "segment_max_turns": 8,
     "segment_max_chars": 4000,
+    "segment_session_max_chars": 4000,
+    "segment_min_part_chars": 300,
     # 按段作业单轮预算：段数 / 正文字符 / 墙钟秒数，0 表示不设该项上限
     "segment_max_per_night": 30,
     "segment_max_chars_per_night": 60000,
     "segment_max_seconds_per_night": 600,
     "segment_max_attempts": 3,
+    # 不进按段提取的会话（支持 fnmatch 通配）。这些 cid 认不出角色，落盘时被兜底进角色
+    # 聊天目录，内容却零信息量：u1 = 分级模式探针；mobile_user / tg_* = 单条主动推送。
+    # 每段必然 no_reusable_info，却要白打一次模型，还挤占当轮 30 段预算。
+    # default / default_user 是「本地默认会话」，主人真在那儿聊天时是真实记忆，故不进默认名单；
+    # 确认它们只放探针后可自行加进这个列表。
+    "segment_skip_conversations": ["u1", "mobile_user", "tg_*"],
 }
 
 # `__file__` 位于 `memory/nightly/config.py`，向上两级回到项目根目录。

@@ -46,6 +46,19 @@ class MemorySettings(BaseSettings):
     notes_retrieval_enabled: bool = Field(
         default=True, description="search_memory 是否优先检索按段梗概（派生笔记库）"
     )
+    # 分段器 / 梗概库版本（spec §7.1、§13.4）：v1 = 按轮数（现行），v2 = 交换 + 话题。
+    # 切到 v2 时 nightly 与回填改用 v2 分段并写 notes_v2/，检索读 notes_v2/；拨回 v1 即回滚，旧库不动。
+    notes_segmenter: str = Field(
+        default="v1", description="按段梗概的分段器版本：v1（按轮数）或 v2（交换 + 话题）"
+    )
+    # 主对话每轮自动注入梗概（.trae/specs/notes_injection_spec.md）；关掉时 prompt 与旧版逐字节一致。
+    notes_injection_enabled: bool = Field(
+        default=False, description="主对话每轮是否自动注入相关梗概 / 近期计划 / 偏好"
+    )
+    # 隐私梗概只进本地模型（类似无痕）：开着时用云端模型就不注入隐私梗概；关掉则按全局隐私隔离判断。
+    notes_injection_private_local_only: bool = Field(
+        default=True, description="自动注入时隐私梗概是否只给本地模型（云端模型一律不带）"
+    )
 
     # 内存管理配置
     memory_pruning_threshold: float = Field(default=0.3, description="重要性阈值")

@@ -117,7 +117,8 @@ data class ShopMenuItemDto(
             foodType = if (cat == com.aveline.ai.mobile.domain.models.ShopCategory.FOOD)
                 com.aveline.ai.mobile.domain.models.FoodType.fromString(sub_type) else null,
             price = price,
-            icon = icon.ifEmpty { cat.icon },
+            // 图标只透传后端字段；商城改版后 UI 用类别线性图标，不再从类别回填表情
+            icon = icon,
             nutrition = nutrition?.let { n ->
                 com.aveline.ai.mobile.domain.models.NutritionProfile(
                     hunger = n.hunger,

@@ -108,14 +108,14 @@ fun StudyPlanTab(
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            // 外层分页器已留 16dp 内边距；这里再留一次会让二级页正文比页头窄一截。
             // 左右滑动看前一天/后一天的计划;同时消费掉横滑,避免冒泡到顶层把侧边栏拖出来
             .horizontalPagingSwipe(
                 onPrevious = { gotoDate(shiftDateString(selectedDate, -1)) },
                 onNext = { gotoDate(shiftDateString(selectedDate, 1)) }
             ),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
+        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
     ) {
         item {
             DateSelector(

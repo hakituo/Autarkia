@@ -49,8 +49,7 @@ class StudySessionManager(
             studyRepository.getWorkspaceStudyPanel(historyLimit = 20).onSuccess { response ->
                 val data = response["data"]?.jsonObject ?: response
                 val panel = data["study_panel"]?.jsonObject ?: JsonObject(emptyMap())
-                // 「今日学习时长」以 study_panel.today 为权威口径（含背单词前台计时）；
-                // portrait 是旧版快照路径，仅作兼容兜底。
+                val todayMinutes = parseTodayStudyMinutes(response)
                 val studyToday = panel["today"]?.jsonObject
                 val studyPortrait = data["workspace_snapshot"]
                     ?.jsonObject
@@ -58,9 +57,6 @@ class StudySessionManager(
                     ?.jsonObject
                     ?.get("study")
                     ?.jsonObject
-                val todayMinutes = studyToday?.get("total_minutes")?.jsonPrimitive?.intOrNull
-                    ?: studyPortrait?.get("total_minutes")?.jsonPrimitive?.intOrNull
-                    ?: 0
                 val sessions = (studyToday?.get("sessions")?.jsonArray
                     ?: studyPortrait?.get("sessions")?.jsonArray)
                     .orEmptyArray()
@@ -69,7 +65,8 @@ class StudySessionManager(
                         StudyRecord(
                             topic = obj.string("topic"),
                             content = obj.string("content"),
-                            time = obj.string("time")
+                            time = obj.string("time"),
+                            minutes = obj["minutes"]?.jsonPrimitive?.intOrNull
                         )
                     }
 

@@ -1,9 +1,8 @@
 """优先级分析模块
-负责分析任务优先级、画像补全优先级、每日推送优先级
+负责分析任务优先级、每日推送优先级
 
 重构后：
 - 每日推送优先级函数委托到 daily_push_priority 模块
-- 关键词映射与覆盖检测委托到 portrait_keyword_map 模块
 - PriorityAnalyzer 保留核心优先级焦点构建和探测签名/冷却逻辑
 """
 
@@ -12,7 +11,6 @@ from typing import Any, Dict, List, Optional
 from core.utils.logger import get_module_logger
 from config.integrated_config import get_settings
 from core.services.priority import cooldown_seconds_for_focus
-from core.services.active_care.decision.portrait_keyword_map import check_portrait_keyword_coverage
 from core.services.active_care.decision.daily_push_priority import (
     build_daily_push_priority_candidates,
     analyze_daily_push_priority as _analyze_daily_push_priority,
@@ -43,15 +41,15 @@ class PriorityAnalyzer:
             workspace_snapshot: 工作区快照
             now_dt: 当前时间
             recent_history: 最近聊天记录
-            elapsed_seconds: 用户沉默时长（秒），用于判断是否应降低画像补全优先级
+            elapsed_seconds: 用户沉默时长（秒），保留参数以兼容调用方
 
         Returns:
             {
                 "must_probe": bool,  # 是否必须探测
                 "stage": str,        # 当前阶段
                 "task_probe": dict,  # 任务探测信息
-                "portrait_priority": list,  # 画像优先级
-                "covered_topics": list,     # 已覆盖话题
+                "portrait_priority": list,  # 恒为空（画像补齐已移除）
+                "covered_topics": list,     # 恒为空
                 "summary": dict,            # 摘要
             }
         """
@@ -107,82 +105,18 @@ class PriorityAnalyzer:
                 "pending_total": timed_pending + untimed_pending,
             }
 
-        quality = snapshot.get("portrait_completeness") or {}
-        missing_items = quality.get("missing_items") or []
-        if not isinstance(missing_items, list):
-            missing_items = []
-
-        # BERT 语义覆盖过滤
-        _health_topics = ["wakeup", "sleep", "meal", "activity", "study", "mood", "health"]
-        _relevant_missing = [item for item in missing_items if item in _health_topics]
-        _covered_topics: List[str] = []
-        if _relevant_missing and recent_history and self.bert_analyzer:
-            try:
-                coverage_result = self.bert_analyzer.analyze_portrait_topic_coverage(
-                    recent_messages=recent_history,
-                    candidate_topics=_relevant_missing,
-                )
-                _covered_topics = coverage_result.get("covered_topics") or []
-                if _covered_topics:
-                    missing_items = [item for item in missing_items if item not in _covered_topics]
-                    logger.info(
-                        f"Active Care: build_priority_focus BERT过滤已覆盖话题 "
-                        f"covered={_covered_topics}, 剩余missing={missing_items}"
-                    )
-            except Exception as e:
-                logger.warning(f"Active Care: build_priority_focus BERT覆盖检测失败: {e}")
-
-        # 关键词兜底检测：BERT 可能漏检时，用关键词直接匹配用户消息
-        if _relevant_missing and recent_history:
-            _keyword_covered = check_portrait_keyword_coverage(
-                recent_history, _relevant_missing, exclude=_covered_topics
-            )
-            if _keyword_covered:
-                _covered_topics.extend(_keyword_covered)
-                missing_items = [item for item in missing_items if item not in _keyword_covered]
-                logger.info(
-                    f"Active Care: build_priority_focus 关键词兜底过滤已覆盖话题 "
-                    f"covered={_keyword_covered}, 剩余missing={missing_items}"
-                )
-
-        portrait_priority: List[str] = []
-        hour = int(getattr(now_dt, "hour", 0))
-        if hour < 11:
-            for item in ["wakeup", "meal"]:
-                if item in missing_items:
-                    portrait_priority.append(item)
-        elif hour < 17:
-            for item in ["meal", "activity", "study"]:
-                if item in missing_items:
-                    portrait_priority.append(item)
-        else:
-            for item in ["meal", "activity", "mood", "sleep"]:
-                if item in missing_items:
-                    portrait_priority.append(item)
-
-        # 用户刚互动过（沉默<20分钟）时，不强制画像补全探测，避免查户口式追问
-        _PORTRAIT_PROBE_MIN_SILENCE = 1200  # 20分钟
-        if portrait_priority and not must_probe:
-            if elapsed_seconds >= _PORTRAIT_PROBE_MIN_SILENCE:
-                must_probe = True
-                stage = "daily_routine"
-            else:
-                # 用户刚互动过，画像补全降级为"可选"而非"必须"
-                logger.info(
-                    f"Active Care: 用户沉默仅{elapsed_seconds}s，画像补全降级为可选 "
-                    f"(需>={_PORTRAIT_PROBE_MIN_SILENCE}s才强制探测)"
-                )
-
+        # 画像补齐（每天按时段追问起床 / 吃饭 / 活动等）已于 2026-10-28 移除：
+        # 它是查岗式主动消息的主要来源。键保留为空，供只读它的下游（决策引擎
+        # 状态压缩、冷却档位）保持兼容。
         return {
             "must_probe": must_probe,
             "stage": stage,
             "task_probe": task_probe,
-            "portrait_priority": portrait_priority[:2],
-            "covered_topics": _covered_topics,
+            "portrait_priority": [],
+            "covered_topics": [],
             "summary": {
                 "timed_pending": timed_pending,
                 "untimed_pending": untimed_pending,
-                "missing_items": missing_items,
             },
         }
 
@@ -191,14 +125,11 @@ class PriorityAnalyzer:
         if not isinstance(focus, dict):
             return "none"
         task_probe = focus.get("task_probe") or {}
-        portrait_priority = focus.get("portrait_priority") or []
         if task_probe:
             return (
                 f"task:{task_probe.get('reason')}:{task_probe.get('task_id') or ''}:"
                 f"{task_probe.get('task_title') or ''}"
             )
-        if portrait_priority:
-            return "portrait:" + ",".join(str(item) for item in portrait_priority[:2])
         return str(focus.get("stage") or "idle")
 
     def get_priority_probe_cooldown_seconds(self, focus: Dict[str, Any]) -> int:

@@ -124,7 +124,7 @@ class DecisionExecutor:
                     decision_ctx, probe_actions
                 )
                 logger.info(
-                    "Active Care: Priority probe mode enabled by portrait/tasks snapshot, "
+                    "Active Care: Priority probe mode enabled by tasks snapshot, "
                     "action chosen by MDP/bandit -> %s",
                     chosen_action,
                 )

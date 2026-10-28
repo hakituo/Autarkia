@@ -78,4 +78,29 @@ class StudyTodayLogicTest {
         assertEquals(listOf("数学", "英语", "物理"), subjects.map { it.name })
         assertEquals(0.7f, subjects.first().progress)
     }
+
+    @Test
+    fun `record duration is formatted as hours and minutes`() {
+        assertEquals("0m", formatRecordMinutes(0))
+        assertEquals("45m", formatRecordMinutes(45))
+        assertEquals("2h", formatRecordMinutes(120))
+        assertEquals("3h 20m", formatRecordMinutes(200))
+    }
+
+    @Test
+    fun `progress summary drops subject section and keeps other sections`() {
+        val content = """
+            今天物理推进到电磁感应。
+            ## 各科进展
+            ### 物理
+            - 状态：框架
+            ## 备注
+            明天继续。
+        """.trimIndent()
+
+        assertEquals(
+            "今天物理推进到电磁感应。\n\n## 备注\n明天继续。",
+            stripSubjectProgress(content)
+        )
+    }
 }

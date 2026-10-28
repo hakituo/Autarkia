@@ -66,5 +66,13 @@ data class MessageRequest(
     val message_id: String? = branch_metadata?.assistant_message_id,
     // 当前 persona filename：用于后端规范化 conversation_id 为 shared__persona__{slug}
     // 不同 persona 走不同的历史和记忆池；不传时后端 fallback 用全局 active persona
-    val profile_filename: String? = null
+    val profile_filename: String? = null,
+    /**
+     * 思考模式（DeepSeek / MiniMax / 智谱等支持）。
+     *
+     * null = 该角色没设置过，后端沿用 settings.model.llm.thinking_enabled；
+     * true / false = 用户在该角色的「模型」页显式开关过。
+     * 后端 routers/v1/chat.py 读 body 里的 thinking / enable_thinking。
+     */
+    val thinking: Boolean? = null
 )

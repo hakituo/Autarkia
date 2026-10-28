@@ -1,36 +1,20 @@
 package com.aveline.ai.mobile.presentation.study
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,29 +23,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.domain.models.PlanItem
-import com.aveline.ai.mobile.presentation.components.SectionCard
-import com.aveline.ai.mobile.presentation.theme.Accent
-import com.aveline.ai.mobile.presentation.theme.TextPrimary
+import com.aveline.ai.mobile.presentation.study.today.PlanItemDetailSheet
+import com.aveline.ai.mobile.presentation.study.today.TodayNextTask
+import com.aveline.ai.mobile.presentation.study.today.TodayProgress
+import com.aveline.ai.mobile.presentation.study.today.TodayTaskRow
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
- * Study 的执行首页。
+ * Study 的执行首页（今天）。
  *
- * 这里直接消费 typed DailyPlan 与真实 Study 统计：
+ * 页面只有一个主动作：「下一项」上的实心按钮。其余信息按重要性降级：
+ * 进度（大数字 + 细条）→ 下一项 → 任务行 → 底部任务详情面板。
+ * 具体排版在同包 [com.aveline.ai.mobile.presentation.study.today] 下按块拆开，
+ * 本文件只负责数据口径与拼装。
+ *
+ * 数据口径：
  * - [StudyUiState.todayStudyMinutes] 是实际学习分钟数；
  * - DailyPlan.dailyGoalMinutes 是后端 canonical 日目标；
- * - [StudyPlanUiState.planItems] 的预计总分钟是 planned，不等于 goal；
- * - 点击开始学习把完整 typed PlanItem 交给 Focus，避免再靠标题定位。
+ * - 计划项预计总分钟是 planned，不等于 goal。
  */
 @Composable
 fun StudyTodayTab(
@@ -80,15 +64,10 @@ fun StudyTodayTab(
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(top = 16.dp, bottom = 28.dp)
     ) {
         item {
-            TodayHeader(date = planUiState.plan?.date ?: planUiState.selectedDate)
-        }
-
-        item {
-            TodayProgressCard(
+            TodayProgress(
                 actualMinutes = uiState.todayStudyMinutes,
                 goalMinutes = dailyGoalMinutes,
                 plannedMinutes = plannedMinutes,
@@ -103,63 +82,30 @@ fun StudyTodayTab(
                     text = message,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
                 )
             }
         }
 
         item {
-            NextTaskCard(
+            TodayNextTask(
                 item = nextItem,
-                onOpen = { detailItem = nextItem },
+                onOpen = { nextItem?.let { detailItem = it } },
                 onStart = { nextItem?.let(onStartFocus) }
             )
         }
 
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "今日任务",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = if (items.isEmpty()) "暂无计划" else "$completed / ${items.size} 已完成",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TextTertiary
-                    )
-                }
-                TextButton(onClick = onOpenPlanManager) {
-                    Text("管理计划")
-                }
-            }
+            TodayTasksHeader(onOpenPlanManager = onOpenPlanManager)
         }
 
         if (items.isEmpty()) {
-            item {
-                SectionCard(title = "还没有今日计划") {
-                    Text(
-                        text = "可以先进入计划管理手动添加；自动 Planner 生成后也会直接出现在这里。",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedButton(
-                        onClick = onOpenPlanManager,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("打开计划管理")
-                    }
-                }
-            }
+            item { EmptyPlanHint(onOpenPlanManager = onOpenPlanManager) }
         } else {
             items(items, key = { it.id.ifBlank { "${it.time}:${it.content}" } }) { item ->
-                TodayTaskCard(
+                TodayTaskRow(
                     item = item,
                     onOpen = { detailItem = item },
                     onToggle = { onToggleItem(item) },
@@ -170,7 +116,7 @@ fun StudyTodayTab(
     }
 
     detailItem?.let { item ->
-        PlanItemDetailDialog(
+        PlanItemDetailSheet(
             item = item,
             onDismiss = { detailItem = null },
             onToggle = {
@@ -185,329 +131,59 @@ fun StudyTodayTab(
     }
 }
 
+/** 「今日任务」标记 + 右侧管理入口：小字标签，不再抢主标题。 */
 @Composable
-private fun TodayHeader(date: String) {
-    val formatted = remember(date) {
-        runCatching {
-            val source = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val target = SimpleDateFormat("M月d日 EEEE", Locale.CHINA)
-            target.format(source.parse(date) ?: Date())
-        }.getOrDefault(date)
-    }
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "今天",
-            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-            color = TextPrimary
-        )
-        Text(
-            text = formatted,
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
-        )
-    }
-}
-
-@Composable
-private fun TodayProgressCard(
-    actualMinutes: Int,
-    goalMinutes: Int,
-    plannedMinutes: Int,
-    completedCount: Int,
-    totalCount: Int
-) {
-    val progress = if (goalMinutes > 0) {
-        (actualMinutes.toFloat() / goalMinutes.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-    val remaining = (goalMinutes - actualMinutes).coerceAtLeast(0)
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Accent.copy(alpha = 0.09f))
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Column {
-                    Text(
-                        text = "今日学习",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = TextSecondary
-                    )
-                    Text(
-                        text = if (goalMinutes > 0) {
-                            "${actualMinutes.coerceAtLeast(0)} / $goalMinutes min"
-                        } else {
-                            formatStudyMinutes(actualMinutes)
-                        },
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                        color = TextPrimary
-                    )
-                }
-                Text(
-                    text = if (plannedMinutes > 0) {
-                        "今日计划 ${formatStudyMinutes(plannedMinutes)}"
-                    } else {
-                        "等待计划"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
-                )
-            }
-
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = Accent,
-                trackColor = Color(0x1AFFFFFF)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = if (goalMinutes > 0) {
-                        "目标剩余 ${formatStudyMinutes(remaining)}"
-                    } else {
-                        "等待学习目标"
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = TextTertiary
-                )
-                Text(
-                    text = "$completedCount / $totalCount 项",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = TextTertiary
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun NextTaskCard(
-    item: PlanItem?,
-    onOpen: () -> Unit,
-    onStart: () -> Unit
-) {
-    SectionCard(
-        title = "下一项",
-        icon = Icons.Default.Schedule,
-        subtitle = "现在只需要处理这一件事"
-    ) {
-        if (item == null) {
-            Text(
-                text = "今天没有待执行任务",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextTertiary,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-            return@SectionCard
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0x14000000))
-                .clickable(onClick = onOpen)
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = item.subject?.takeIf { it.isNotBlank() }
-                    ?.let { "$it · ${item.content}" }
-                    ?: item.content,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = TextPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetaText(item.time.ifBlank { "灵活" })
-                MetaText(planItemActualText(item) ?: "${item.estimatedDurationMinutes} min")
-                MetaText(priorityLabel(item.priority))
-            }
-            item.description?.takeIf { it.isNotBlank() }?.let { description ->
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Button(
-                onClick = onStart,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("开始学习")
-            }
-        }
-    }
-}
-
-@Composable
-private fun TodayTaskCard(
-    item: PlanItem,
-    onOpen: () -> Unit,
-    onToggle: () -> Unit,
-    onStart: () -> Unit
-) {
-    val done = item.isDone || item.status == "completed"
-    val skipped = item.status == "skipped"
-    Card(
+private fun TodayTasksHeader(onOpenPlanManager: () -> Unit) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onOpen),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0x10000000))
+            .padding(top = 4.dp, bottom = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        Text(
+            text = "今日任务",
+            fontSize = 13.sp,
+            color = TextTertiary
+        )
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(onClick = onOpenPlanManager)
+                .padding(horizontal = 6.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onToggle, enabled = !skipped) {
-                Icon(
-                    imageVector = if (done) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                    contentDescription = if (done) "已完成" else "标记完成",
-                    tint = when {
-                        done -> Accent
-                        skipped -> TextTertiary
-                        else -> TextSecondary
-                    },
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.subject?.takeIf { it.isNotBlank() }
-                        ?.let { "$it · ${item.content}" }
-                        ?: item.content,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = if (done || skipped) TextTertiary else TextPrimary,
-                    textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MetaText(item.time.ifBlank { "灵活" })
-                    MetaText(planItemActualText(item) ?: "${item.estimatedDurationMinutes} min")
-                    MetaText(statusLabel(item.status))
-                    if (item.priority == "high" || item.priority == "urgent") {
-                        MetaText(priorityLabel(item.priority))
-                    }
-                }
-            }
-
-            if (!done && !skipped) {
-                IconButton(onClick = onStart) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "开始学习",
-                        tint = Accent
-                    )
-                }
-            }
+            Text(
+                text = "管理计划",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = TextSecondary
+            )
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = TextSecondary,
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }
 
 @Composable
-private fun MetaText(text: String) {
+private fun EmptyPlanHint(onOpenPlanManager: () -> Unit) {
     Text(
-        text = text,
-        style = MaterialTheme.typography.labelSmall,
-        color = TextTertiary
+        text = "今天还没有计划。可以先手动添加；自动 Planner 生成后会直接出现在这里。",
+        fontSize = 14.sp,
+        lineHeight = 23.sp,
+        color = TextSecondary,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .clickable(onClick = onOpenPlanManager)
     )
 }
 
-@Composable
-private fun PlanItemDetailDialog(
-    item: PlanItem,
-    onDismiss: () -> Unit,
-    onToggle: () -> Unit,
-    onStart: () -> Unit
-) {
-    val done = item.isDone || item.status == "completed"
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = item.subject?.takeIf { it.isNotBlank() } ?: "计划详情",
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = item.content,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    MetaText(item.time.ifBlank { "灵活安排" })
-                    MetaText(planItemActualText(item) ?: "${item.estimatedDurationMinutes} 分钟")
-                    MetaText(priorityLabel(item.priority))
-                }
-                item.description?.takeIf { it.isNotBlank() }?.let {
-                    Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-                }
-                item.settlementReason?.takeIf { it.isNotBlank() }?.let {
-                    Text(
-                        text = "调整原因：$it",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-                if (item.carryoverCount > 0) {
-                    Text(
-                        text = "已结转 ${item.carryoverCount} 次",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TextTertiary
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            if (!done && item.status != "skipped") {
-                TextButton(onClick = onStart) {
-                    Text("开始学习")
-                }
-            }
-        },
-        dismissButton = {
-            Row {
-                if (item.status != "skipped") {
-                    TextButton(onClick = onToggle) {
-                        Text(if (done) "标记未完成" else "标记完成")
-                    }
-                }
-                TextButton(onClick = onDismiss) {
-                    Text("关闭")
-                }
-            }
-        }
-    )
-}
-
+/** 下一项：进行中优先，其次第一个未完成且未跳过的任务。 */
 internal fun selectNextPlanItem(items: List<PlanItem>): PlanItem? {
     return items.firstOrNull { it.status == "in_progress" }
         ?: items.firstOrNull {
@@ -529,18 +205,4 @@ internal fun formatStudyMinutes(minutes: Int): String {
         rest == 0 -> "${hours}h"
         else -> "${hours}h ${rest}min"
     }
-}
-
-private fun priorityLabel(priority: String): String = when (priority) {
-    "urgent" -> "紧急"
-    "high" -> "高优先级"
-    "low" -> "低优先级"
-    else -> "普通"
-}
-
-private fun statusLabel(status: String): String = when (status) {
-    "in_progress" -> "进行中"
-    "completed" -> "已完成"
-    "skipped" -> "已跳过"
-    else -> "待开始"
 }

@@ -56,6 +56,43 @@ async def _probe_plan_reminder(ctx: dict) -> Tuple[str, Commit]:
         return "", None
 
 
+async def _probe_active_care_agenda(ctx: dict) -> Tuple[str, Commit]:
+    """P1.5：Active Care 开场议程。轻问候发出后，要聊的那件事放在这里一步步带。
+
+    只在主人私聊里出现（群聊 / 角色互聊不带）；被选中才计一轮，
+    没被选中（同一轮有到点硬提醒）就留到下一轮。结束由模型调用 close_agenda。
+    """
+    try:
+        from core.agents.chat_agent_components.persona_system.prompt.active_care_prompts import (
+            build_agenda_chat_injection,
+        )
+        from core.services.active_care.agenda import (
+            get_active_agenda,
+            is_agenda_conversation,
+            record_agenda_turn,
+            scope_for_conversation,
+        )
+
+        user_id = str(ctx.get("user_id") or "")
+        if not is_agenda_conversation(user_id):
+            return "", None
+        scope = scope_for_conversation(user_id)
+        agenda = await get_active_agenda(scope)
+        if agenda is None:
+            return "", None
+        text = build_agenda_chat_injection(
+            opener=agenda.opener, topic=agenda.topic, turn=agenda.turns + 1
+        )
+
+        async def _commit() -> None:
+            await record_agenda_turn(scope, agenda.agenda_id)
+
+        return text, _commit
+    except Exception as e:
+        logger.warning(f"Failed to peek Active Care agenda: {e}")
+        return "", None
+
+
 async def _probe_daily_study_task(ctx: dict) -> Tuple[str, Commit]:
     """P2：每日学习任务更新。peek 不落盘，选中后才 commit。"""
     prep = ctx.get("prep")

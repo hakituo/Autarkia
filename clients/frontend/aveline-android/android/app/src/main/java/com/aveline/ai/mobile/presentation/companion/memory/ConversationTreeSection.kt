@@ -1,7 +1,8 @@
 package com.aveline.ai.mobile.presentation.companion.memory
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,15 +15,13 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,76 +35,79 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.aveline.ai.mobile.presentation.theme.Line
+import androidx.compose.ui.unit.sp
+import com.aveline.ai.mobile.presentation.companion.companionRowHairline
 import com.aveline.ai.mobile.presentation.theme.Accent
+import com.aveline.ai.mobile.presentation.theme.Background
+import com.aveline.ai.mobile.presentation.theme.TextBody
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
 import java.time.Instant
 
+/** 每层分支的缩进步长 */
+private val RailStep = 16.dp
+
 /**
- * 聊天记录树工具栏：消息数、分支数、只看当前世界线、全部展开/收起。
+ * 「只看当前世界线」开关。
+ *
+ * 原来是一个 FilterChip：选中后整块变强调色，读起来像「启用了一个滤镜」，
+ * 而它其实是一个二值开关。改成带说明文字的 Switch，副标题直接写清它会隐藏什么。
  */
 @Composable
-internal fun ConversationTreeToolbar(
+internal fun ConversationWorldLineSwitch(
     messageCount: Int,
     branchCount: Int,
     activeOnly: Boolean,
-    actionLabel: String,
     onToggleActiveOnly: () -> Unit,
-    onAction: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 4.dp, end = 4.dp, top = 4.dp),
+                .padding(start = 4.dp, end = 4.dp, top = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "聊天记录树",
-                style = MaterialTheme.typography.titleSmall,
-                color = TextPrimary,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.size(6.dp))
             Text(
                 text = if (branchCount > 0) "$messageCount 条 · $branchCount 处分支" else "$messageCount 条",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
                 color = TextTertiary
             )
-            Spacer(modifier = Modifier.weight(1f))
-            if (branchCount > 0 && !activeOnly) {
-                TextButton(onClick = onAction) {
-                    Text(
-                        text = actionLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TextSecondary
-                    )
-                }
-            }
         }
-
         Row(
-            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggleActiveOnly)
+                .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            FilterChip(
-                selected = activeOnly,
-                onClick = onToggleActiveOnly,
-                label = {
-                    Text(
-                        text = "只看当前世界线",
-                        color = if (activeOnly) Color.White else TextSecondary
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Accent.copy(alpha = 0.85f),
-                    containerColor = Color(0x1A000000)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "只看当前世界线",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.5.sp),
+                    color = TextPrimary
+                )
+                Text(
+                    text = "隐藏重新生成和编辑产生的分支",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    color = TextTertiary
+                )
+            }
+            Switch(
+                checked = activeOnly,
+                onCheckedChange = { onToggleActiveOnly() },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Background,
+                    checkedTrackColor = TextPrimary,
+                    checkedBorderColor = Color.Transparent,
+                    uncheckedThumbColor = TextPrimary,
+                    uncheckedTrackColor = Color.White.copy(alpha = 0.14f),
+                    uncheckedBorderColor = Color.Transparent
                 )
             )
         }
@@ -119,11 +121,15 @@ internal fun ConversationTreeToolbar(
  */
 internal fun LazyListScope.conversationTreeItems(
     rows: List<ConversationTreeRow>,
+    companionName: String,
     onExpandBranch: (String) -> Unit
 ) {
     items(items = rows, key = { it.key }) { row ->
         when (row) {
-            is ConversationTreeRow.MessageRow -> ConversationMessageRow(row)
+            is ConversationTreeRow.MessageRow -> ConversationMessageRow(
+                row = row,
+                companionName = companionName
+            )
             is ConversationTreeRow.BranchRow -> ConversationBranchRow(
                 row = row,
                 onClick = { onExpandBranch(row.parentId) }
@@ -132,80 +138,105 @@ internal fun LazyListScope.conversationTreeItems(
     }
 }
 
+/**
+ * 一条消息：作者 + 时间 + 来源 + 正文，不再套卡片。
+ *
+ * 主世界线不缩进；分支靠左侧一条细线挂在父消息上，越深越往右。
+ * 未采用的分支整体降到 45% 透明度并标「未采用」，来自服务端的标「来自 Windows」。
+ */
 @Composable
-private fun ConversationMessageRow(row: ConversationTreeRow.MessageRow) {
+private fun ConversationMessageRow(
+    row: ConversationTreeRow.MessageRow,
+    companionName: String
+) {
     val message = row.message
-    val roleColor = if (message.isUser) Accent else Color(0xFFA78BFA)
     val thought = message.thought?.trim().orEmpty()
     var thoughtExpanded by rememberSaveable(message.id) { mutableStateOf(false) }
+    val who = if (message.isUser) "我" else companionName.ifBlank { "她" }
+    val whoColor = if (message.isUser) TextBody else Accent
+    val bodyColor = if (row.onActivePath) TextBody else TextTertiary
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .then(
                 if (row.showRail) {
-                    Modifier.drawBehind {
-                        drawBranchRail(depth = row.depth, isLast = row.isLastChild)
-                    }
+                    Modifier.drawBehind { drawBranchRail(depth = row.depth, isLast = row.isLastChild) }
                 } else {
                     Modifier
                 }
             )
-            .padding(start = rowIndent(row.depth), end = 4.dp, top = 3.dp, bottom = 3.dp)
+            .padding(start = rowIndent(row.depth), end = 4.dp)
+            .alpha(if (row.onActivePath) 1f else 0.45f)
     ) {
-        Surface(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .alpha(if (row.onActivePath) 1f else 0.45f),
-            shape = RoundedCornerShape(10.dp),
-            color = Color.Transparent,
-            border = BorderStroke(1.dp, Line)
+                .weight(1f)
+                .companionRowHairline()
+                .padding(top = 10.dp, bottom = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                RoleBadge(isUser = message.isUser, color = roleColor)
-                Spacer(modifier = Modifier.width(8.dp))
-                Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = who,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = whoColor,
+                    maxLines = 1
+                )
+                Text(
+                    text = formatMessageTime(message.timestamp),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.5.sp
+                    ),
+                    color = TextTertiary,
+                    maxLines = 1
+                )
+                if (row.fromServer) {
                     Text(
-                        text = conversationMessageText(message),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextPrimary,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
+                        text = "来自 Windows",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                        color = TextTertiary,
+                        maxLines = 1
                     )
-                    Spacer(modifier = Modifier.size(3.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (row.fromServer) {
-                            ServerBadge()
-                            Spacer(modifier = Modifier.width(6.dp))
-                        }
-                        if (message.variantCount > 1) {
-                            VariantBadge(
-                                index = message.variantIndex,
-                                count = message.variantCount,
-                                active = row.onActivePath
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                        }
-                        if (thought.isNotEmpty()) {
-                            ThoughtToggle(
-                                expanded = thoughtExpanded,
-                                onClick = { thoughtExpanded = !thoughtExpanded }
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                        }
-                        Text(
-                            text = formatMessageTime(message.timestamp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextTertiary
-                        )
-                    }
-                    if (thought.isNotEmpty() && thoughtExpanded) {
-                        ThoughtBody(text = thought)
-                    }
                 }
+                if (!row.onActivePath) {
+                    Text(
+                        text = "未采用",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                        color = TextTertiary,
+                        maxLines = 1
+                    )
+                } else if (message.variantCount > 1) {
+                    Text(
+                        text = "${message.variantIndex + 1}/${message.variantCount}",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                        color = TextTertiary,
+                        maxLines = 1
+                    )
+                }
+                if (thought.isNotEmpty()) {
+                    ThoughtToggle(
+                        expanded = thoughtExpanded,
+                        onClick = { thoughtExpanded = !thoughtExpanded }
+                    )
+                }
+            }
+            Text(
+                text = conversationMessageText(message),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.5.sp, lineHeight = 22.sp),
+                color = bodyColor,
+                maxLines = 6,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (thought.isNotEmpty() && thoughtExpanded) {
+                ThoughtBody(text = thought)
             }
         }
     }
@@ -214,51 +245,46 @@ private fun ConversationMessageRow(row: ConversationTreeRow.MessageRow) {
 /** 「心想」按键：点一下展开对方的内心独白 */
 @Composable
 private fun ThoughtToggle(expanded: Boolean, onClick: () -> Unit) {
-    Surface(
-        color = Accent.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(4.dp),
-        modifier = Modifier.clickable(onClick = onClick)
+    Row(
+        modifier = Modifier
+            .background(Accent.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 5.dp, vertical = 1.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val chevron =
-                if (expanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight
-            Icon(
-                imageVector = chevron,
-                contentDescription = null,
-                tint = Accent,
-                modifier = Modifier.size(12.dp)
-            )
-            Text(
-                text = "心想",
-                style = MaterialTheme.typography.labelSmall,
-                color = Accent
-            )
-        }
+        Icon(
+            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            contentDescription = null,
+            tint = Accent.copy(alpha = 0.85f),
+            modifier = Modifier.size(12.dp)
+        )
+        Text(
+            text = "心想",
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+            color = Accent.copy(alpha = 0.85f)
+        )
     }
 }
 
 /** 展开后的心想正文 */
 @Composable
 private fun ThoughtBody(text: String) {
-    Surface(
-        color = Accent.copy(alpha = 0.08f),
-        shape = RoundedCornerShape(6.dp),
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 5.dp)
+            .padding(top = 2.dp)
+            .background(Accent.copy(alpha = 0.06f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp, lineHeight = 19.sp),
+            color = TextSecondary
         )
     }
 }
 
+/** 分支行：灰色文字 + 展开箭头（原来是强调色的「其他 N 个版本」） */
 @Composable
 private fun ConversationBranchRow(row: ConversationTreeRow.BranchRow, onClick: () -> Unit) {
     Row(
@@ -266,68 +292,30 @@ private fun ConversationBranchRow(row: ConversationTreeRow.BranchRow, onClick: (
             .fillMaxWidth()
             .drawBehind { drawBranchRail(depth = row.depth, isLast = row.isLastChild) }
             .clickable(onClick = onClick)
-            .padding(start = rowIndent(row.depth), end = 4.dp, top = 4.dp, bottom = 4.dp),
+            .padding(start = rowIndent(row.depth), end = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = Accent,
-            modifier = Modifier.size(16.dp)
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = "其他 ${row.hiddenCount} 个版本",
-            style = MaterialTheme.typography.labelMedium,
-            color = Accent
-        )
-    }
-}
-
-@Composable
-private fun RoleBadge(isUser: Boolean, color: Color) {
-    Surface(
-        color = color.copy(alpha = 0.16f),
-        shape = RoundedCornerShape(4.dp)
-    ) {
-        Text(
-            text = if (isUser) "你" else "AI",
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-        )
-    }
-}
-
-/** 服务端历史标记：这条消息来自 Windows / 其他平台，不是本机产生的 */
-@Composable
-private fun ServerBadge() {
-    Surface(
-        color = Color(0x1AFFFFFF),
-        shape = RoundedCornerShape(4.dp)
-    ) {
-        Text(
-            text = "服务器",
-            style = MaterialTheme.typography.labelSmall,
-            color = TextTertiary,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-        )
-    }
-}
-
-@Composable
-private fun VariantBadge(index: Int, count: Int, active: Boolean) {
-    val color = if (active) Accent else TextTertiary
-    Surface(
-        color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(4.dp)
-    ) {
-        Text(
-            text = "${index + 1}/$count",
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-        )
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .companionRowHairline()
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "其他 ${row.hiddenCount} 个版本",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                color = TextSecondary,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.width(2.dp))
+            Icon(
+                imageVector = Icons.Default.ExpandMore,
+                contentDescription = "展开",
+                tint = TextTertiary,
+                modifier = Modifier.size(17.dp)
+            )
+        }
     }
 }
 
@@ -348,8 +336,8 @@ internal fun EmptyConversationTreeState() {
     }
 }
 
-/** 行缩进：主世界线 16dp，每层分支 +18dp */
-private fun rowIndent(depth: Int) = 16.dp + 18.dp * depth
+/** 行缩进：主世界线 10dp，每层分支 +16dp */
+private fun rowIndent(depth: Int) = 10.dp + RailStep * depth
 
 /**
  * 画本行的分支线。
@@ -360,8 +348,7 @@ private fun rowIndent(depth: Int) = 16.dp + 18.dp * depth
  */
 private fun DrawScope.drawBranchRail(depth: Int, isLast: Boolean) {
     if (depth <= 0) return
-    val step = 18.dp.toPx()
-    val x = 8.dp.toPx() + (depth - 1) * step
+    val x = 2.dp.toPx() + (depth - 1) * RailStep.toPx()
     val midY = size.height / 2f
     val startY = if (isLast) midY else 0f
     val stroke = 1.dp.toPx()
@@ -382,4 +369,4 @@ private fun DrawScope.drawBranchRail(depth: Int, isLast: Boolean) {
 }
 
 private fun formatMessageTime(timestamp: Long): String =
-    formatMemoryTimestamp(Instant.ofEpochMilli(timestamp))
+    formatMemoryClock(Instant.ofEpochMilli(timestamp))

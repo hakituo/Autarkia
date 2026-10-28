@@ -124,16 +124,13 @@ class ContentPlanner:
             context, sleep_metrics, now_hour, elapsed_seconds,
         )
 
+        # 可带的话题：排序前几名做成菜单，决策模型 send 时用 topic_id 选一条，
+        # 选中的话题一路传到生成层（direct）或议程（greeting），不再在半路丢掉。
+        from core.services.active_care.agenda.topics import build_topic_menu, format_topic_menu
+
         ranked_items = (priority_focus.get("daily_push_ranked") or []) if isinstance(priority_focus, dict) else []
-        daily_push_priority = context.get("daily_push_priority") or {}
-        daily_push_text = ""
-        if ranked_items:
-            top_item = ranked_items[0] if isinstance(ranked_items[0], dict) else {}
-            daily_push_text = (
-                f"【今日推送优先级】摘要: {daily_push_priority.get('summary') or ''}"
-                f"\n最高优先: {top_item.get('title') or ''} (intent={top_item.get('suggested_intent') or ''}, "
-                f"reason={top_item.get('reason') or ''})"
-            )
+        topic_menu = build_topic_menu(ranked_items)
+        daily_push_text = format_topic_menu(topic_menu)
 
         bundle = build_active_care_decision_prompt(
             chosen_action=chosen_action,
@@ -171,6 +168,7 @@ class ContentPlanner:
                 chosen_action=chosen_action,
             )
             result["specific_instruction"] = specific_instruction
+            result["topic_menu"] = topic_menu
             # intent 强制回填上游已选动作（决策模型不允许改写 intent）
             result["intent"] = str(result.get("intent") or chosen_action or "").strip() or chosen_action
             # 睡眠/低打扰期间的 defer 间隔硬下限（秒）：LLM 可能返回过小的
@@ -218,17 +216,9 @@ class ContentPlanner:
     def _resolve_priority_focus(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """把 daily_push_priority 的 ranked 结果合并进 priority_focus"""
         priority_focus = dict(context.get("priority_focus") or {})
-        # 使用 daily_push_priority 的 ranked 结果替代原始 portrait_priority
         daily_push_priority = context.get("daily_push_priority") or {}
         ranked_items = daily_push_priority.get("ranked") or []
         if ranked_items and isinstance(ranked_items, list):
-            # 从 ranked 中提取真正需要关注的画像项（已过滤已覆盖话题）
-            covered_topics = set((priority_focus.get("covered_topics") or []))
-            filtered_portrait = [
-                p for p in (priority_focus.get("portrait_priority") or [])
-                if p not in covered_topics
-            ]
-            priority_focus["portrait_priority"] = filtered_portrait
             priority_focus["daily_push_ranked"] = ranked_items
         return priority_focus
 
@@ -254,7 +244,6 @@ class ContentPlanner:
                 specific_instruction += f"\n今天和室友聊到的话题：{'、'.join(peer_topics[:3])}。从中选一个有趣的分享给主人。"
         else:
             specific_instruction = get_action_prompt(chosen_action)
-        portrait_priority = priority_focus.get("portrait_priority") or []
         task_probe = priority_focus.get("task_probe") or {}
         focus_stage = str(priority_focus.get("stage") or "")
         quiet_mode_active = bool(context.get("quiet_mode_active", False))
@@ -270,7 +259,7 @@ class ContentPlanner:
             now_hour = -1
 
         return _build_specific_instruction(
-            specific_instruction, portrait_priority, task_probe, focus_stage,
+            specific_instruction, task_probe, focus_stage,
             quiet_mode_active, reduced_mode_active, reduced_mode_reason,
             active_care_mode, elapsed_seconds, now_hour, context,
         )

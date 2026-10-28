@@ -47,7 +47,7 @@ async def test_picks_highest_priority_and_stops(fake_agenda_ladder):
     assert name == "tomorrow_tone"
     assert text == "【今日总基调】x"
     # P1/P2 没命中要继续探测，命中后立即停 → 只应探测到 tomorrow_tone 为止
-    assert calls == ["plan_reminder", "daily_study_task", "tomorrow_tone"]
+    assert calls == ["plan_reminder", "active_care_agenda", "daily_study_task", "tomorrow_tone"]
 
 
 @pytest.mark.asyncio

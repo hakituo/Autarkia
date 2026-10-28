@@ -93,6 +93,15 @@ data class MemoryListResponse(
     
     @SerialName("data")
     val data: List<MemoryDto>,
+
+    @SerialName("total")
+    val total: Int? = null,
+
+    @SerialName("offset")
+    val offset: Int? = null,
+
+    @SerialName("has_more")
+    val hasMore: Boolean? = null,
     
     @SerialName("timestamp")
     val timestamp: Double? = null

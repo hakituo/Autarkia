@@ -91,7 +91,6 @@ internal fun ChatBottomArea(
             hasPendingAttachment = uiState.lastUploadedImageUrl != null ||
                 uiState.pendingAttachments.isNotEmpty() || uiState.pendingVideoUrl != null,
             showMorePanel = showMorePanel,
-            voicePartialText = uiState.voicePartialText,
             voiceAmplitude = uiState.voiceAmplitude,
             onVoiceCancel = onVoiceCancel,
             onVoiceFinish = onVoiceFinish

@@ -368,14 +368,6 @@ class StudyFocusViewModel @Inject constructor(
         }
     }
 
-    fun startBackendSync(userId: String = "default") {
-        syncFromBackend(userId)
-    }
-
-    fun clearBackendSession() {
-        _backendSession.value = null
-    }
-
     override fun onCleared() {
         super.onCleared()
         timerManager.clear()

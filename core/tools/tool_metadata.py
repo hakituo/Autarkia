@@ -114,7 +114,9 @@ _DOMAIN_GROUPS: Dict[str, Dict[str, Tuple[str, ...]]] = {
     },
     "memory_search": {
         "tags": ("记忆", "聊天历史", "人物档案", "回忆", "memory", "search"),
-        "tools": ("search_memory", "search_chat_history", "query_person_profile"),
+        "tools": (
+            "search_memory", "expand_memory", "search_chat_history", "query_person_profile",
+        ),
     },
     "memory_write": {
         "tags": ("记住", "偏好", "经验", "任务", "摘要", "memory", "record"),
@@ -142,7 +144,7 @@ _DOMAIN_GROUPS: Dict[str, Dict[str, Tuple[str, ...]]] = {
         "tools": (
             "adjust_active_care_frequency", "pause_active_care",
             "schedule_active_care_message", "toggle_active_care",
-            "get_active_care_status",
+            "get_active_care_status", "close_agenda",
         ),
     },
     "device_observe": {
@@ -262,6 +264,7 @@ _TOOL_TAG_OVERRIDES: Dict[str, Tuple[str, ...]] = {
     "query_health_data": ("心率", "步数", "手表健康", "睡眠数据", "饮食记录", "营养摄入", "吃了什么"),
     "record_nutrition_from_image": ("食物照片", "食物图片", "营养记录", "记录饮食"),
     "search_memory": ("回忆", "记得我", "以前的记忆"),
+    "expand_memory": ("展开梗概", "原话", "当时怎么说的"),
     "search_chat_history": ("聊天记录", "以前聊过", "之前说过", "对话历史"),
     "query_person_profile": ("人物档案", "他是谁", "她是谁"),
     "record_preference": ("记住偏好", "记住我以后", "我喜欢", "我不喜欢"),

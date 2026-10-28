@@ -97,12 +97,26 @@ def test_disabled_makes_zero_calls(env):
     assert report == {"segment_extraction": "disabled"} and fake.calls == []
 
 
-def test_not_whitelisted_and_no_extractor(env):
+def test_not_whitelisted_and_no_extractor(env, monkeypatch):
     fake = FakeExtractor()
+    # 可选的自定义名单（不与旧蒸馏白名单共用）
+    assert _run(env, fake, segment_role_whitelist=["ye"])["segment_extraction"] == "not_whitelisted"
+    # 默认不限名单：正式角色照跑，旧蒸馏白名单不影响按段提取。
+    # 只验闸门、不真跑：真跑会用掉下面最后一个断言要用的同一批段（笔记库 / 账本按段记账），
+    # 让 ``fake`` 那轮看到 pending=0。
+    other = FakeExtractor()
     assert (
-        _run(env, fake, distillation_role_whitelist=["ye"])["segment_extraction"]
-        == "not_whitelisted"
+        _run(env, other, segments=[], distillation_role_whitelist=["ye"])["segment_extraction"]
+        == "ok"
     )
+    # 人设库认不出的 legacy scope 跳过。
+    # 用 monkeypatch.context() 局部生效：直接调用 monkeypatch.undo() 会把 env fixture 打的
+    # 补丁（含 notes_dir 改道）一起撤掉，后面的断言就会读写真实笔记库。
+    from memory.nightly import perspective
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(perspective, "perspective_for_scope", lambda _scope: {})
+        assert _run(env, other)["segment_extraction"] == "legacy_scope"
     assert fake.calls == []
     manager, store = env
     report = asyncio.run(

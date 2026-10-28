@@ -1,6 +1,5 @@
 package com.aveline.ai.mobile.presentation.companion.memory
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,49 +10,57 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aveline.ai.mobile.domain.models.Memory
-import com.aveline.ai.mobile.presentation.theme.Line
-import com.aveline.ai.mobile.presentation.theme.Accent
+import com.aveline.ai.mobile.presentation.companion.companionRowHairline
+import com.aveline.ai.mobile.presentation.theme.TextBody
 import com.aveline.ai.mobile.presentation.theme.TextPrimary
 import com.aveline.ai.mobile.presentation.theme.TextSecondary
 import com.aveline.ai.mobile.presentation.theme.TextTertiary
+
+/** 话题行里色点所在列宽 */
+private val TopicDotColumn = 14.dp
+
+/** 条目左侧引导线的 x 位置 */
+private val LeafRailX = 21.dp
+
+/** 引导线与条目正文的缩进 */
+private val LeafIndent = 34.dp
 
 /**
  * 把「时间桶 → 话题 → 记忆条目」三层树展开成 LazyColumn 的扁平 item。
  *
  * 树节点之间不依靠 LazyColumn 的间距，避免间距把引导线切断；
  * 行与行的呼吸感全部放在各自的 padding 里。
+ *
+ * 版式按设计稿收紧了一层：时间桶只是两行小字之间的一条气口，话题是一行
+ * （色点 + 名称 + 重要数 + 条数 + 箭头），条目直接挂在一条细线下——
+ * 不再给每层套卡片和数量徽章。
  */
 internal fun LazyListScope.memoryTreeItems(
     groups: List<MemoryBucketNode>,
@@ -62,14 +69,13 @@ internal fun LazyListScope.memoryTreeItems(
     onToggleBucket: (MemoryTimeBucket) -> Unit,
     onToggleTopic: (String, String) -> Unit,
     onMemoryClick: (Memory) -> Unit,
-    onToggleImportant: (Memory) -> Unit,
     onDelete: (Memory) -> Unit
 ) {
     groups.forEach { bucket ->
         val bucketExpanded = isBucketExpanded(bucket.bucket)
 
         item(key = "bucket-${bucket.bucket.name}") {
-            BucketHeaderRow(
+            BucketCaptionRow(
                 bucket = bucket,
                 expanded = bucketExpanded,
                 onToggle = { onToggleBucket(bucket.bucket) }
@@ -78,14 +84,12 @@ internal fun LazyListScope.memoryTreeItems(
 
         if (!bucketExpanded) return@forEach
 
-        bucket.topics.forEachIndexed { topicIndex, topic ->
+        bucket.topics.forEach { topic ->
             val topicExpanded = isTopicExpanded(bucket.bucket.name, topic.key)
-            val lastTopic = topicIndex == bucket.topics.lastIndex
 
             item(key = "topic-${bucket.bucket.name}-${topic.key}") {
-                TopicHeaderRow(
+                TopicRow(
                     topic = topic,
-                    isLast = lastTopic,
                     expanded = topicExpanded,
                     onToggle = { onToggleTopic(bucket.bucket.name, topic.key) }
                 )
@@ -95,13 +99,11 @@ internal fun LazyListScope.memoryTreeItems(
                 itemsIndexed(
                     items = topic.memories,
                     key = { _, memory -> "leaf-${memory.id}" }
-                ) { index, memory ->
+                ) { _, memory ->
                     MemoryLeafRow(
                         memory = memory,
-                        isLast = index == topic.memories.lastIndex,
                         onClick = { onMemoryClick(memory) },
-                        onToggleImportant = { onToggleImportant(memory) },
-                        onDelete = { onDelete(memory) }
+                        onLongClick = { onDelete(memory) }
                     )
                 }
             }
@@ -109,96 +111,39 @@ internal fun LazyListScope.memoryTreeItems(
     }
 }
 
-/**
- * 树工具栏：条目总数 + 展开/收起动作。
- *
- * 动作文案由调用方决定：默认是「全部展开 / 全部收起」，
- * 存在搜索或话题筛选时改为「重置筛选」，避免收起动作在强制展开下失效。
- */
+/** 时间桶：左边是「今天 / 昨天」，右边是条数，中间不画任何东西 */
 @Composable
-internal fun MemoryTreeToolbar(
-    total: Int,
-    actionLabel: String,
-    onAction: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "记忆树",
-            style = MaterialTheme.typography.titleSmall,
-            color = TextPrimary,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(modifier = Modifier.size(6.dp))
-        Text(
-            text = "$total 条",
-            style = MaterialTheme.typography.labelSmall,
-            color = TextTertiary
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        TextButton(onClick = onAction) {
-            Text(
-                text = actionLabel,
-                style = MaterialTheme.typography.labelMedium,
-                color = TextSecondary
-            )
-        }
-    }
-}
-
-@Composable
-private fun BucketHeaderRow(
+private fun BucketCaptionRow(
     bucket: MemoryBucketNode,
     expanded: Boolean,
     onToggle: () -> Unit
 ) {
-    Column {
-        HorizontalDivider(color = Line, thickness = 1.dp)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onToggle)
-                .padding(horizontal = 4.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .height(18.dp)
-                    .background(Accent, RoundedCornerShape(2.dp))
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = bucket.bucket.label,
-                style = MaterialTheme.typography.titleSmall,
-                color = TextPrimary,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            CountBadge(count = bucket.count)
-            Spacer(modifier = Modifier.weight(1f))
-            if (bucket.importantCount > 0) {
-                Text(
-                    text = "${bucket.importantCount} 条重要",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MemoryImportantColor
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-            }
-            ExpandIcon(expanded = expanded)
-        }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(start = 4.dp, end = 4.dp, top = 14.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = bucket.bucket.label,
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+            color = TextTertiary
+        )
+        Text(
+            text = if (expanded) "${bucket.count} 条" else "${bucket.count} 条 · 已收起",
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+            color = TextTertiary.copy(alpha = 0.7f),
+            maxLines = 1
+        )
     }
 }
 
+/** 话题行：色点 + 名称 + 重要数 + 条数 + 展开箭头 */
 @Composable
-private fun TopicHeaderRow(
+private fun TopicRow(
     topic: MemoryTopicNode,
-    isLast: Boolean,
     expanded: Boolean,
     onToggle: () -> Unit
 ) {
@@ -206,169 +151,135 @@ private fun TopicHeaderRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .drawBehind { drawTreeRail(x = 14.dp.toPx(), isLast = isLast, branchLength = 10.dp.toPx()) }
+            .heightIn(min = 46.dp)
+            .companionRowHairline()
             .clickable(onClick = onToggle)
-            .padding(start = 34.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier
-                .size(8.dp)
-                .background(topicColor, CircleShape)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
+            modifier = Modifier.width(TopicDotColumn),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(topicColor)
+            )
+        }
         Text(
             text = topic.label,
-            style = MaterialTheme.typography.labelLarge,
-            color = TextSecondary,
-            fontWeight = FontWeight.Medium
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
+            color = TextPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
         )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = "${topic.count}",
-            style = MaterialTheme.typography.labelSmall,
-            color = TextTertiary
-        )
-        Spacer(modifier = Modifier.weight(1f))
         if (topic.importantCount > 0) {
-            Icon(
-                imageVector = Icons.Default.Star,
-                contentDescription = null,
-                tint = MemoryImportantColor,
-                modifier = Modifier.size(12.dp)
-            )
-            Spacer(modifier = Modifier.width(2.dp))
             Text(
-                text = "${topic.importantCount}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MemoryImportantColor
+                text = "重要 ${topic.importantCount}",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
+                color = MemoryImportantColor,
+                maxLines = 1
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(8.dp))
         }
-        ExpandIcon(expanded = expanded, size = 18)
+        Text(
+            text = "${topic.count} 条",
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
+            color = TextTertiary,
+            maxLines = 1
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Icon(
+            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            contentDescription = if (expanded) "收起" else "展开",
+            tint = TextTertiary,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }
 
+/**
+ * 条目：正文 + 一行元信息，整体挂在左侧一条细线下。
+ *
+ * 点击看详情；长按删除（外层会弹确认对话框）。星标只在详情面板里出现：
+ * 每一行都放一颗星，等于让「重要」这个标记在列表里反复抢注意力。
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MemoryLeafRow(
     memory: Memory,
-    isLast: Boolean,
     onClick: () -> Unit,
-    onToggleImportant: () -> Unit,
-    onDelete: () -> Unit
+    onLongClick: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .drawBehind { drawTreeRail(x = 32.dp.toPx(), isLast = isLast, branchLength = 10.dp.toPx()) }
-            .padding(start = 52.dp, end = 4.dp, top = 3.dp, bottom = 3.dp)
+            .leafRail()
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(start = LeafIndent, end = 4.dp, top = 8.dp, bottom = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .combinedClickable(onClick = onClick, onLongClick = onDelete),
-            shape = RoundedCornerShape(12.dp),
-            color = if (memory.isImportant) MemoryImportantColor.copy(alpha = 0.08f) else Color.Transparent,
-            border = BorderStroke(
-                width = 1.dp,
-                color = if (memory.isImportant) MemoryImportantColor.copy(alpha = 0.28f) else Line
-            )
+        Text(
+            text = memory.displayContent,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 22.sp),
+            color = TextBody,
+            maxLines = 4,
+            overflow = TextOverflow.Ellipsis
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(modifier = Modifier.padding(start = 12.dp, top = 10.dp, end = 6.dp, bottom = 8.dp)) {
+            Text(
+                text = formatMemoryClock(memory.createdAt),
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.5.sp
+                ),
+                color = TextTertiary,
+                maxLines = 1
+            )
+            Text(
+                text = "想起 ${memory.accessCount} 次",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                color = TextTertiary,
+                maxLines = 1
+            )
+            if (memory.isSummaryOnly) {
                 Text(
-                    text = memory.displayContent,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextPrimary,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
+                    text = "摘要",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                    color = TextTertiary,
+                    maxLines = 1
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (memory.isSummaryOnly) {
-                        Surface(
-                            color = MemoryImportantColor.copy(alpha = 0.12f),
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                text = "摘要",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MemoryImportantColor.copy(alpha = 0.9f),
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                    }
-                    Text(
-                        text = memory.formattedCreatedAt,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextTertiary
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    IconButton(
-                        onClick = onToggleImportant,
-                        modifier = Modifier.size(26.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (memory.isImportant) Icons.Default.Star else Icons.Default.StarBorder,
-                            contentDescription = if (memory.isImportant) "取消重要" else "标记重要",
-                            tint = if (memory.isImportant) MemoryImportantColor else TextTertiary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
+            }
+            if (memory.isImportant) {
+                Text(
+                    text = "重要",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                    color = MemoryImportantColor,
+                    maxLines = 1
+                )
             }
         }
     }
 }
 
-@Composable
-internal fun CountBadge(count: Int, color: Color = TextSecondary) {
-    Surface(
-        color = Color(0x1AFFFFFF),
-        shape = RoundedCornerShape(6.dp)
-    ) {
-        Text(
-            text = "$count",
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
-        )
-    }
-}
-
-@Composable
-private fun ExpandIcon(expanded: Boolean, size: Int = 20) {
-    Icon(
-        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-        contentDescription = if (expanded) "收起" else "展开",
-        tint = TextTertiary,
-        modifier = Modifier.size(size.dp)
-    )
-}
-
-/** 画一段「├─ / └─」引导线，竖线在Ye行之间自然接续 */
-private fun DrawScope.drawTreeRail(x: Float, isLast: Boolean, branchLength: Float) {
-    val stroke = 1.dp.toPx()
-    val midY = size.height / 2f
-    val endY = if (isLast) midY else size.height
+/** 条目左侧那条竖线：14% 白，从行顶画到行底，相邻条目自然接续 */
+private fun Modifier.leafRail(): Modifier = drawBehind {
+    val x = LeafRailX.toPx()
     drawLine(
-        color = MemoryTreeLineColor,
+        color = Color.White.copy(alpha = 0.14f),
         start = Offset(x, 0f),
-        end = Offset(x, endY),
-        strokeWidth = stroke,
-        cap = StrokeCap.Round
-    )
-    drawLine(
-        color = MemoryTreeLineColor,
-        start = Offset(x, midY),
-        end = Offset(x + branchLength, midY),
-        strokeWidth = stroke,
-        cap = StrokeCap.Round
+        end = Offset(x, size.height),
+        strokeWidth = 1.dp.toPx()
     )
 }
 
-/** 树为空时的占位（放在 SectionCard 内） */
+/** 树为空时的占位 */
 @Composable
 internal fun EmptyMemoryState(
     hasFilters: Boolean,

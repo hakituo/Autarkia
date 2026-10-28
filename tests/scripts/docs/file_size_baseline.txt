@@ -1,4 +1,4 @@
-# 单文件超限存量清单（418 项）—— 技术债看板，只减不增
+# 单文件超限存量清单（417 项）—— 技术债看板，只减不增
 # 由 `check_file_sizes.py --update-baseline` 生成；新增超限文件请直接拆分，不要往这里加
 # 分档口径见 `.trae/rules/RULES.md` §2；tests/ 的 Python 见 audit_tests.py 的 large_file_baseline.txt
 clients/frontend/aveline-web/src/components/StudyPanel.tsx  # 1565 行 > 350
@@ -107,7 +107,6 @@ core/services/journal/summary_service.py  # 603 行 > 300
 core/utils/data/scope_registry.py  # 602 行 > 300
 core/services/active_care/checker/checker_event_handler.py  # 602 行 > 300
 clients/frontend/aveline-android/android/app/src/main/java/com/aveline/ai/mobile/data/remote/api/WebSocketManager.kt  # 602 行 > 400
-clients/frontend/aveline-android/android/app/src/main/java/com/aveline/ai/mobile/presentation/companion/CompanionStatusTab.kt  # 601 行 > 400
 core/image/prompt_processor.py  # 598 行 > 300
 clients/frontend/aveline-android/android/code-review-reports/06_components.md  # 598 行 > 500
 core/agents/chat_agent_components/persona_system/prompt/dialogue_examples.py  # 597 行 > 300

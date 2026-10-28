@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
  *
  * 关于「完成」为什么不等最终结果：
  * ASR 停止后还要跑一段收尾解码（native），等它返回会让用户对着空输入框干等。
- * 这里在点「完成」的瞬间就把**已经实时上屏**的中间文本落进输入框，
+ * 这里在点「完成」的瞬间就把**已经识别出的**中间文本落进输入框，
  * 最终结果回来后再原地替换这一小段（[committedVoiceText]），
  * 既不用等，也不会覆盖用户在这期间自己补的字。
  *
@@ -134,7 +134,7 @@ class ChatVoiceInputController(
     fun hasPermission(): Boolean = voiceInputManager.hasRecordAudioPermission()
 
     /**
-     * 把已实时上屏的文本接在输入框末尾。
+     * 把已识别出的文本接在输入框末尾。
      *
      * 中文之间不补空格；只有两边都是西文字符时才补一个，避免 "hello" + "world" 粘成 "helloworld"。
      */

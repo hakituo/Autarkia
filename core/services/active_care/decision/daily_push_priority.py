@@ -109,7 +109,7 @@ def build_daily_push_priority_candidates(
                     "reason": "review_due",
                     "suggested_intent": "planned_topic",
                     "base_score": _score,
-                    "_study_detail": _topics_text,
+                    "detail": _topics_text,
                 }
             )
 
@@ -191,29 +191,6 @@ def build_daily_push_priority_candidates(
     except Exception:
         pass
 
-    for item in (focus.get("portrait_priority") or [])[:3]:
-        p = str(item or "").strip()
-        if not p:
-            continue
-        cn_map = {
-            "wakeup": "起床",
-            "sleep": "睡眠",
-            "meal": "饮食",
-            "activity": "活动",
-            "study": "学习",
-            "mood": "心情",
-            "health": "健康",
-        }
-        _push(
-            {
-                "id": f"portrait:{p}",
-                "title": f"补齐画像：{cn_map.get(p, p)}",
-                "reason": "portrait_missing",
-                "suggested_intent": "user_health_reminder",
-                "base_score": 70,
-            }
-        )
-
     for need in (urgent_needs or [])[:2]:
         need_text = str(need or "").strip()
         if not need_text:
@@ -229,16 +206,7 @@ def build_daily_push_priority_candidates(
             }
         )
 
-    if not candidates:
-        _push(
-            {
-                "id": "general:companion",
-                "title": "轻量陪伴",
-                "reason": "fallback",
-                "suggested_intent": "share_thought",
-                "base_score": 60,
-            }
-        )
+    # 没有任何候选时不再塞「轻量陪伴」兜底：没有要聊的事就不该硬发（2026-10-28）。
 
     # 双角色互聊话题：今天和室友聊了有趣的事，可以分享给主人
     recent_peer_chat_topics = focus.get("recent_peer_chat_topics") or []
@@ -279,9 +247,10 @@ def build_daily_push_priority_fallback(
                 "reason": str(item.get("reason") or "fallback"),
                 "suggested_intent": str(item.get("suggested_intent") or "share_thought"),
                 "score": int(max(0, min(100, float(item.get("base_score") or 0.0)))),
+                "detail": str(item.get("detail") or ""),
             }
         )
-    summary = "基于任务紧迫度、画像缺口和突发状态的启发式排序"
+    summary = "基于任务紧迫度、今日计划和突发状态的启发式排序"
     return {
         "analysis_ts": float(now),
         "latest_user_signal_ts": float(latest_user_signal_ts),
@@ -326,10 +295,29 @@ async def analyze_daily_push_priority(
 
     analysis_interval_seconds = 3600
     if latest_user_signal_ts <= 0 or (now - latest_user_signal_ts) > analysis_interval_seconds:
+        # 用户超过 1 小时没回：只跳过 LLM 排序，候选照样按规则排。
+        # 原来直接返回空，沉默时（最需要主动消息的时候）计划候选全部消失。
+        silent_candidates = build_daily_push_priority_candidates(
+            workspace_snapshot=workspace_snapshot,
+            priority_focus=priority_focus,
+            urgent_needs=urgent_needs,
+        )
+        if not silent_candidates:
+            return {
+                "enabled": False,
+                "skip_reason": "no_recent_user_reply_within_1h",
+                "analysis": {},
+            }
+        silent_analysis = build_daily_push_priority_fallback(
+            candidates=silent_candidates,
+            now=now,
+            latest_user_signal_ts=latest_user_signal_ts,
+        )
+        silent_analysis["source"] = "rule_silent"
         return {
-            "enabled": False,
-            "skip_reason": "no_recent_user_reply_within_1h",
-            "analysis": {},
+            "enabled": True,
+            "skip_reason": "no_recent_user_reply_rule_rank",
+            "analysis": silent_analysis,
         }
 
     # 使用统一 safe_timestamp 工具函数
@@ -400,7 +388,6 @@ async def analyze_daily_push_priority(
         "latest_user_signal_age_seconds": int(max(0.0, now - latest_user_signal_ts)),
         "priority_focus": priority_focus,
         "urgent_needs": urgent_needs,
-        "portrait_completeness": (workspace_snapshot.get("portrait_completeness") or {}),
         "daily_tasks_focus": ((workspace_snapshot.get("daily_tasks") or {}).get("focus") or {}),
         "candidates": candidates,
         "recent_chat": recent_chat_summary,
@@ -498,6 +485,7 @@ async def analyze_daily_push_priority(
                 "user_health_reminder",
                 "bio_complaint",
                 "share_peer_chat",
+                "planned_topic",
             }:
                 suggested_intent = str(base.get("suggested_intent") or "share_thought")
             try:
@@ -512,6 +500,7 @@ async def analyze_daily_push_priority(
                     "reason": str(item.get("reason") or base.get("reason") or "").strip(),
                     "suggested_intent": suggested_intent,
                     "score": max(0, min(100, score)),
+                    "detail": str(base.get("detail") or ""),
                 }
             )
 

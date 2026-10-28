@@ -42,8 +42,19 @@ class RoleModelController(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    /**
+     * 角色级思考模式开关。
+     *
+     * null = 这个角色没表态过，界面上按「开」显示（与后端默认一致），
+     * 但发请求时**不带**该字段，继续沿用后端配置。
+     */
+    private val _thinking = MutableStateFlow<Boolean?>(null)
+    val thinking: StateFlow<Boolean?> = _thinking.asStateFlow()
+
     fun loadForRole(role: String) {
         if (role.isBlank()) return
+        // 思考开关与模型列表无关：模型列表拉失败也要先把这个角色的值读出来
+        _thinking.value = preferences.getThinking(role)
         scope.launch {
             _isLoading.value = true
             _error.value = null
@@ -110,6 +121,29 @@ class RoleModelController(
         _selectedModel.value = model
         _error.value = null
         Log.d(TAG, "保存角色模型: role=$role model=${model.id} route=$route")
+    }
+
+    /** 保存当前角色的思考模式开关（与模型选择一样按角色隔离）。 */
+    fun setThinkingForCurrentRole(enabled: Boolean) {
+        val role = getCurrentRole()?.takeIf { it.isNotBlank() } ?: run {
+            _error.value = "当前聊天没有角色信息，无法保存思考模式"
+            return
+        }
+        preferences.setThinking(role, enabled)
+        _thinking.value = enabled
+        _error.value = null
+        Log.d(TAG, "保存角色思考模式: role=$role enabled=$enabled")
+    }
+
+    /**
+     * 返回当前角色本次生成应显式携带的思考开关。
+     *
+     * 直接读持久化而不只是读 [_thinking]，避免「进了页面但模型列表还没加载完」时丢设置。
+     * 返回 null 表示该角色没表态过，请求里不带这个字段，沿用后端配置。
+     */
+    fun requestThinking(): Boolean? {
+        val role = getCurrentRole()?.takeIf { it.isNotBlank() } ?: return null
+        return preferences.getThinking(role)
     }
 
     /**

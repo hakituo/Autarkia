@@ -127,9 +127,8 @@ internal fun NavGraphBuilder.studyScreen() {
                     when (tab) {
                         StudyTabV2.VOCAB -> {
                             viewModel.loadLearnWords()
-                            viewModel.loadManualStudyToday()
                             viewModel.loadVocabBooks()
-                            // 拉取复习总览(连续天数+记忆曲线)、今日已背与词书进度
+                            // 拉取复习总览(连续天数/已掌握)、今日已背与词书进度
                             viewModel.loadReviewOverview()
                             viewModel.loadMistakes()
                             viewModel.loadVocabInsights()
@@ -212,7 +211,6 @@ internal fun NavGraphBuilder.studyScreen() {
                 onFocusLongBreakMinutesChange = focusViewModel::setLongBreakMinutes,
                 onFocusNameChange = focusViewModel::setFocusName,
                 onToggleWordOrder = viewModel::toggleWordOrder,
-                onAddManualStudy = viewModel::addManualStudy,
                 onOpenBooks = viewModel::loadVocabBooks,
                 onLoadBookWords = { viewModel.loadBookWords() },
                 onSwitchBook = viewModel::switchVocabBook,

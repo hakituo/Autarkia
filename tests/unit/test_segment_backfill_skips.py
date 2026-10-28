@@ -30,7 +30,6 @@ def _patch_plan(monkeypatch, tmp_path, items):
     monkeypatch.setattr(
         backfill, "NoteStore", lambda scope: SimpleNamespace(list_notes=lambda cid: [])
     )
-    monkeypatch.setattr(backfill.policy, "excluded", lambda scope, events: False)
     monkeypatch.setattr(
         backfill.policy, "provider_for", lambda scope, started: "deepseek"
     )

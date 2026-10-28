@@ -27,6 +27,8 @@ from core.services.active_care.shared.tuning import (
 )
 from core.services.active_care.decision.decision_context import DecisionFlowContext
 from core.services.active_care.core.trigger_result import TriggerOutcome
+from core.services.active_care.agenda.send_plan import build_send_plan, open_agenda_for_plan
+from core.services.active_care.agenda.topics import topic_text
 
 logger = get_module_logger("ACTIVE_CARE_CHECKER", "active_care_schedule.log")
 msg_logger = get_module_logger("ACTIVE_CARE_MSG", "active_care_messages.log")
@@ -186,6 +188,11 @@ class CheckerActionFlow:
             except Exception as e:
                 logger.warning(f"Active Care: persist daily push priority files failed: {e}")
 
+        ctx.priority_focus["has_planned_topic"] = any(
+            isinstance(item, dict) and item.get("suggested_intent") == "planned_topic"
+            for item in ((ctx.priority_analysis or {}).get("ranked") or [])
+        ) if isinstance(ctx.priority_analysis, dict) else False
+
         if ctx.is_early_morning and not ctx.urgent_needs and ctx.quiet_mode_active:
             ctx.priority_focus["must_probe"] = False
             if is_debug_enabled("active_care"):
@@ -335,6 +342,41 @@ class CheckerActionFlow:
 
         await self.execute_send_or_skip(ctx, decision, chosen_action, profile_filename=ctx.profile_filename)
 
+    def _agenda_scope(self, profile_filename: str) -> str:
+        """议程按角色存：人设文件名解析不出 scope 时退回当前运行 scope。"""
+        from core.utils.data.scope_registry import resolve_persona_slug_scope
+
+        scope = resolve_persona_slug_scope(profile_filename) if profile_filename else ""
+        return scope or str(self._checker.storage.get_runtime_scope() or "aveline")
+
+    async def _build_send_plan(
+        self, decision: Dict, intent: str, specific_instruction: str, profile_filename: str
+    ):
+        from core.services.active_care.agenda import recent_openers
+
+        openers = []
+        try:
+            openers = await recent_openers(self._agenda_scope(profile_filename))
+        except Exception as e:  # noqa: BLE001 - 去重提示拿不到不影响发送
+            logger.warning("Active Care: 读取最近开场白失败: %s", e)
+        return build_send_plan(
+            decision,
+            intent=intent,
+            specific_instruction=specific_instruction,
+            recent_opener_texts=openers,
+        )
+
+    async def _open_agenda(self, send_plan, intent: str, trigger_result, profile_filename: str) -> None:
+        try:
+            await open_agenda_for_plan(
+                self._agenda_scope(profile_filename),
+                send_plan,
+                intent=intent,
+                opener_text=getattr(trigger_result, "content", "") or "",
+            )
+        except Exception as e:  # noqa: BLE001 - 开场白已发出，议程写失败只记日志
+            logger.warning("Active Care: 写入开场议程失败: %s", e)
+
     async def execute_send_or_skip(self, ctx: DecisionFlowContext, decision: Dict, chosen_action: str, profile_filename: str = ""):
         """根据决策结果执行发送或跳过
 
@@ -422,7 +464,21 @@ class CheckerActionFlow:
                 return
 
             intent = decision.get("intent", chosen_action)
-            user_input_mock = f"[{intent.upper()}_TRIGGER]"
+            # 发送方式（2026-10-28）：greeting 只发轻问候、话题送达后进议程；
+            # direct 把选中的话题交给生成层。逻辑在 agenda/send_plan.py。
+            send_plan = await self._build_send_plan(decision, intent, specific_instruction, profile_filename)
+            if send_plan.skip_reason:
+                checker.last_skip_reason = send_plan.skip_reason
+                await checker.set_next_decision_ts(
+                    now + float(ctx.default_next_check),
+                    source=send_plan.skip_reason,
+                    profile_filename=profile_filename,
+                )
+                msg_logger.info(
+                    "Active Care: Skip send (%s) intent=%s", send_plan.skip_reason, intent
+                )
+                return
+            user_input_mock = send_plan.user_input_mock
 
             # 提醒分工检查：如果当前 intent 是提醒类，检查跨 persona 分工共享池
             reminder_id = ""
@@ -505,13 +561,13 @@ class CheckerActionFlow:
                 # 不能与普通发送失败共用同一等待时长。
                 trigger_result = await asyncio.shield(
                     checker.executor.trigger_message_with_result(
-                        sys_prompt_type=intent,
+                        sys_prompt_type=send_plan.sys_prompt_type,
                         user_input_mock=user_input_mock,
                         thought=None,
                         client_type=ctx.client_type,
-                        specific_instruction=specific_instruction,
+                        specific_instruction=send_plan.specific_instruction,
                         profile_filename=profile_filename,
-                        planned_topic="",
+                        planned_topic="" if send_plan.is_opener else topic_text(send_plan.topic),
                         reply_text=None,
                         self_activity=False,
                     )
@@ -532,6 +588,8 @@ class CheckerActionFlow:
 
             if delivered:
                 checker.last_intent = intent
+                if send_plan.is_opener:
+                    await self._open_agenda(send_plan, intent, trigger_result, profile_filename)
                 # 强制应用 non_response 惩罚到 next_check，防止 LLM 返回过小的 next_check_seconds 绕过惩罚
                 penalized_next_check = max(
                     next_check_seconds,

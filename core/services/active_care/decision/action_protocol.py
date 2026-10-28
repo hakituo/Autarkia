@@ -28,6 +28,11 @@ ACTION_DEFER = DEFER_TOOL
 # 终止型工具：命中即结束决策循环，不需要真正的工具执行
 TERMINAL_TOOL_NAMES = frozenset({SEND_TOOL, DEFER_TOOL})
 
+# send 的发送方式：greeting 轻问候开场（话题进议程），direct 直接说
+STYLE_GREETING = "greeting"
+STYLE_DIRECT = "direct"
+SEND_STYLES = frozenset({STYLE_GREETING, STYLE_DIRECT})
+
 # retry_after_seconds 合法区间
 MIN_RETRY_AFTER_SECONDS = 60
 MAX_RETRY_AFTER_SECONDS = 4 * 3600
@@ -45,6 +50,8 @@ class ActiveCareDecisionAction:
         reason_code: send 的理由/状态码；defer 时的简短原因。
         retry_after_seconds: defer 时下次重判间隔（秒），>= 60。
         source: 来源标记（tool_call / json / fallback），便于排查。
+        style: send 时的发送方式（greeting / direct），缺省 direct。
+        topic_id: send 时从【可带的话题】里选中的话题编号，可为空。
     """
 
     action: str = ACTION_DEFER
@@ -52,6 +59,8 @@ class ActiveCareDecisionAction:
     reason_code: str = ""
     retry_after_seconds: int = DEFAULT_RETRY_AFTER_SECONDS
     source: str = ""
+    style: str = STYLE_DIRECT
+    topic_id: str = ""
 
     @property
     def should_send(self) -> bool:
@@ -67,8 +76,19 @@ def clamp_retry_after_seconds(value: Any) -> int:
     return max(MIN_RETRY_AFTER_SECONDS, min(MAX_RETRY_AFTER_SECONDS, seconds))
 
 
+def normalize_style(value: Any) -> str:
+    """发送方式归一化：不认识的一律按 direct（保持旧行为）。"""
+    style = str(value or "").strip().lower()
+    return style if style in SEND_STYLES else STYLE_DIRECT
+
+
 def build_send_action(
-    reason_code: str = "", *, intent: str = "", source: str = ""
+    reason_code: str = "",
+    *,
+    intent: str = "",
+    source: str = "",
+    style: Any = None,
+    topic_id: Any = None,
 ) -> ActiveCareDecisionAction:
     """构造 send 出口（不再携带 text；最终文本由生成层产出）。"""
     return ActiveCareDecisionAction(
@@ -77,6 +97,8 @@ def build_send_action(
         reason_code=str(reason_code or "").strip()[:80],
         retry_after_seconds=0,
         source=source,
+        style=normalize_style(style),
+        topic_id=str(topic_id or "").strip()[:80],
     )
 
 
@@ -127,6 +149,8 @@ def parse_terminal_tool_call(
             reason_code=str(args.get("reason_code") or "").strip(),
             intent=intent,
             source="tool_call",
+            style=args.get("style"),
+            topic_id=args.get("topic_id"),
         )
 
     return build_defer_action(
@@ -154,6 +178,8 @@ def decision_action_to_dict(action: ActiveCareDecisionAction) -> Dict[str, Any]:
         "should_send": action.should_send,
         "next_check_seconds": max(30, next_check_seconds),
         "source": action.source,
+        "style": action.style if action.action == ACTION_SEND else "",
+        "topic_id": action.topic_id if action.action == ACTION_SEND else "",
     }
 
 
@@ -163,6 +189,10 @@ __all__ = [
     "ACTION_SEND",
     "ACTION_DEFER",
     "TERMINAL_TOOL_NAMES",
+    "STYLE_GREETING",
+    "STYLE_DIRECT",
+    "SEND_STYLES",
+    "normalize_style",
     "MIN_RETRY_AFTER_SECONDS",
     "MAX_RETRY_AFTER_SECONDS",
     "DEFAULT_RETRY_AFTER_SECONDS",

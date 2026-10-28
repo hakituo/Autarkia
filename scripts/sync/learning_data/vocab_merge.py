@@ -199,11 +199,16 @@ def _iter_lines(raw: bytes) -> Iterable[Optional[str]]:
 
 
 def _parse_word_line(line: str) -> Optional[Tuple[str, int]]:
-    """解析 ``单词`` / ``单词 次数`` / 注释；与 UnfamiliarWordBook 口径一致。"""
+    """解析 ``单词`` / ``单词 次数`` / 注释；与 UnfamiliarWordBook 口径一致。
+
+    末尾不是数字时整行都是单词：词条允许短语（``mark_unknown("multi word")``
+    会写成 ``multi word 1``），次数归零后是 ``multi word``；只取首段会把短语
+    截成一个不存在的单词，还会让合并结果覆盖掉对端的原记录。
+    """
     stripped = line.strip()
     if not stripped or stripped.startswith("#"):
         return None
     parts = stripped.rsplit(None, 1)
     if len(parts) == 2 and parts[1].isdigit():
         return parts[0], int(parts[1])
-    return parts[0], 0
+    return stripped, 0

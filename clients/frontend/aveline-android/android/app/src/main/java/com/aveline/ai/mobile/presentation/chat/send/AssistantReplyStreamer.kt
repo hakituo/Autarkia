@@ -37,6 +37,8 @@ internal class AssistantReplyStreamer(
     private val replyNotifier: ReplyOutcomeNotifier,
     private val mapEmotion: (String) -> Emotion?,
     private val resolveRoleModelRoute: () -> String? = { null },
+    /** 当前角色这一轮要不要开思考模式；null = 跟随后端配置。 */
+    private val resolveRoleThinking: () -> Boolean? = { null },
     /** 媒体本地仓库：SSE 推送的图片/表情包收到即落盘。可空 + 默认值：单测不传。 */
     private val localMediaStore: LocalMediaStore? = null
 ) {
@@ -71,10 +73,12 @@ internal class AssistantReplyStreamer(
         assistantVariantOfId: String? = null
     ) {
         val requestModel = resolveRoleModelRoute()?.takeIf { it.isNotBlank() } ?: model
+        // 思考开关同样在这一刻冻结：生成中途切角色/改开关不该影响已经在飞的这一轮
         run(
             userMessage = userMessage,
             prefixHistory = prefixHistory,
             requestModel = requestModel,
+            thinking = resolveRoleThinking(),
             profileFilename = profileFilename,
             assistantVariantIndex = assistantVariantIndex,
             aiMessageId = SendRuntime.generateMessageId(),
@@ -88,6 +92,7 @@ internal class AssistantReplyStreamer(
         userMessage: Message,
         prefixHistory: List<Message>,
         requestModel: String,
+        thinking: Boolean?,
         profileFilename: String?,
         assistantVariantIndex: Int,
         aiMessageId: String,
@@ -163,7 +168,8 @@ internal class AssistantReplyStreamer(
                     assistantMessage = aiPlaceholder,
                     userVariantOfId = userVariantOfId,
                     assistantVariantOfId = assistantVariantOfId
-                )
+                ),
+                thinking = thinking
             ).collect { event ->
                 when (event) {
                     is StreamEvent.Chunk -> {

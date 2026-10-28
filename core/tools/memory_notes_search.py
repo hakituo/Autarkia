@@ -63,7 +63,10 @@ def search_note_entries(
             "timestamp": hit.get("occurred_from") or 0,
             "occurred_to": hit.get("occurred_to"),
             "source": SOURCE_NOTES,
-            "category": "episode",
+            # episode 梗概 / fact / preference / plan（提取器 v8 起的短事实）
+            "category": hit.get("kind") or "episode",
+            "importance": hit.get("importance"),
+            "status": hit.get("status"),
             "note_id": hit["note_id"],
             "source_event_ids": hit.get("source_event_ids") or [],
         }
@@ -71,24 +74,49 @@ def search_note_entries(
     ]
 
 
+#: 派生笔记在工具结果里的标签（模型读的是中文）
+NOTE_LABELS = {"episode": "梗概", "fact": "事实", "preference": "偏好", "plan": "计划"}
+#: plan 状态后缀：做完 / 取消的计划不能看着像还没做
+STATUS_LABELS = {"done": "·已完成", "cancelled": "·已取消", "expired": "·已过期"}
+
+
+def note_label(entry: dict[str, Any]) -> str:
+    """``- [梗概] [10-26 14:00–14:20] …`` 里的「[梗概] [时间段]」部分（跨天时结束带日期）。"""
+    from core.utils.time_utils import format_timestamp
+
+    label = NOTE_LABELS.get(str(entry.get("category") or ""), "梗概")
+    label += STATUS_LABELS.get(str(entry.get("status") or ""), "")
+    start, end = entry.get("timestamp"), entry.get("occurred_to")
+    if not start:
+        return f"[{label}]"
+    text = format_timestamp(float(start), "%m-%d %H:%M")
+    if end and float(end) - float(start) >= 60:
+        same_day = format_timestamp(float(end), "%m-%d") == format_timestamp(float(start), "%m-%d")
+        text += "–" + format_timestamp(float(end), "%H:%M" if same_day else "%m-%d %H:%M")
+    return f"[{label}] [{text}]"
+
+
 def merge_with_notes(
     notes: list[dict[str, Any]], others: list[dict[str, Any]], limit: int
 ) -> list[dict[str, Any]]:
-    """梗概在前（C8：梗概是更好的主检索单元），但给旧记忆 / 原文至少留 2 个位置。
+    """梗概在前（C8：梗概是更好的主检索单元），给旧记忆 / 原文留 1 个位置。
 
-    原文与梗概不同池排序：原文补在后面，用于需要原话的场景。
+    原文与梗概不同池排序：原文补在后面，用于需要原话的场景。原先留 2 个位置时，
+    默认 5 条里梗概只剩 3 条、主动关怀（3 条）只剩 1 条；四分之一实测证据@3→@5 多 2 题。
     """
     if not notes:
         return others[:limit]
-    quota = max(1, limit - 2) if others else limit
+    quota = max(1, limit - 1) if others else limit
     picked = notes[:quota]
     return picked + others[: max(limit - len(picked), 0)]
 
 
 __all__ = [
+    "NOTE_LABELS",
     "SOURCE_NOTES",
     "is_sensitive_note",
     "merge_with_notes",
+    "note_label",
     "notes_retrieval_enabled",
     "search_note_entries",
 ]

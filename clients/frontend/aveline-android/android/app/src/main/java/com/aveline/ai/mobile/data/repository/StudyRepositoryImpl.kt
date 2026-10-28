@@ -262,37 +262,9 @@ class StudyRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getMemoryCurve(): Result<JsonObject> {
-        return try {
-            Result.success(apiService.getMemoryCurve())
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
     override suspend fun getMistakes(): Result<JsonObject> {
         return try {
             Result.success(apiService.getMistakes())
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun addManualStudy(count: Int, date: String?): Result<JsonObject> {
-        return try {
-            val payload = buildJsonObject {
-                put("count", count)
-                date?.let { put("date", it) }
-            }
-            Result.success(apiService.addManualStudy(payload))
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun getManualStudyStats(days: Int, date: String?): Result<JsonObject> {
-        return try {
-            Result.success(apiService.getManualStudyStats(days, date ?: ""))
         } catch (e: Exception) {
             Result.failure(e)
         }

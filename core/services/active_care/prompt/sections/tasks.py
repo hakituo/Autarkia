@@ -6,6 +6,7 @@ from typing import Optional
 
 from core.agents.chat_agent_components.persona_system.prompt.active_care_prompts import (
     TASK_ACTIVITY_RETURN_PROACTIVE_TEMPLATE,
+    TASK_AGENDA_OPENER_TEMPLATE,
     TASK_FOCUS_NUDGE_TEMPLATE,
     TASK_GOOD_MORNING_PROACTIVE_TEMPLATE,
     TASK_GOOD_MORNING_SLEEP_SAFE_TEMPLATE,
@@ -47,6 +48,11 @@ def _build_task_block_dynamic(
 ) -> str:
     if sys_prompt_type == "reminder" and reminder_msg:
         return TASK_REMINDER_TEMPLATE.format(tod=tod, reminder_msg=reminder_msg)
+    if sys_prompt_type == "agenda_opener":
+        # 轻问候开场：specific_instruction 里只放「最近用过的开场白」去重提示
+        return TASK_AGENDA_OPENER_TEMPLATE.format(
+            tod=tod, recent_openers_ctx=str(specific_instruction or "")
+        )
     if sys_prompt_type == "planned_topic":
         thought_context = f"你的思考：{thought}\n" if thought else ""
         topic_text = (

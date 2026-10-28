@@ -55,8 +55,6 @@ object StudyPlanFocusLink {
         }
     }
 
-    fun consumeSelected(): String? = consumeSelectedTarget()?.itemId
-
     fun resolveUniqueTarget(title: String): StudyPlanFocusTarget? {
         // Today/新计划页显式选择的 ID 优先；标题只用于旧调用链兜底。
         consumeSelectedTarget()?.let { return it }
@@ -66,7 +64,4 @@ object StudyPlanFocusLink {
             itemId = itemId,
             planDate = planDateById[itemId]
         )
-    }
-
-    fun resolveUnique(title: String): String? = resolveUniqueTarget(title)?.itemId
-}
+    }}

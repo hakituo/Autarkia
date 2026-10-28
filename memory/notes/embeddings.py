@@ -63,6 +63,22 @@ def _write(path: Path, vectors: dict[str, np.ndarray]) -> None:
     tmp.replace(path)
 
 
+def _seed_from_legacy(
+    scope: str, conversation_id: str, cached: dict[str, np.ndarray], live: dict[str, str]
+) -> int:
+    """v2 过渡期双读旧梗概时，旧梗概的向量直接从旧目录缓存搬过来，不重算。"""
+    legacy = paths.legacy_notes_dir(scope)
+    if legacy is None:
+        return 0
+    wanted = {note_id for note_id in live if note_id not in cached}
+    if not wanted:
+        return 0
+    stem = paths.notes_path(scope, conversation_id).stem
+    found = {k: v for k, v in _read(legacy / "_vectors" / f"{stem}.npz").items() if k in wanted}
+    cached.update(found)
+    return len(found)
+
+
 def load_vectors(
     scope: str,
     conversation_id: str,
@@ -88,6 +104,7 @@ def load_vectors_counted(
     with _lock:
         cached = _read(path)
         live = {str(note["note_id"]): str(note.get("text") or "") for note in notes}
+        seeded = _seed_from_legacy(scope, conversation_id, cached, live)
         missing = [note_id for note_id in live if note_id not in cached][: max(max_new, 0)]
         stale = set(cached) - set(live)
         if missing:
@@ -95,7 +112,7 @@ def load_vectors_counted(
             cached.update(zip(missing, fresh))
         for note_id in stale:
             cached.pop(note_id, None)
-        if (missing or stale) and cached:
+        if (missing or stale or seeded) and cached:
             _write(path, cached)
     vectors = {
         note_id: _normalize(vec[None, :])[0] for note_id, vec in cached.items() if note_id in live

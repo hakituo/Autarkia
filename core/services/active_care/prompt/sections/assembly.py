@@ -181,7 +181,8 @@ def build_active_care_prompt(
         PromptSection(
             "recent_history_text",
             ""
-            if sys_prompt_type == "usage_limit_exceeded" or isolate_previous_style
+            if sys_prompt_type in {"usage_limit_exceeded", "agenda_opener"}
+            or isolate_previous_style
             else recent_history_text,
         ),
         PromptSection("task_block_dynamic", task_block),

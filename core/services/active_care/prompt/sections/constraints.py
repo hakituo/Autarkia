@@ -19,6 +19,7 @@ from core.agents.chat_agent_components.persona_system.prompt.active_care_prompts
 
 NO_INTERROGATION_EXEMPT_TYPES = frozenset(
     {
+        "agenda_opener",
         "goodnight_proactive",
         "sleep_again_proactive",
         "activity_return_proactive",

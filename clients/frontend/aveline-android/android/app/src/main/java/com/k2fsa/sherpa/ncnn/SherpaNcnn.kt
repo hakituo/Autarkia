@@ -61,6 +61,10 @@ class SherpaNcnn(
         } else {
             ptr = newFromFile(config)
         }
+        // native 侧构造失败时会返回 0，而不是抛 Java 异常。
+        // 继续拿着 0 去调 decode/getText 就是空指针解引用 —— 直接 SIGSEGV，
+        // 上层 try/catch 和 CrashHandler 都救不回来。这里改成可捕获的 Java 异常。
+        check(ptr != 0L) { "sherpa-ncnn recognizer 构造失败 (native 返回空指针)" }
     }
 
     protected fun finalize() {

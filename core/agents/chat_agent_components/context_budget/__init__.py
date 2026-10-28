@@ -13,7 +13,11 @@
 
 from .history_fetch import fetch_history_for_scope
 from .budget_apply import apply_cloud_history_budget, apply_local_context_budget
-from .memory_injection import inject_thinking_store, inject_sensitive_memories
+from .memory_injection import (
+    inject_note_memories,
+    inject_sensitive_memories,
+    inject_thinking_store,
+)
 
 __all__ = [
     "fetch_history_for_scope",
@@ -21,4 +25,5 @@ __all__ = [
     "apply_local_context_budget",
     "inject_thinking_store",
     "inject_sensitive_memories",
+    "inject_note_memories",
 ]

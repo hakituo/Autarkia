@@ -91,6 +91,13 @@ async def prepare_active_tools(
     if carried:
         active_tools = list(dict.fromkeys([*active_tools, *carried]))
 
+    # 开场议程：有未结束的议程时挂上 close_agenda，让模型自己判断何时结束
+    from core.tools.close_agenda_tool import close_agenda_tool_names
+
+    agenda_tools = await close_agenda_tool_names(user_id)
+    if agenda_tools:
+        active_tools = list(dict.fromkeys([*active_tools, *agenda_tools]))
+
     if not message:
         return active_tools
 

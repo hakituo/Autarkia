@@ -135,7 +135,6 @@ def test_decision_instruction_user_activity() -> None:
         }
         return _build_specific_instruction(
             base_instruction="",
-            portrait_priority=[],
             task_probe={},
             focus_stage="",
             quiet_mode_active=False,

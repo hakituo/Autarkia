@@ -18,6 +18,7 @@ from core.agents.chat_agent_components.handler_tool_calls import (
     _execute_native_tool_calls,
 )
 from core.agents.chat_agent_components.handler_tools import ToolRuntime
+from core.agents.chat_agent_components.thinking_mode import get_request_thinking
 from core.utils.logger import get_logger
 
 logger = get_logger("ChatAgent")
@@ -101,6 +102,10 @@ async def _run_llm_turns(
         if tools.openai_tools:
             llm_chat_kwargs["tools"] = tools.openai_tools
             llm_chat_kwargs["tool_choice"] = "auto"
+        # 按请求开关思考模式；None 表示客户端没表态，沿用后端配置（不传这个 kwarg）
+        thinking_enabled = get_request_thinking()
+        if thinking_enabled is not None:
+            llm_chat_kwargs["thinking_enabled"] = thinking_enabled
         response_payload = await agent.llm_module.chat(
             messages,
             **llm_chat_kwargs,

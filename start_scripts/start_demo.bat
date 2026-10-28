@@ -169,9 +169,9 @@ if "%START_TTS%"=="1" (
   if exist "%ROOT%\models\GPT-SoVITS-v2pro-20250604-nvidia50" (
     echo - Starting TTS - port %TTS_PORT%
     if "%DRY_RUN%"=="1" (
-      echo   [DRY-RUN] start "Xiaoyou-TTS" /D "..." cmd /k "..."
+      echo   [DRY-RUN] start "Autarkia-TTS" /D "..." cmd /k "..."
     ) else (
-      start "Xiaoyou-TTS" /D "%ROOT%\models\GPT-SoVITS-v2pro-20250604-nvidia50" cmd /k title Xiaoyou-TTS ^& "%PY_EXE%" api_v2.py -a %BACKEND_HOST% -p %TTS_PORT% -c GPT_SoVITS/configs/tts_infer.yaml
+      start "Autarkia-TTS" /D "%ROOT%\models\GPT-SoVITS-v2pro-20250604-nvidia50" cmd /k title Autarkia-TTS ^& "%PY_EXE%" api_v2.py -a %BACKEND_HOST% -p %TTS_PORT% -c GPT_SoVITS/configs/tts_infer.yaml
     )
   ) else (
     echo - Skipping TTS - not found: %ROOT%\models\GPT-SoVITS-v2pro-20250604-nvidia50
@@ -184,9 +184,9 @@ if "%START_FORGE%"=="1" (
   if exist "%ROOT%\models\Image\stable-diffusion-webui-forge-main\webui-user.bat" (
     echo - Starting Forge - port %FORGE_PORT%
     if "%DRY_RUN%"=="1" (
-      echo   [DRY-RUN] start "Xiaoyou-Forge" /D "..." cmd /k "..."
+      echo   [DRY-RUN] start "Autarkia-Forge" /D "..." cmd /k "..."
     ) else (
-      start "Xiaoyou-Forge" /D "%ROOT%\models\Image\stable-diffusion-webui-forge-main" cmd /k title Xiaoyou-Forge ^& set "PYTHONPATH=" ^& set "PYTHONHOME=" ^& set "COMMANDLINE_ARGS=--api --nowebui --skip-prepare-environment --port %FORGE_PORT% --opt-sdp-attention --disable-xformers" ^& call webui-user.bat
+      start "Autarkia-Forge" /D "%ROOT%\models\Image\stable-diffusion-webui-forge-main" cmd /k title Autarkia-Forge ^& set "PYTHONPATH=" ^& set "PYTHONHOME=" ^& set "COMMANDLINE_ARGS=--api --nowebui --skip-prepare-environment --port %FORGE_PORT% --opt-sdp-attention --disable-xformers" ^& call webui-user.bat
     )
   ) else (
     echo - Skipping Forge - not found: %ROOT%\models\Image\stable-diffusion-webui-forge-main\webui-user.bat
@@ -197,9 +197,9 @@ if "%START_FORGE%"=="1" (
 
 echo - Starting main backend (port %BACKEND_PORT%)
 if "%DRY_RUN%"=="1" (
-  echo   [DRY-RUN] start "Xiaoyou-Backend" /D "%ROOT%" cmd /k "..."
+  echo   [DRY-RUN] start "Autarkia-Backend" /D "%ROOT%" cmd /k "..."
 ) else (
-  start "Xiaoyou-Backend" /D "%ROOT%" cmd /k title Xiaoyou-Backend ^& "%PY_EXE%" main.py
+  start "Autarkia-Backend" /D "%ROOT%" cmd /k title Autarkia-Backend ^& "%PY_EXE%" main.py
 )
 
 echo.
@@ -267,7 +267,7 @@ echo.
 echo [Operation Guide]
 echo - Dashboard URL: http://localhost:%BACKEND_PORT%/demo
 echo - Click the "Architecture" tab to show the topology diagram
-echo - The Xiaoyou-Controller console window provides Web demo helpers
+echo - The Autarkia-Controller console window provides Web demo helpers
 echo.
 if "%DRY_RUN%"=="1" (
   exit /b 0

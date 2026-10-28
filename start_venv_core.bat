@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title XiaoYou AI Core (venv_core)
+title Autarkia (venv_core)
 cd /d "%~dp0"
 
 echo ==========================================
-echo    XiaoYou AI Core Launcher (venv_core)
+echo    Autarkia Launcher (venv_core)
 echo ==========================================
 echo.
 
@@ -40,12 +40,12 @@ set HOME_PYTHON=%HOME_PYTHON: =%
 
 if not exist "%HOME_PYTHON%\python.exe" (
     echo [WARN] Home Python not found at %HOME_PYTHON%, using venv launcher
-    echo [INFO] Starting XiaoYou AI Core with %VENV% launcher...
+    echo [INFO] Starting Autarkia with %VENV% launcher...
     echo.
     "%VENV%\Scripts\python.exe" main.py
 ) else (
     set PYTHONPATH=%CD%\%VENV%\Lib\site-packages
-    echo [INFO] Starting XiaoYou AI Core ^(no venv launcher, Ctrl+C safe^):
+    echo [INFO] Starting Autarkia ^(no venv launcher, Ctrl+C safe^):
     echo        Python: %HOME_PYTHON%\python.exe
     echo        Packages: %VENV%\Lib\site-packages
     echo.

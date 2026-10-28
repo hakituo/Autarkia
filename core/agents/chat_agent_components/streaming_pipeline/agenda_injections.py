@@ -42,6 +42,7 @@ from core.services.priority import PriorityLevel, ThrottlePolicy, may_fire
 from .agenda_probes import (
     Commit,
     Probe,
+    _probe_active_care_agenda,
     _probe_daily_study_task,
     _probe_meal_care,
     _probe_plan_reminder,
@@ -98,6 +99,12 @@ class AgendaItem(NamedTuple):
 _LADDER: Tuple[AgendaItem, ...] = (
     AgendaItem(
         "plan_reminder", _probe_plan_reminder,
+        once_per_day=False, chitchat_gated=False, level=PriorityLevel.OVERDUE,
+    ),
+    # 开场议程：轻问候之后一步步带的那件事。不门控、不限每天一次——
+    # 它本来就只在开场之后存在，结束由模型调用 close_agenda 决定。
+    AgendaItem(
+        "active_care_agenda", _probe_active_care_agenda,
         once_per_day=False, chitchat_gated=False, level=PriorityLevel.OVERDUE,
     ),
     AgendaItem(

@@ -68,13 +68,16 @@ def _reset_note_retrieval_cache(monkeypatch, tmp_path_factory):
     """笔记库指到临时目录（search_memory 默认会读梗概，不得读到真实回填的笔记），
     并清掉按 scope 缓存的语料与 BM25，用例之间不得复用别的用例造的笔记。"""
     from memory.notes import paths
+    from memory.notes.injection import reset_injection_cache
     from memory.notes.retrieval import reset_note_retrieval_cache
 
     notes_root = tmp_path_factory.mktemp("notes")
     monkeypatch.setattr(paths, "notes_dir", lambda scope: notes_root / scope)
     reset_note_retrieval_cache()
+    reset_injection_cache()  # 梗概自动注入的语料 / 结果块缓存，同样不得跨用例复用
     yield
     reset_note_retrieval_cache()
+    reset_injection_cache()
 
 
 @pytest.fixture(autouse=True)
@@ -101,4 +104,15 @@ def _daily_submodules_follow_facade_clock(monkeypatch):
                     name,
                     (lambda n=name: lambda *a, **k: getattr(facade, n)(*a, **k))(),
                 )
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _isolate_active_care_agenda(monkeypatch, tmp_path_factory):
+    """开场议程文件指到临时目录：测试会话 ``u1`` 也解析到 aveline，
+    不隔离就会读写真实 ``companion_data/aveline_data/active_care/agenda.json``。"""
+    from core.services.active_care.agenda import paths
+
+    root = tmp_path_factory.mktemp("agenda")
+    monkeypatch.setattr(paths, "agenda_file", lambda scope: root / scope / "agenda.json")
     yield

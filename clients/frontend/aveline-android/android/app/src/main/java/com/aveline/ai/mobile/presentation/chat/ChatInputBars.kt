@@ -56,13 +56,12 @@ import com.aveline.ai.mobile.utils.CoilImageModel
  * "+" 不再直接打开相册，只负责切换聊天更多面板。真正的相册、文件入口在
  * [ChatMorePanel] 中，避免操作按钮误触直接弹系统选择器。
  *
- * 录音时输入栏**原位**切成语音态（[ChatVoiceInputPanel]），不再另挂一条转写横幅：
- * 第一行是实时转写，底部「取消 / 完成」直接接管本轮录音。
+ * 录音时输入栏**原位**切成一条 48dp 录音条（[ChatVoiceInputPanel]），
+ * 不再另挂转写横幅，高度保持不变。
  *
- * @param voicePartialText ASR 流式中间文本（已确认句 + 当前句）
  * @param voiceAmplitude 当前音量（0-1），驱动波形
  * @param onVoiceCancel 丢弃本轮录音
- * @param onVoiceFinish 结束本轮录音，并把已经实时上屏的文本立刻落进输入框
+ * @param onVoiceFinish 结束本轮录音，并把已识别的文本落进输入框
  */
 @Composable
 fun ChatBottomBar(
@@ -75,7 +74,6 @@ fun ChatBottomBar(
     isRecording: Boolean,
     hasPendingAttachment: Boolean = false,
     showMorePanel: Boolean = false,
-    voicePartialText: String = "",
     voiceAmplitude: Float = 0f,
     onVoiceCancel: () -> Unit = {},
     onVoiceFinish: () -> Unit = {},
@@ -84,7 +82,6 @@ fun ChatBottomBar(
     val voicePanel: (@Composable () -> Unit)? = if (isRecording) {
         {
             ChatVoiceInputPanel(
-                partialText = voicePartialText,
                 amplitude = voiceAmplitude,
                 onCancel = onVoiceCancel,
                 onFinish = onVoiceFinish

@@ -3,7 +3,7 @@ chcp 65001 >nul
 setlocal EnableExtensions EnableDelayedExpansion
 
 echo =======================================================
-echo          Xiaoyou QQ Bot Integration
+echo          Autarkia QQ Bot Integration
 echo =======================================================
 echo.
 
@@ -110,7 +110,7 @@ if not exist "%ADAPTER_SCRIPT%" (
     exit /b 1
 )
 
-start "Xiaoyou QQ Adapter" cmd /k "cd /d "%BASE_DIR%" && "%PYTHON_EXE%" "%ADAPTER_SCRIPT%""
+start "Autarkia QQ Adapter" cmd /k "cd /d "%BASE_DIR%" && "%PYTHON_EXE%" "%ADAPTER_SCRIPT%""
 
 echo.
 echo =======================================================

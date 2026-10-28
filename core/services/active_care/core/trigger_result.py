@@ -22,6 +22,8 @@ class TriggerMessageResult:
     outcome: TriggerOutcome
     detail: str = ""
     retry_after_minutes: int = 0
+    #: 送达时实际发出的文本（开场议程要记下开场白用于去重）
+    content: str = ""
 
     @property
     def is_interval_blocked(self) -> bool:

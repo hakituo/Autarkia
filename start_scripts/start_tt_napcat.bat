@@ -3,7 +3,7 @@ chcp 65001 >nul
 setlocal EnableExtensions EnableDelayedExpansion
 
 echo =======================================================
-echo       Xiaoyou TT + Yeye NapCat (3003 / 3004)
+echo       Autarkia TT + Yeye NapCat (3003 / 3004)
 echo =======================================================
 echo.
 

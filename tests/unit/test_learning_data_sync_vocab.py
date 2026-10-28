@@ -166,6 +166,14 @@ def test_word_list_union_rejects_invalid_utf8():
     assert union_word_list(b"raid 1\n", b"\xff\xfe") is None
 
 
+def test_word_list_union_preserves_phrases_without_count():
+    """短语次数归零后是纯单词行，不能被截断成首词（会改坏对端原记录）。"""
+    merged = union_word_list(b"multi word\n", b"raid 1\n")
+
+    assert merged is not None
+    assert merged.decode("utf-8").splitlines() == ["multi word", "raid 1"]
+
+
 def test_union_bytes_dispatches_vocab_strategies():
     progress = _json_bytes({"alpha": {"reps": 1}})
     word_list = b"raid 1\n"

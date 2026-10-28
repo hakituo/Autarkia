@@ -6,11 +6,10 @@ decision_instruction_builder 中的重复定义。
 包含：
 - _PORTRAIT_KEYWORD_MAP：画像话题关键词映射（完整版，合并了两处定义）
 - _USER_COVERED_KEYWORDS：用户已覆盖话题关键词映射（从 decision_instruction_builder 迁移）
-- check_portrait_keyword_coverage：关键词兜底检测函数（从 PriorityAnalyzer 拆出）
 - detect_user_already_covered：检测用户最近消息中已明确表示过的话题（从 decision_instruction_builder 迁移）
 """
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
 
 
 # ============================================================
@@ -67,50 +66,6 @@ PORTRAIT_KEYWORD_MAP: Dict[str, List[str]] = _PORTRAIT_KEYWORD_MAP
 # ============================================================
 
 _USER_COVERED_KEYWORDS: Dict[str, List[str]] = _PORTRAIT_KEYWORD_MAP
-
-
-def check_portrait_keyword_coverage(
-    recent_history: List[Dict[str, Any]],
-    candidate_topics: List[str],
-    exclude: Optional[List[str]] = None,
-) -> List[str]:
-    """关键词兜底检测：检查用户最近消息中是否包含画像话题关键词
-
-    当 BERT 语义检测可能漏检时，用关键词直接匹配作为第二道防线。
-    只检查 role=user 的消息，避免助手消息中的关键词误判。
-
-    Args:
-        recent_history: 最近聊天记录
-        candidate_topics: 候选画像话题列表
-        exclude: 已由 BERT 检测到的话题，跳过
-
-    Returns:
-        已覆盖的话题列表
-    """
-    exclude_set = set(exclude or [])
-    topics_to_check = [t for t in candidate_topics if t not in exclude_set]
-    if not topics_to_check or not recent_history:
-        return []
-
-    # 只取用户消息，拼接为小写文本
-    user_texts = []
-    for msg in recent_history:
-        if str(msg.get("role", "")).lower() == "user":
-            content = str(msg.get("content", "")).strip().lower()
-            if content:
-                user_texts.append(content)
-
-    if not user_texts:
-        return []
-
-    combined_text = " ".join(user_texts)
-    covered = []
-    for topic in topics_to_check:
-        keywords = _PORTRAIT_KEYWORD_MAP.get(topic, [])
-        if any(kw in combined_text for kw in keywords):
-            covered.append(topic)
-
-    return covered
 
 
 def _detect_backend_meals_covered() -> Set[str]:

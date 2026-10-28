@@ -1,9 +1,11 @@
 package com.aveline.ai.mobile.domain.repository
 
+import com.aveline.ai.mobile.domain.models.MEMORY_PAGE_SIZE
 import com.aveline.ai.mobile.domain.models.Memory
 import com.aveline.ai.mobile.domain.models.MemoryAnchor
 import com.aveline.ai.mobile.domain.models.MemoryFilter
 import com.aveline.ai.mobile.domain.models.MemoryGraph
+import com.aveline.ai.mobile.domain.models.MemoryPage
 import com.aveline.ai.mobile.domain.models.MemoryRelation
 import com.aveline.ai.mobile.domain.models.MemorySortOrder
 import com.aveline.ai.mobile.domain.models.MemoryStats
@@ -20,17 +22,21 @@ import kotlinx.coroutines.flow.Flow
 interface MemoryRepository {
     
     /**
-     * 获取所有记忆
+     * 分页获取记忆
      *
      * @param persona 可选，按 persona 查询记忆：传人格文件名（如 core_aveline.json），
      *                由后端解析成 shared__scope__{scope} 返回该角色的记忆池。
      *                不传则用后端默认 user_id（"default"）。
+     * @param offset 跳过的条数
+     * @param limit 单页条数，默认 [MEMORY_PAGE_SIZE]
      */
     suspend fun getMemories(
         filter: MemoryFilter = MemoryFilter(),
         sortOrder: MemorySortOrder = MemorySortOrder.NEWEST_FIRST,
-        persona: String? = null
-    ): List<Memory>
+        persona: String? = null,
+        offset: Int = 0,
+        limit: Int = MEMORY_PAGE_SIZE
+    ): MemoryPage
     
     /**
      * 搜索记忆

@@ -30,7 +30,12 @@ interface ChatRepository {
         model: String,
         profileFilename: String? = null,
         historyOverride: List<Message>? = null,
-        branchContext: ChatBranchContext? = null
+        branchContext: ChatBranchContext? = null,
+        /**
+         * 思考模式：null = 本角色没表态过，请求里不带该字段、沿用后端配置；
+         * true / false = 用户在本角色的「模型」页显式开关过。
+         */
+        thinking: Boolean? = null
     ): Flow<StreamEvent>
 
     /** 当前世界线（只含被选中的分支），聊天页使用。 */

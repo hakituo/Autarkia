@@ -159,7 +159,10 @@ def test_partial_topology_is_carried():
     assert _build(events)[0].segment.topology_status == "partial"
 
 
-def test_params_from_config_and_defaults():
+def test_params_from_config_and_defaults(monkeypatch):
+    from memory.notes import paths as notes_paths
+
+    monkeypatch.setattr(notes_paths, "active_segmenter", lambda: "v1")  # 不随 app.yaml 的开关变
     assert SegmentParams.from_config({}) == SegmentParams(1800.0, 8, 4000)
     assert SegmentParams.from_config({"segment_max_turns": 3}).max_turns == 3
 
@@ -208,3 +211,76 @@ def test_list_scope_conversations_skips_other_roles(tmp_path, monkeypatch):
 
     assert "shared__scope__ling" not in stems
     assert {"web_role_aveline", "u1"} <= set(stems)
+
+
+def test_skip_patterns_are_case_insensitive_and_support_glob():
+    from memory.nightly.segment_jobs.skip import is_skipped_conversation
+
+    assert is_skipped_conversation("U1", ["u1"])
+    assert is_skipped_conversation("tg_123456", ["tg_*"])
+    assert not is_skipped_conversation("web_role_aveline", ["u1", "default"])
+    assert not is_skipped_conversation("", ["u1"])
+    assert not is_skipped_conversation("u1", [])
+
+
+def test_list_scope_conversations_honours_skip(tmp_path, monkeypatch):
+    from core.utils.data import data_paths
+
+    root = tmp_path / "chat_history" / "2026" / "10" / "26"
+    root.mkdir(parents=True)
+    for stem in ("web_role_aveline", "u1", "tg_123456", "default_user"):
+        (root / f"{stem}.jsonl").write_text("", encoding="utf-8")
+    monkeypatch.setattr(
+        data_paths, "get_role_chat_history_dir", lambda _s: tmp_path / "chat_history"
+    )
+    monkeypatch.setattr(
+        "core.services.chat_history_store.ChatHistoryStore._synced_index",
+        staticmethod(lambda _r: None),
+    )
+
+    stems = seg_inputs.list_scope_conversations("aveline", skip=["u1", "tg_*", "default_user"])
+
+    assert stems == ["web_role_aveline"]
+
+
+def test_collect_segment_inputs_skips_probe_conversations(tmp_path, monkeypatch):
+    store = ChatHistoryStore(tmp_path)
+    written = [
+        store.append_event(
+            conversation_id=CONV,
+            role=event["role"],
+            content=event["content"],
+            message_id=event["message_id"],
+            now_dt=datetime.fromtimestamp(event["timestamp"], tz=timezone.utc),
+        )
+        for event in _long_chat(turns=2)
+    ]
+    last_ts = max(float(event["timestamp"]) for event in written)
+    monkeypatch.setattr(
+        seg_inputs, "list_scope_conversations", lambda _scope, **_kwargs: [CONV, "u1"]
+    )
+
+    class _GuardStore:
+        """探针会话被真正读取就算失败：过滤必须发生在读事件之前。"""
+
+        def list_conversation_events(self, cid, limit=0):
+            assert cid != "u1"
+            return store.list_conversation_events(cid, limit=limit)
+
+    items = collect_segment_inputs("aveline", store=_GuardStore(), now=last_ts + 3600)
+
+    assert items and {item.conversation_id for item in items} == {CONV}
+
+
+def test_default_skip_list_covers_probe_cids():
+    from memory.nightly.config import DEFAULT_NIGHTLY_CONFIG
+    from memory.nightly.segment_jobs.skip import is_skipped_conversation
+
+    patterns = DEFAULT_NIGHTLY_CONFIG["segment_skip_conversations"]
+
+    assert is_skipped_conversation("u1", patterns)
+    assert is_skipped_conversation("tg_123456", patterns)
+    assert not is_skipped_conversation("web_role_aveline", patterns)
+    # 本地默认会话可能是主人的真实聊天，默认名单不许挡
+    assert not is_skipped_conversation("default", patterns)
+    assert not is_skipped_conversation("default_user", patterns)

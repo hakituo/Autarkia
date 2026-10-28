@@ -18,9 +18,11 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from core.tools.base import BaseTool
+from core.tools.expand_memory_tool import note_ref_suffix
 from core.tools.memory_notes_search import (
     SOURCE_NOTES,
     merge_with_notes,
+    note_label,
     search_note_entries,
 )
 from core.tools.recall_intent import (
@@ -222,6 +224,10 @@ class SearchMemoryTool(BaseTool):
             content = mem.get("summary") or mem.get("content", "")
             if not content or len(content) < 3:
                 continue
+            if mem.get("source") == SOURCE_NOTES:
+                ref = note_ref_suffix(mem.get("note_id"))  # 供 expand_memory 展开原话
+                formatted.append(f"- {note_label(mem)} {content}{ref}")
+                continue
             ts = mem.get("timestamp")
             time_label = ""
             if ts:
@@ -234,8 +240,6 @@ class SearchMemoryTool(BaseTool):
             source_label = ""
             if source == "chat_history":
                 source_label = "[聊天] "
-            elif source == SOURCE_NOTES:
-                source_label = "[梗概] "
             elif source and not mem.get("summary"):
                 # 已蒸馏记忆是角色第一人称的自述，再挂 [user]/[assistant] 会读成旁观者口径
                 source_label = f"[{source}] "

@@ -55,6 +55,10 @@ fun VocabSummaryScreen(
     reviewResults: List<ReviewResultItem>,
     isNewWordsMode: Boolean,
     hasMore: Boolean,
+    /** 后台还在同步评分、预取下一组：继续按钮先转圈，结果回来再决定能否继续。 */
+    preparing: Boolean = false,
+    /** 已点继续、正在领取下一组。 */
+    launching: Boolean = false,
     onContinue: () -> Unit,
     onExit: () -> Unit
 ) {
@@ -63,7 +67,8 @@ fun VocabSummaryScreen(
     val unknown = total - known
     val accuracy = if (total > 0) known * 100 / total else 0
     val longestStreak = longestKnownStreak(reviewResults)
-    val canContinue = isNewWordsMode || hasMore
+    // 准备中先按「可继续」占位，避免按钮从无到有把底部撑跳
+    val canContinue = preparing || isNewWordsMode || hasMore
 
     Box(
         modifier = Modifier
@@ -164,7 +169,8 @@ fun VocabSummaryScreen(
                         text = if (isNewWordsMode) "继续下一组" else "继续复习下一组",
                         onClick = onContinue,
                         modifier = Modifier.fillMaxWidth(),
-                        variant = AvelineButtonVariant.Primary
+                        variant = AvelineButtonVariant.Primary,
+                        loading = preparing || launching
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     AvelineButton(

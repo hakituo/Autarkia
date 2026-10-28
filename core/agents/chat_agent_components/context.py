@@ -25,6 +25,9 @@ from core.agents.chat_agent_components.context_budget import (
 from core.agents.chat_agent_components.context_budget import (
     inject_thinking_store as _inject_thinking_store,
 )
+from core.agents.chat_agent_components.context_budget import (
+    inject_note_memories as _inject_note_memories,
+)
 from core.agents.chat_agent_components.context_persona import (
     detect_cloud_mode as _detect_cloud_mode,
 )
@@ -871,6 +874,15 @@ async def build_conversation_history(
         sensitive_injections.extend(
             [msg["content"] for msg in sensitive_msgs if msg.get("content")]
         )
+
+    # 梗概库自动注入（默认关；关时不改动 sensitive_injections，云端只给 SFW 梗概）
+    await _inject_note_memories(
+        user_id=user_id,
+        message_text=message_text,
+        is_cloud=is_cloud,
+        is_sensitive_mode=is_sensitive_mode,
+        injections=sensitive_injections,
+    )
 
     t_now = time.perf_counter()
     timings["sensitive_inject"] = t_now - t_last_checkpoint

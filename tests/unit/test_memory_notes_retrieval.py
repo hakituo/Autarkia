@@ -96,11 +96,17 @@ def test_vector_sidecar_is_reused_capped_and_pruned(store):
     assert set(third) == {notes[0]["note_id"]}
 
 
-def test_merge_keeps_two_slots_for_old_results():
+def test_merge_keeps_one_slot_for_old_results():
     notes = [{"content": f"n{i}"} for i in range(5)]
     others = [{"content": f"o{i}"} for i in range(5)]
     merged = memory_notes_search.merge_with_notes(notes, others, 5)
-    assert [m["content"] for m in merged] == ["n0", "n1", "n2", "o0", "o1"]
+    assert [m["content"] for m in merged] == ["n0", "n1", "n2", "n3", "o0"]
+    # 主动关怀等小 limit 也至少给梗概 limit-1 个位置
+    assert [m["content"] for m in memory_notes_search.merge_with_notes(notes, others, 3)] == [
+        "n0",
+        "n1",
+        "o0",
+    ]
     assert memory_notes_search.merge_with_notes([], others, 3) == others[:3]
     assert memory_notes_search.merge_with_notes(notes, [], 3) == notes[:3]
 

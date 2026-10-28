@@ -17,7 +17,7 @@ import com.aveline.ai.mobile.presentation.navigation.Routes
 import com.aveline.ai.mobile.presentation.navigation.fadeEnter
 import com.aveline.ai.mobile.presentation.navigation.fadeExit
 
-/** 日常生活（健康 / 饮水 / 日程 / 餐食）。 */
+/** 日常生活（健康 / 饮水 / 餐食）。 */
 internal fun NavGraphBuilder.lifeScreen() {
     composable(
         route = Routes.LIFE,
@@ -48,8 +48,7 @@ internal fun NavGraphBuilder.lifeScreen() {
                     }
                 },
                 // LifeTab 与 DailyTab 不兼容,LifeScreen 自管 pagerState,这里无需通知
-                onTabChange = { _ -> },
-                onUpdateSchedule = viewModel::updateSchedule
+                onTabChange = { _ -> }
             )
         }
     }

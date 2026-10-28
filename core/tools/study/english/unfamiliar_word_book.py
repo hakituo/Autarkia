@@ -85,11 +85,13 @@ class UnfamiliarWordBook:
         stripped = raw.strip()
         if not stripped or stripped.startswith("#"):
             return None
-        # 从右边切一次，兼容词中含空格的极端情况（实际英文单词无空格）
+        # 从右边切一次，兼容词条含空格的短语（mark_unknown("multi word") 会写成
+        # "multi word 1"）；末尾不是数字时整行都是单词，只取首段会截断短语，
+        # 次数归零写回时把原词改坏。
         parts = stripped.rsplit(None, 1)
         if len(parts) == 2 and parts[1].isdigit():
             return parts[0], int(parts[1])
-        return parts[0], 0
+        return stripped, 0
 
     def _load_entries(self) -> List[_WordEntry]:
         """加载所有条目（去重，保留首次出现位置）"""

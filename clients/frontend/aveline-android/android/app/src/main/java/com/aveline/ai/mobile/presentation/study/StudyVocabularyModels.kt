@@ -52,12 +52,6 @@ data class DailyWord(
     val dueTime: Long?
 )
 
-data class StudyWord(
-    val word: String,
-    val translation: String,
-    val status: String,
-)
-
 data class SessionStats(
     val active: Boolean,
     val duration: Int,

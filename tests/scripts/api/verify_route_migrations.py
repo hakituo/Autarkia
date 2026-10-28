@@ -50,8 +50,14 @@ def verify_backend(errors: list[str]) -> None:
     )
     _assert_contains(
         memories_router,
-        "manager.get_weighted_memories,\n            min_weight=min_weight,",
+        "manager.get_weighted_memories_page,\n            min_weight=min_weight,",
         "memories 路由",
+        errors,
+    )
+    _assert_contains(
+        memories_router,
+        "offset: int = Query(0, ge=0",
+        "memories 路由分页",
         errors,
     )
 

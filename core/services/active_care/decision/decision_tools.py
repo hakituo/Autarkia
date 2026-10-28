@@ -65,6 +65,18 @@ DECISION_TERMINAL_TOOLS = [
                         "type": "string",
                         "description": "简短内部原因代码，如 planned_reminder_due / recent_open_topic，只进日志",
                     },
+                    "style": {
+                        "type": "string",
+                        "enum": ["greeting", "direct"],
+                        "description": (
+                            "greeting：只发一句轻问候开头，要聊的事留到他回话后慢慢带；"
+                            "direct：直接把事说出来（到点硬提醒、正在聊可直接接着说）"
+                        ),
+                    },
+                    "topic_id": {
+                        "type": "string",
+                        "description": "从【可带的话题】里选中的 topic_id；greeting 时必填",
+                    },
                 },
             },
         },
@@ -116,8 +128,8 @@ DECISION_CONTEXT_TOOLS = [
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "返回结果数量，默认3",
-                        "default": 3,
+                        "description": "返回结果数量，默认5",
+                        "default": 5,
                     },
                 },
                 "required": ["query"],

@@ -365,6 +365,15 @@ async def handle_message(
         if not length_preference and "length" in message:
             length_preference = str(message["length"])
 
+        # 思考模式：安卓「模型」页的开关按角色存在本地，发消息时随请求体带上
+        # thinking / enable_thinking（true / false）。没带或为 null 表示客户端没表态，
+        # 沿用后端 settings.model.llm.thinking_enabled，不影响老客户端。
+        from core.agents.chat_agent_components.thinking_mode import normalize_thinking
+
+        thinking_flag = normalize_thinking(
+            message.get("thinking", message.get("enable_thinking"))
+        )
+
         if not stream and "stream" in message:
             stream = bool(message["stream"])
 
@@ -479,8 +488,14 @@ async def handle_message(
                     set_chat_history_branch_scope,
                     set_request_branch_metadata,
                 )
+                from core.agents.chat_agent_components.thinking_mode import (
+                    reset_request_thinking,
+                    set_request_thinking,
+                )
 
                 branch_token = set_request_branch_metadata(raw_branch_metadata)
+                # 本轮思考开关：随 ContextVar 传进 streaming / handler 的 llm_kwargs
+                thinking_token = set_request_thinking(thinking_flag)
                 # 回滚/重生成分支下的聊天记录检索边界（仅在带 history_override 时生效）。
                 history_branch_token = (
                     set_chat_history_branch_scope(
@@ -542,6 +557,7 @@ async def handle_message(
                     yield f"data: {json.dumps(err_resp, ensure_ascii=False)}\n\n"
                 finally:
                     reset_request_branch_metadata(branch_token)
+                    reset_request_thinking(thinking_token)
                     if history_branch_token is not None:
                         reset_chat_history_branch_scope(history_branch_token)
 
@@ -575,8 +591,13 @@ async def handle_message(
                 reset_request_branch_metadata,
                 set_request_branch_metadata,
             )
+            from core.agents.chat_agent_components.thinking_mode import (
+                reset_request_thinking,
+                set_request_thinking,
+            )
 
             branch_token = set_request_branch_metadata(raw_branch_metadata)
+            thinking_token = set_request_thinking(thinking_flag)
             try:
                 # create_task 会复制当前 Context；任务内再创建的 history-save task 继续继承。
                 task = asyncio.create_task(
@@ -601,6 +622,7 @@ async def handle_message(
                 )
             finally:
                 reset_request_branch_metadata(branch_token)
+                reset_request_thinking(thinking_token)
 
             timeout_seconds = 300
             try:

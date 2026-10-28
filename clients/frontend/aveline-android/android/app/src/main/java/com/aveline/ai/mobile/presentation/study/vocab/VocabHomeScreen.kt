@@ -27,21 +27,18 @@ import com.aveline.ai.mobile.presentation.theme.TextTertiary
 /**
  * 词汇主页：只回答「今天要背多少、从哪开始」。
  *
- * 今天总量 → 复习/新词两个入口 → 词书进度 → 统计与记忆曲线 → 设置 → 工具。
+ * 今天总量 → 复习/新词两个入口 → 词书进度 → 三项统计 → 词典 → 错题本。
+ * 出词顺序与每组数量收进标题栏齿轮（[VocabSettingsSheet]），主页只留背词主流程。
  */
 @Composable
 fun VocabHomeScreen(
     uiState: VocabUiState,
     onStartReview: () -> Unit,
     onStartNewWords: () -> Unit,
-    onToggleOrder: () -> Unit,
-    onAddManualStudy: (Int) -> Unit,
     onOpenBooks: () -> Unit,
     onOpenMistakes: () -> Unit,
     onSearch: (String) -> Unit,
-    onClearSearch: () -> Unit,
-    onNewWordsBatchSizeChange: (Int) -> Unit,
-    onReviewBatchSizeChange: (Int) -> Unit
+    onClearSearch: () -> Unit
 ) {
     val overview = uiState.reviewOverview
     val book = uiState.bookProgress
@@ -58,7 +55,6 @@ fun VocabHomeScreen(
     val streakDays = overview?.streakDays ?: 0
 
     var searchQuery by remember { mutableStateOf("") }
-    var showManualRecord by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -103,6 +99,7 @@ fun VocabHomeScreen(
         EntryButtons(
             reviewCount = reviewCount,
             newCount = newCount,
+            launching = uiState.launching,
             onStartReview = onStartReview,
             onStartNewWords = onStartNewWords
         )
@@ -121,24 +118,7 @@ fun VocabHomeScreen(
             todayLearned = todayLearned
         )
 
-        overview?.memoryCurve?.takeIf { it.size >= 2 }?.let { curve ->
-            Spacer(modifier = Modifier.height(22.dp))
-            MemoryCurveSection(points = curve)
-        }
-
         Spacer(modifier = Modifier.height(26.dp))
-        VocabDivider()
-        Spacer(modifier = Modifier.height(6.dp))
-        SettingsSection(
-            isShuffle = isShuffle,
-            newWordsBatchSize = uiState.newWordsBatchSize,
-            reviewBatchSize = uiState.reviewBatchSize,
-            onToggleOrder = onToggleOrder,
-            onNewWordsBatchSizeChange = onNewWordsBatchSizeChange,
-            onReviewBatchSizeChange = onReviewBatchSizeChange
-        )
-
-        Spacer(modifier = Modifier.height(18.dp))
         VocabDivider()
         Spacer(modifier = Modifier.height(18.dp))
         VocabSearchField(
@@ -160,20 +140,5 @@ fun VocabHomeScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
         MistakesRow(uiState = uiState, onClick = onOpenMistakes)
-        VocabDivider()
-        ManualRecordRow(
-            todayCount = uiState.manualStudyToday,
-            onClick = { showManualRecord = true }
-        )
-    }
-
-    if (showManualRecord) {
-        VocabManualRecordDialog(
-            onConfirm = { count ->
-                onAddManualStudy(count)
-                showManualRecord = false
-            },
-            onDismiss = { showManualRecord = false }
-        )
     }
 }

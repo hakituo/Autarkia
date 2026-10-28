@@ -2,38 +2,31 @@ package com.aveline.ai.mobile.presentation.study
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.aveline.ai.mobile.presentation.study.vocab.VocabBookDetailScreen
 import com.aveline.ai.mobile.presentation.study.vocab.VocabBookListScreen
 import com.aveline.ai.mobile.presentation.study.vocab.VocabMistakesScreen
 import com.aveline.ai.mobile.presentation.study.vocab.VocabReviewScreen
 import com.aveline.ai.mobile.presentation.study.vocab.VocabSummaryScreen
-import com.aveline.ai.mobile.presentation.theme.Background
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * 词汇模块宿主组件。
+ * 词汇模块全屏层（复习 / 结算 / 词书列表 / 词书详情 / 错题本）。
  *
- * 接管全屏复习/结算与词汇子页面导航：
- * - 复习会话 [VocabReviewScreen]
- * - 会话结算 [VocabSummaryScreen]
- * - 词书列表 / 详情 [VocabBookListScreen] / [VocabBookDetailScreen]
- * - 错题本 [VocabMistakesScreen]
+ * 只有这一层负责进出场：主页状态 [VocabScreen.HOME] 不画任何东西，
+ * 学习页本体在下面由 [rememberVocabBaseCover] 跟随让位，所以退出时
+ * 页面是完整地被带走，不会先变空白再整体淡出。转场规则见 `VocabTransitions.kt`。
  *
- * 子页面状态 [VocabSubScreen] 由 [StudyScreenV2] 提升持有并透传，
- * 本组件只负责渲染、整页切换动画与返回键逐级回退逻辑。
- *
- * @param onSetSessionSummary 设置会话总结（传空字符串清除）
- * @param onLoadBookWords 进入词书详情时补齐单词列表
+ * 子页面状态 [VocabSubScreen] 由 [StudyScreenV2] 提升持有并透传。
  */
 @Composable
 fun StudyVocabBookHost(
@@ -49,118 +42,105 @@ fun StudyVocabBookHost(
     onSwitchBook: (String) -> Unit,
     onLoadBookWords: () -> Unit = {},
     onStartNewWords: () -> Unit = {},
-    onStartReview: () -> Unit = {}
+    onStartReview: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
-    // 当前应展示的页面（单一来源，供 AnimatedContent 做整页切换动画）
-    val currentScreen = when {
-        uiState.isReviewMode -> VocabScreen.REVIEW
-        uiState.sessionSummary != null -> VocabScreen.SUMMARY
-        vocabSubScreen == VocabSubScreen.BOOK_DETAIL -> VocabScreen.BOOK_DETAIL
-        vocabSubScreen == VocabSubScreen.BOOK_LIST -> VocabScreen.BOOK_LIST
-        vocabSubScreen == VocabSubScreen.MISTAKES -> VocabScreen.MISTAKES
-        else -> VocabScreen.NONE
+    val currentScreen = resolveVocabScreen(uiState, vocabSubScreen)
+
+    // 最近一次切换的方向：页面外壳据此决定遮罩出现在进场还是离场
+    var previousScreen by remember { mutableStateOf(currentScreen) }
+    val move = remember(currentScreen) { vocabMove(previousScreen, currentScreen) }
+    SideEffect { previousScreen = currentScreen }
+
+    // 每页离场时冻结在离开那一刻的数据：否则结算页会在滑走途中被清空，
+    // 复习页会在滑走途中换成下一组的词。
+    val snapshots = remember { HashMap<VocabScreen, VocabUiState>() }
+    snapshots[currentScreen] = uiState
+
+    // 进入背词会话后，子页面栈回到主页：关闭会话直接回词汇主页，不再弹回词书详情
+    LaunchedEffect(uiState.isReviewMode) {
+        if (uiState.isReviewMode && vocabSubScreen != VocabSubScreen.DASHBOARD) {
+            onVocabSubScreenChange(VocabSubScreen.DASHBOARD)
+        }
     }
 
-    // 系统返回键：优先在词汇子页面/复习内逐级返回，不直接退出到聊天主页
-    BackHandler(
-        enabled = currentScreen != VocabScreen.NONE
-    ) {
-        when {
-            uiState.isReviewMode -> onSetIsReviewMode(false)
-            uiState.sessionSummary != null -> {
+    // 系统返回键：在词汇全屏层内逐级返回，不直接退出到聊天主页
+    BackHandler(enabled = currentScreen != VocabScreen.HOME) {
+        when (currentScreen) {
+            VocabScreen.REVIEW -> onSetIsReviewMode(false)
+            VocabScreen.SUMMARY -> {
                 onSetSessionSummary("")
                 onVocabSubScreenChange(VocabSubScreen.DASHBOARD)
             }
-            vocabSubScreen == VocabSubScreen.BOOK_DETAIL -> {
-                onVocabSubScreenChange(VocabSubScreen.BOOK_LIST)
-            }
+            VocabScreen.BOOK_DETAIL -> onVocabSubScreenChange(VocabSubScreen.BOOK_LIST)
             else -> onVocabSubScreenChange(VocabSubScreen.DASHBOARD)
         }
     }
 
     AnimatedContent(
         targetState = currentScreen,
-        transitionSpec = {
-            // 根据导航方向决定滑入滑出方向：前进向右进、向左出；回退相反
-            val forward = targetState.ordinal > initialState.ordinal
-            val (inX, outX) = if (forward) 1 to -1 else -1 to 1
-            (slideInHorizontally(tween(300)) { it * inX } + fadeIn(tween(300)))
-                .togetherWith(
-                    slideOutHorizontally(tween(300)) { it * outX } + fadeOut(tween(300))
-                )
-        },
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Background)
+        transitionSpec = { vocabTransform(vocabMove(initialState, targetState)) },
+        modifier = modifier.fillMaxSize(),
+        label = "vocab_host"
     ) { screen ->
-        when (screen) {
-            VocabScreen.REVIEW -> {
-                VocabReviewScreen(
-                    uiState = uiState,
+        if (screen == VocabScreen.HOME) {
+            // 主页由下层的学习页本体展示；这里留空且不拦截点击
+            Box(modifier = Modifier.fillMaxSize())
+            return@AnimatedContent
+        }
+        val state = if (screen == currentScreen) uiState else snapshots[screen] ?: uiState
+        VocabPage(move = move) {
+            when (screen) {
+                VocabScreen.REVIEW -> VocabReviewScreen(
+                    uiState = state,
                     elapsedSeconds = elapsedSeconds,
                     onSetShowAnswer = onSetShowAnswer,
                     onSubmitReview = onSubmitReview,
                     onSetIsReviewMode = onSetIsReviewMode
                 )
-            }
-            VocabScreen.SUMMARY -> {
-                VocabSummaryScreen(
-                    reviewResults = uiState.reviewResults,
-                    isNewWordsMode = uiState.isNewWordsMode,
-                    // 复习分组：finishSession 已预取下一组，空组时不再诱导点击
-                    hasMore = uiState.isNewWordsMode || uiState.learnWords.isNotEmpty(),
+
+                VocabScreen.SUMMARY -> VocabSummaryScreen(
+                    reviewResults = state.reviewResults,
+                    isNewWordsMode = state.isNewWordsMode,
+                    // 复习分组：结算后台预取下一组，空组时不再诱导点击
+                    hasMore = state.isNewWordsMode || state.learnWords.isNotEmpty(),
+                    preparing = state.isFinishing,
+                    launching = state.launching != null,
+                    // 不先清空结算：请求成功后由管理器在同一次更新里切到复习，
+                    // 全屏层不会出现「退回主页再弹进来」的往返
                     onContinue = {
-                        onSetSessionSummary("")
-                        when {
-                            uiState.isNewWordsMode -> onStartNewWords()
-                            uiState.learnWords.isNotEmpty() -> onStartReview()
-                        }
+                        if (state.isNewWordsMode) onStartNewWords() else onStartReview()
                     },
                     onExit = {
                         onSetSessionSummary("")
                         onVocabSubScreenChange(VocabSubScreen.DASHBOARD)
                     }
                 )
-            }
-            VocabScreen.BOOK_LIST -> {
-                VocabBookListScreen(
-                    uiState = uiState,
+
+                VocabScreen.BOOK_LIST -> VocabBookListScreen(
+                    uiState = state,
                     onBack = { onVocabSubScreenChange(VocabSubScreen.DASHBOARD) },
                     onSelectBook = { filename ->
                         // 当前这本再点一次不重复切书，只打开详情
-                        if (filename != uiState.currentBook) onSwitchBook(filename)
+                        if (filename != state.currentBook) onSwitchBook(filename)
                         onVocabSubScreenChange(VocabSubScreen.BOOK_DETAIL)
                     }
                 )
-            }
-            VocabScreen.BOOK_DETAIL -> {
-                VocabBookDetailScreen(
-                    uiState = uiState,
+
+                VocabScreen.BOOK_DETAIL -> VocabBookDetailScreen(
+                    uiState = state,
                     onBack = { onVocabSubScreenChange(VocabSubScreen.BOOK_LIST) },
-                    onStartNewWords = {
-                        onVocabSubScreenChange(VocabSubScreen.DASHBOARD)
-                        onStartNewWords()
-                    },
+                    onStartNewWords = onStartNewWords,
                     onLoadBookWords = onLoadBookWords
                 )
-            }
-            VocabScreen.MISTAKES -> {
-                VocabMistakesScreen(
-                    uiState = uiState,
+
+                VocabScreen.MISTAKES -> VocabMistakesScreen(
+                    uiState = state,
                     onBack = { onVocabSubScreenChange(VocabSubScreen.DASHBOARD) }
                 )
+
+                VocabScreen.HOME -> Unit
             }
-            VocabScreen.NONE -> { /* 不渲染 */ }
         }
     }
-}
-
-/** 宿主内部页面枚举（顺序决定整页切换的滑入滑出方向） */
-private enum class VocabScreen {
-    NONE,        // 未进入词汇模块
-    BOOK_LIST,   // 词书列表
-    BOOK_DETAIL, // 词书详情
-    MISTAKES,    // 错题本
-    REVIEW,      // 复习模式
-    SUMMARY      // 会话总结
 }

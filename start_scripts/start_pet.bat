@@ -1,7 +1,7 @@
 @echo off
-title Xiaoyou Desktop Pet
+title Autarkia Desktop Pet
 echo ==========================================
-echo Starting Xiaoyou Desktop Pet (Electron)...
+echo Starting Autarkia Desktop Pet (Electron)...
 echo ==========================================
 
 :: Canonical frontend: clients\frontend\aveline-web, dev port 3000.
@@ -24,7 +24,7 @@ if %errorlevel% neq 0 (
     echo [INFO] Starting Frontend Server...
     
     if exist "%PROJECT_ROOT%\start_scripts\start_web.bat" (
-        start "Xiaoyou Web" "%PROJECT_ROOT%\start_scripts\start_web.bat"
+        start "Autarkia Web" "%PROJECT_ROOT%\start_scripts\start_web.bat"
     ) else (
         echo [ERROR] start_web.bat not found at %PROJECT_ROOT%\start_scripts\start_web.bat
         echo Please manually start the frontend server.
