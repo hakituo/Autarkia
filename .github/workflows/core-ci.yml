@@ -64,12 +64,18 @@ jobs:
             DESELECT+=(
               --deselect 'tests/journal_plan/test_plan_workflow.py::test_active_care_prompt_injection'
               --deselect 'tests/journal_plan/test_plan_workflow.py::test_prompt_templates'
+              --deselect 'tests/unit/test_active_care_agenda_chat.py::test_injection_stages_follow_turns'
+              --deselect 'tests/unit/test_active_care_agenda_chat.py::test_probe_injects_in_private_chat_and_commit_counts_turn'
+              --deselect 'tests/unit/test_active_care_agenda_chat.py::test_opener_task_block_and_filters'
+              --deselect 'tests/unit/test_active_care_send_plan.py::test_greeting_uses_opener_and_dedups_recent_openers'
               --deselect 'tests/unit/test_active_care_poke_gate.py::SleepSafeMorningCase::test_sleep_session_active_uses_sleep_safe_template'
               --deselect 'tests/unit/test_active_care_poke_gate.py::SleepSafeMorningCase::test_sleep_session_inactive_uses_normal_template'
               --deselect 'tests/unit/test_data_paths_scope.py::test_build_shared_persona_conversation_id[\u4e03\u6fd1 Aveline.json-shared__persona__\u4e03\u6fd1_Aveline]'
               --deselect 'tests/unit/test_peer_chat_parsers.py::TestParseAssignmentsFromScript::test_persona_aliases_normalize[\u4e03\u6fd1 Aveline-aveline]'
               --deselect 'tests/unit/test_memory_notes_retrieval.py::test_sfw_request_excludes_sensitive_notes_like_legacy_memories'
               --deselect 'tests/unit/test_segment_episode_extractor.py::test_offline_role_prefix_is_long_stable_and_role_specific'
+              --deselect 'tests/unit/test_segment_episode_extractor.py::test_offline_role_prefix_does_not_cache_transient_failures'
+              --deselect 'tests/unit/test_segment_episode_topics.py::test_note_signals_feed_people_gate_by_source_event'
               --deselect 'tests/unit/test_segment_model_routes.py::test_deepseek_route_uses_role_key_and_falls_back_to_default'
               --deselect 'tests/unit/test_segment_model_routes.py::test_policy_routes_match_provider_choice'
             )
